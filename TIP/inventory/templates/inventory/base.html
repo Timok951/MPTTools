@@ -1,0 +1,300 @@
+﻿{% load inventory_extras %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>MPT Inventory</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=Space+Grotesk:wght@400;600;700&display=swap" rel="stylesheet" />
+    <style>
+        :root {
+            color-scheme: light;
+            --bg: #f4efe6;
+            --panel: #fffaf4;
+            --ink: #1b1f24;
+            --muted: #5b6470;
+            --accent: #d4572a;
+            --accent-2: #0f5e4b;
+            --accent-3: #f2b84b;
+            --border: #e2d8cc;
+            --shadow: 0 16px 40px rgba(21, 24, 27, 0.08);
+        }
+        * { box-sizing: border-box; }
+        body {
+            margin: 0;
+            font-family: "Space Grotesk", "Segoe UI", sans-serif;
+            background: radial-gradient(circle at 15% 10%, #fff3df 0%, var(--bg) 45%, #f6efe3 100%);
+            color: var(--ink);
+        }
+        .page {
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+        header {
+            position: sticky;
+            top: 0;
+            z-index: 10;
+            background: rgba(255, 250, 244, 0.9);
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid var(--border);
+        }
+        .topbar {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px 24px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 16px;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .brand {
+            display: grid;
+            gap: 6px;
+        }
+        .brand h1 {
+            margin: 0;
+            font-family: "DM Serif Display", serif;
+            font-size: 24px;
+            letter-spacing: 0.5px;
+        }
+        .brand span {
+            color: var(--muted);
+            font-size: 13px;
+        }
+        nav {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+        nav a {
+            text-decoration: none;
+            color: var(--ink);
+            padding: 6px 12px;
+            border-radius: 999px;
+            border: 1px solid transparent;
+            font-size: 13px;
+            font-weight: 600;
+            transition: all 0.2s ease;
+        }
+        nav a:hover {
+            border-color: var(--accent);
+            color: var(--accent);
+        }
+        .user-chip {
+            background: #f7ead9;
+            padding: 6px 14px;
+            border-radius: 999px;
+            font-size: 12px;
+        }
+        main {
+            flex: 1;
+            max-width: 1200px;
+            width: 100%;
+            margin: 0 auto;
+            padding: 24px;
+        }
+        .card {
+            background: var(--panel);
+            border: 1px solid var(--border);
+            border-radius: 18px;
+            padding: 18px;
+            box-shadow: var(--shadow);
+            margin-bottom: 18px;
+            animation: rise 0.4s ease both;
+        }
+        @keyframes rise {
+            from { opacity: 0; transform: translateY(8px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        h2, h3 {
+            margin-top: 0;
+        }
+        .muted { color: var(--muted); }
+        .grid {
+            display: grid;
+            gap: 14px;
+        }
+        .grid.cols-4 { grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); }
+        .grid.cols-3 { grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
+        .stat {
+            background: linear-gradient(135deg, #fff3df, #fffaf4);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 14px;
+        }
+        .stat strong {
+            font-size: 20px;
+        }
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 4px 10px;
+            border-radius: 999px;
+            font-size: 12px;
+            background: #e9f2ef;
+            color: var(--accent-2);
+            font-weight: 600;
+        }
+        .badge.warn {
+            background: #fde7cf;
+            color: var(--accent);
+        }
+        .actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        .actions a,
+        .btn {
+            text-decoration: none;
+            border: none;
+            padding: 8px 14px;
+            border-radius: 10px;
+            font-weight: 600;
+            background: var(--accent-2);
+            color: white;
+            cursor: pointer;
+        }
+        .actions a.secondary,
+        .btn.secondary,
+        a.secondary {
+            background: transparent;
+            color: var(--accent-2);
+            border: 1px solid var(--accent-2);
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 12px;
+            font-size: 14px;
+        }
+        th, td {
+            text-align: left;
+            padding: 10px 8px;
+            border-bottom: 1px solid var(--border);
+        }
+        th { color: var(--muted); font-weight: 600; }
+        .filters {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 12px;
+            align-items: end;
+        }
+        label {
+            font-size: 12px;
+            color: var(--muted);
+            display: block;
+            margin-bottom: 4px;
+        }
+        input, select, textarea {
+            width: 100%;
+            padding: 8px 10px;
+            border-radius: 10px;
+            border: 1px solid var(--border);
+            font-family: inherit;
+        }
+        .timeline {
+            display: grid;
+            gap: 14px;
+        }
+        .timeline-item {
+            display: grid;
+            grid-template-columns: 120px 1fr;
+            gap: 16px;
+        }
+        .timeline-time {
+            font-size: 12px;
+            color: var(--muted);
+        }
+        .timeline-body {
+            background: #fff;
+            border-radius: 14px;
+            padding: 12px 14px;
+            border: 1px solid var(--border);
+        }
+        .timeline-body ul {
+            margin: 8px 0 0;
+            padding-left: 18px;
+            color: var(--muted);
+        }
+        .auth-card {
+            max-width: 420px;
+            margin: 40px auto;
+        }
+        .auth-card h2 {
+            margin-bottom: 8px;
+        }
+        .inline-links {
+            display: flex;
+            gap: 12px;
+            font-size: 13px;
+        }
+        .inline-links a {
+            color: var(--accent-2);
+            text-decoration: none;
+        }
+        footer {
+            padding: 18px 24px 32px;
+            color: var(--muted);
+            font-size: 12px;
+            text-align: center;
+        }
+        @media (max-width: 720px) {
+            .timeline-item { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <div class="page">
+        <header>
+            <div class="topbar">
+                <div class="brand">
+                    <h1>MPT Inventory</h1>
+                    <span>Asset tracking for MPT Technical College</span>
+                </div>
+                <nav>
+                    <a href="{% url 'analytics' %}">Analytics</a>
+                    <a href="{% url 'equipment_list' %}">Equipment</a>
+                    <a href="{% url 'inventory_search' %}">Search</a>
+                    <a href="{% url 'request_history' %}">Requests</a>
+                    <a href="{% url 'usage_history' %}">Usage</a>
+                    <a href="{% url 'checkouts' %}">Checkouts</a>
+                    <a href="{% url 'timer_panel' %}">Timers</a>
+                    <a href="{% url 'workplaces' %}">Workplaces</a>
+                    <a href="{% url 'cabinets' %}">Cabinets</a>
+                    <a href="{% url 'suppliers' %}">Suppliers</a>
+                    <a href="{% url 'history' %}">History</a>
+                    <a href="{% url 'reports' %}">Reports</a>
+                    {% if user|has_group:"Administrator" %}
+                        <a href="{% url 'role_assignment' %}">Roles</a>
+                    {% endif %}
+                    <a href="/admin/">Admin</a>
+                    {% if user.is_authenticated %}
+                        <a href="{% url 'logout' %}">Logout</a>
+                    {% else %}
+                        <a href="{% url 'login' %}">Login</a>
+                        <a href="{% url 'register' %}">Register</a>
+                    {% endif %}
+                </nav>
+                <div class="user-chip">
+                    {% if user.is_authenticated %}
+                        {{ user.username }}
+                    {% else %}
+                        Not signed in
+                    {% endif %}
+                </div>
+            </div>
+        </header>
+        <main>
+            {% block content %}{% endblock %}
+        </main>
+        <footer>Full CRUD and role management are available in Django admin.</footer>
+    </div>
+    {% block scripts %}{% endblock %}
+</body>
+</html>

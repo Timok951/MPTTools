@@ -1,0 +1,31 @@
+﻿{% extends "inventory/base.html" %}
+
+{% block content %}
+<div class="card">
+    <h2>Cabinets</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>Code</th>
+                <th>Name</th>
+                <th>Workplace</th>
+                <th>Floor</th>
+                <th>Description</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for cabinet in cabinets %}
+            <tr>
+                <td>{{ cabinet.code }}</td>
+                <td>{{ cabinet.name }}</td>
+                <td>{{ cabinet.workplace }}</td>
+                <td>{{ cabinet.floor }}</td>
+                <td>{{ cabinet.description }}</td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="5" class="muted">No cabinets yet.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

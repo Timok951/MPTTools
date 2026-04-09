@@ -1,0 +1,82 @@
+﻿{% extends "inventory/base.html" %}
+
+{% block content %}
+<div class="card">
+    <h2>Reports</h2>
+    <form method="get" class="filters">
+        <div>
+            <label for="id_from">From</label>
+            <input id="id_from" type="date" name="from" value="{{ filters.from }}" />
+        </div>
+        <div>
+            <label for="id_to">To</label>
+            <input id="id_to" type="date" name="to" value="{{ filters.to }}" />
+        </div>
+        <div>
+            <button class="btn" type="submit">Apply</button>
+        </div>
+    </form>
+</div>
+
+<div class="card">
+    <div class="actions">
+        <a href="{% url 'reports_export' 'cabinets' %}?from={{ filters.from }}&to={{ filters.to }}">Export cabinets (Excel)</a>
+    </div>
+    <h3>Cabinet summary</h3>
+    <table>
+        <thead>
+            <tr>
+                <th>Cabinet</th>
+                <th>Workplace</th>
+                <th>Items</th>
+                <th>Total qty</th>
+                <th>Available qty</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in cabinet_report %}
+            <tr>
+                <td>{{ item.cabinet__code }}</td>
+                <td>{{ item.cabinet__workplace__name }}</td>
+                <td>{{ item.items }}</td>
+                <td>{{ item.total }}</td>
+                <td>{{ item.available }}</td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="5" class="muted">No cabinet data.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<div class="card">
+    <div class="actions">
+        <a href="{% url 'reports_export' 'materials' %}?from={{ filters.from }}&to={{ filters.to }}">Export materials (Excel)</a>
+    </div>
+    <h3>Consumables usage</h3>
+    <table>
+        <thead>
+            <tr>
+                <th>Material</th>
+                <th>Inventory #</th>
+                <th>Total</th>
+                <th>Available</th>
+                <th>Used</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in materials_report %}
+            <tr>
+                <td>{{ item.name }}</td>
+                <td>{{ item.inventory_number }}</td>
+                <td>{{ item.total }}</td>
+                <td>{{ item.available }}</td>
+                <td>{{ item.used }}</td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="5" class="muted">No materials data.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

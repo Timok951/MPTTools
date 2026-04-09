@@ -1,0 +1,17 @@
+﻿{% extends "inventory/base.html" %}
+
+{% block content %}
+<div class="card auth-card">
+    <h2>Регистрация</h2>
+    <p class="muted">После регистрации администратор назначит роль.</p>
+    <form method="post" class="grid">
+        {% csrf_token %}
+        {{ form.as_p }}
+        <button class="btn" type="submit">Создать аккаунт</button>
+    </form>
+    <div class="inline-links">
+        <span>Уже есть аккаунт?</span>
+        <a href="{% url 'login' %}">Войти</a>
+    </div>
+</div>
+{% endblock %}

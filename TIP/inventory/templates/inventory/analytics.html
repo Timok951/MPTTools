@@ -1,0 +1,223 @@
+﻿{% extends "inventory/base.html" %}
+
+{% block content %}
+<div class="card">
+    <h2>Analytics</h2>
+    <div class="grid cols-4">
+        <div class="stat">
+            <div class="muted">Total equipment</div>
+            <strong>{{ equipment_total }}</strong>
+        </div>
+        <div class="stat">
+            <div class="muted">Consumables</div>
+            <strong>{{ consumables_total }}</strong>
+        </div>
+        <div class="stat">
+            <div class="muted">Low stock</div>
+            <strong>{{ low_stock_total }}</strong>
+        </div>
+        <div class="stat">
+            <div class="muted">Pending requests</div>
+            <strong>{{ requests_pending }}</strong>
+        </div>
+        <div class="stat">
+            <div class="muted">Active checkouts</div>
+            <strong>{{ active_checkouts }}</strong>
+        </div>
+        <div class="stat">
+            <div class="muted">Inventory due</div>
+            <strong>{{ inventory_due_total }}</strong>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="grid cols-3">
+        <div>
+            <h3>Equipment by status</h3>
+            <canvas id="equipmentStatusChart" height="180"></canvas>
+        </div>
+        <div>
+            <h3>Requests by status</h3>
+            <canvas id="requestStatusChart" height="180"></canvas>
+        </div>
+        <div>
+            <h3>Stock by category</h3>
+            <canvas id="categoryStockChart" height="180"></canvas>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <h3>Activity last 30 days</h3>
+    <canvas id="activityChart" height="120"></canvas>
+</div>
+
+<div class="card">
+    <h3>Recent requests</h3>
+    <table>
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Requester</th>
+                <th>Equipment</th>
+                <th>Qty</th>
+                <th>Status</th>
+                <th>Requested at</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in recent_requests %}
+            <tr>
+                <td>{{ item.id }}</td>
+                <td>{{ item.requester }}</td>
+                <td>{{ item.equipment }}</td>
+                <td>{{ item.quantity }}</td>
+                <td><span class="badge">{{ item.get_status_display }}</span></td>
+                <td>{{ item.requested_at }}</td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="6" class="muted">No requests yet.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<div class="card">
+    <h3>Recent material usage</h3>
+    <table>
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Equipment</th>
+                <th>Qty</th>
+                <th>User</th>
+                <th>Workplace</th>
+                <th>Date</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in recent_usage %}
+            <tr>
+                <td>{{ item.id }}</td>
+                <td>{{ item.equipment }}</td>
+                <td>{{ item.quantity }}</td>
+                <td>{{ item.used_by }}</td>
+                <td>{{ item.workplace }}</td>
+                <td>{{ item.used_at }}</td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="6" class="muted">No usage records yet.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+{{ equipment_by_status|json_script:"equipmentStatusData" }}
+{{ requests_by_status|json_script:"requestStatusData" }}
+{{ day_labels|json_script:"dayLabelsData" }}
+{{ requests_daily|json_script:"requestsDailyData" }}
+{{ usage_daily|json_script:"usageDailyData" }}
+{{ checkouts_daily|json_script:"checkoutsDailyData" }}
+{{ category_stock|json_script:"categoryStockData" }}
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+    const equipmentData = JSON.parse(document.getElementById("equipmentStatusData").textContent || "[]");
+    const requestData = JSON.parse(document.getElementById("requestStatusData").textContent || "[]");
+    const dayLabels = JSON.parse(document.getElementById("dayLabelsData").textContent || "[]");
+    const requestsDaily = JSON.parse(document.getElementById("requestsDailyData").textContent || "[]");
+    const usageDaily = JSON.parse(document.getElementById("usageDailyData").textContent || "[]");
+    const checkoutsDaily = JSON.parse(document.getElementById("checkoutsDailyData").textContent || "[]");
+    const categoryStock = JSON.parse(document.getElementById("categoryStockData").textContent || "[]");
+
+    const equipmentCtx = document.getElementById("equipmentStatusChart");
+    if (equipmentCtx) {
+        new Chart(equipmentCtx, {
+            type: "doughnut",
+            data: {
+                labels: equipmentData.map(item => item.status),
+                datasets: [{
+                    data: equipmentData.map(item => item.count),
+                    backgroundColor: ["#0f5e4b", "#d4572a", "#f2b84b", "#748cab", "#c9ada7"],
+                }]
+            },
+            options: { responsive: true, plugins: { legend: { position: "bottom" } } }
+        });
+    }
+
+    const requestCtx = document.getElementById("requestStatusChart");
+    if (requestCtx) {
+        new Chart(requestCtx, {
+            type: "bar",
+            data: {
+                labels: requestData.map(item => item.status),
+                datasets: [{
+                    data: requestData.map(item => item.count),
+                    backgroundColor: "#d4572a",
+                }]
+            },
+            options: { responsive: true, plugins: { legend: { display: false } } }
+        });
+    }
+
+    const categoryCtx = document.getElementById("categoryStockChart");
+    if (categoryCtx) {
+        new Chart(categoryCtx, {
+            type: "bar",
+            data: {
+                labels: categoryStock.map(item => item.category),
+                datasets: [{
+                    label: "Available",
+                    data: categoryStock.map(item => item.available),
+                    backgroundColor: "#0f5e4b",
+                }, {
+                    label: "Total",
+                    data: categoryStock.map(item => item.total),
+                    backgroundColor: "#f2b84b",
+                }]
+            },
+            options: { responsive: true, plugins: { legend: { position: "bottom" } } }
+        });
+    }
+
+    const activityCtx = document.getElementById("activityChart");
+    if (activityCtx) {
+        new Chart(activityCtx, {
+            type: "line",
+            data: {
+                labels: dayLabels,
+                datasets: [
+                    {
+                        label: "Requests",
+                        data: requestsDaily,
+                        borderColor: "#d4572a",
+                        backgroundColor: "rgba(212, 87, 42, 0.2)",
+                        tension: 0.3,
+                        fill: true,
+                    },
+                    {
+                        label: "Usage",
+                        data: usageDaily,
+                        borderColor: "#0f5e4b",
+                        backgroundColor: "rgba(15, 94, 75, 0.2)",
+                        tension: 0.3,
+                        fill: true,
+                    },
+                    {
+                        label: "Checkouts",
+                        data: checkoutsDaily,
+                        borderColor: "#748cab",
+                        backgroundColor: "rgba(116, 140, 171, 0.2)",
+                        tension: 0.3,
+                        fill: true,
+                    },
+                ],
+            },
+            options: { responsive: true, plugins: { legend: { position: "bottom" } } },
+        });
+    }
+</script>
+{% endblock %}

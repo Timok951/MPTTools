@@ -1,0 +1,37 @@
+﻿{% extends "inventory/base.html" %}
+{% load inventory_extras %}
+
+{% block content %}
+<div class="card">
+    <h2>Workplaces</h2>
+    {% for workplace in workplaces %}
+        <div class="card">
+            <strong>{{ workplace.name }}</strong>
+            <div class="muted">{{ workplace.location }}</div>
+            <div>{{ workplace.description }}</div>
+            <table>
+                <thead>
+                    <tr>
+                        <th>User</th>
+                        <th>Role</th>
+                        <th>Assigned at</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for member in members_by_workplace|get_item:workplace.id %}
+                    <tr>
+                        <td>{{ member.user }}</td>
+                        <td>{{ member.get_role_display }}</td>
+                        <td>{{ member.assigned_at }}</td>
+                    </tr>
+                    {% empty %}
+                    <tr><td colspan="3" class="muted">No members assigned.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% empty %}
+        <div class="muted">No workplaces defined.</div>
+    {% endfor %}
+</div>
+{% endblock %}

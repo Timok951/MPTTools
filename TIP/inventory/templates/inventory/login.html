@@ -1,0 +1,17 @@
+﻿{% extends "inventory/base.html" %}
+
+{% block content %}
+<div class="card auth-card">
+    <h2>Вход</h2>
+    <p class="muted">Используйте учётную запись колледжа для доступа.</p>
+    <form method="post" class="grid">
+        {% csrf_token %}
+        {{ form.as_p }}
+        <button class="btn" type="submit">Войти</button>
+    </form>
+    <div class="inline-links">
+        <span>Нет аккаунта?</span>
+        <a href="{% url 'register' %}">Создать</a>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,71 @@
+﻿{% extends "inventory/base.html" %}
+
+{% block content %}
+<div class="card">
+    <h2>History timeline</h2>
+    <form method="get" class="filters">
+        <div>
+            <label for="id_action">Action</label>
+            <select id="id_action" name="action">
+                <option value="">All</option>
+                <option value="created" {% if filters.action == "created" %}selected{% endif %}>Created</option>
+                <option value="updated" {% if filters.action == "updated" %}selected{% endif %}>Updated</option>
+                <option value="deleted" {% if filters.action == "deleted" %}selected{% endif %}>Deleted</option>
+            </select>
+        </div>
+        <div>
+            <label for="id_model">Model</label>
+            <select id="id_model" name="model">
+                <option value="">All</option>
+                {% for model in content_types %}
+                <option value="{{ model }}" {% if filters.model == model %}selected{% endif %}>{{ model }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div>
+            <label for="id_order">Order</label>
+            <select id="id_order" name="order">
+                <option value="asc" {% if filters.order == "asc" %}selected{% endif %}>Oldest first</option>
+                <option value="desc" {% if filters.order == "desc" %}selected{% endif %}>Newest first</option>
+            </select>
+        </div>
+        <div>
+            <label for="id_from">From</label>
+            <input id="id_from" type="date" name="from" value="{{ filters.from }}" />
+        </div>
+        <div>
+            <label for="id_to">To</label>
+            <input id="id_to" type="date" name="to" value="{{ filters.to }}" />
+        </div>
+        <div>
+            <button class="btn" type="submit">Apply</button>
+        </div>
+    </form>
+</div>
+
+<div class="card">
+    <div class="timeline">
+        {% for item in logs %}
+        <div class="timeline-item">
+            <div class="timeline-time">
+                {{ item.created_at }}
+            </div>
+            <div class="timeline-body">
+                <div class="badge">{{ item.action }}</div>
+                <strong>{{ item.object_repr }}</strong>
+                <div class="muted">{{ item.model_label }} · {{ item.actor|default:"System" }}</div>
+                {% if item.meta.changes %}
+                    <ul>
+                        {% for key, change in item.meta.changes.items %}
+                        <li>{{ key }}: {{ change.from }} -> {{ change.to }}</li>
+                        {% endfor %}
+                    </ul>
+                {% endif %}
+            </div>
+        </div>
+        {% empty %}
+        <div class="muted">No history yet.</div>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}

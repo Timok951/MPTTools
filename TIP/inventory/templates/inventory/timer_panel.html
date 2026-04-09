@@ -1,0 +1,38 @@
+﻿{% extends "inventory/base.html" %}
+
+{% block content %}
+<div class="card">
+    <h2>Timer panel</h2>
+    <div class="actions">
+        <a href="{% url 'timer_create' %}">New timer entry</a>
+    </div>
+    <table>
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>User</th>
+                <th>Workplace</th>
+                <th>Equipment</th>
+                <th>Start</th>
+                <th>End</th>
+                <th>Duration (sec)</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in timers %}
+            <tr>
+                <td>{{ item.id }}</td>
+                <td>{{ item.user }}</td>
+                <td>{{ item.workplace }}</td>
+                <td>{{ item.equipment }}</td>
+                <td>{{ item.started_at }}</td>
+                <td>{{ item.ended_at }}</td>
+                <td>{{ item.duration_seconds }}</td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="7" class="muted">No timers yet.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

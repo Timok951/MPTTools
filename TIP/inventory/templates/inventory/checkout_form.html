@@ -1,0 +1,13 @@
+﻿{% extends "inventory/base.html" %}
+
+{% block content %}
+<div class="card">
+    <h2>Выдача оборудования</h2>
+    <p class="muted">Выдача возможна только по утверждённой заявке.</p>
+    <form method="post" class="grid">
+        {% csrf_token %}
+        {{ form.as_p }}
+        <button class="btn" type="submit">Выдать</button>
+    </form>
+</div>
+{% endblock %}

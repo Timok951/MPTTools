@@ -1,0 +1,58 @@
+﻿{% extends "inventory/base.html" %}
+
+{% block content %}
+<div class="card">
+    <h2>Выдача ролей</h2>
+    <p class="muted">Назначьте роль каждому пользователю. Роль определяет уровень доступа.</p>
+    <div class="grid cols-4">
+        {% for role, description in roles.items %}
+        <div class="stat">
+            <strong>{{ role }}</strong>
+            <div class="muted">{{ description }}</div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+
+<div class="card">
+    <table>
+        <thead>
+            <tr>
+                <th>Пользователь</th>
+                <th>Текущая роль</th>
+                <th>Назначить роль</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for user in users %}
+            <tr>
+                <td>{{ user.username }}</td>
+                <td>
+                    {% if user.is_superuser %}
+                        Administrator (superuser)
+                    {% else %}
+                        {% for group in user.groups.all %}
+                            {{ group.name }}
+                        {% empty %}
+                            <span class="muted">Без роли</span>
+                        {% endfor %}
+                    {% endif %}
+                </td>
+                <td>
+                    <form method="post" class="actions">
+                        {% csrf_token %}
+                        <input type="hidden" name="user_id" value="{{ user.id }}" />
+                        <select name="role">
+                            {% for role, description in roles.items %}
+                            <option value="{{ role }}">{{ role }}</option>
+                            {% endfor %}
+                        </select>
+                        <button class="btn" type="submit">Назначить</button>
+                    </form>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

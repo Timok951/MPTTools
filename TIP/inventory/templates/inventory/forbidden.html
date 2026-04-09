@@ -1,0 +1,12 @@
+﻿{% extends "inventory/base.html" %}
+
+{% block content %}
+<div class="card auth-card">
+    <h2>Доступ ограничен</h2>
+    <p class="muted">{{ message }}</p>
+    <div class="actions">
+        <a class="btn" href="{{ back_url }}">Вернуться назад</a>
+        <a class="btn secondary" href="{% url 'analytics' %}">На главную</a>
+    </div>
+</div>
+{% endblock %}

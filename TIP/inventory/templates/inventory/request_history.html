@@ -1,0 +1,74 @@
+﻿{% extends "inventory/base.html" %}
+
+{% block content %}
+<div class="card">
+    <h2>Requests</h2>
+    <form method="get" class="filters">
+        <div>
+            <label for="id_status">Status</label>
+            <select id="id_status" name="status">
+                <option value="">All</option>
+                {% for value, label in status_choices %}
+                <option value="{{ value }}" {% if filters.status == value %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div>
+            <label for="id_kind">Kind</label>
+            <select id="id_kind" name="kind">
+                <option value="">All</option>
+                {% for value, label in kind_choices %}
+                <option value="{{ value }}" {% if filters.kind == value %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div>
+            <label for="id_from">From</label>
+            <input id="id_from" type="date" name="from" value="{{ filters.from }}" />
+        </div>
+        <div>
+            <label for="id_to">To</label>
+            <input id="id_to" type="date" name="to" value="{{ filters.to }}" />
+        </div>
+        <div>
+            <button class="btn" type="submit">Apply</button>
+        </div>
+    </form>
+</div>
+
+<div class="card">
+    <div class="actions">
+        <a href="{% url 'request_create' %}">New request</a>
+    </div>
+    <table>
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Requester</th>
+                <th>Kind</th>
+                <th>Equipment</th>
+                <th>Qty</th>
+                <th>Status</th>
+                <th>Requested at</th>
+                <th>Needed by</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in requests %}
+            <tr>
+                <td>{{ item.id }}</td>
+                <td>{{ item.requester }}</td>
+                <td>{{ item.get_request_kind_display }}</td>
+                <td>{{ item.equipment }}</td>
+                <td>{{ item.quantity }}</td>
+                <td><span class="badge">{{ item.get_status_display }}</span></td>
+                <td>{{ item.requested_at }}</td>
+                <td>{{ item.needed_by }}</td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="8" class="muted">No requests yet.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

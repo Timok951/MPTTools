@@ -1,0 +1,68 @@
+﻿{% extends "inventory/base.html" %}
+
+{% block content %}
+<div class="card">
+    <h2>Equipment checkouts</h2>
+    <form method="get" class="filters">
+        <div>
+            <label for="id_status">Status</label>
+            <select id="id_status" name="status">
+                <option value="">All</option>
+                <option value="active" {% if filters.status == "active" %}selected{% endif %}>Active</option>
+                <option value="returned" {% if filters.status == "returned" %}selected{% endif %}>Returned</option>
+            </select>
+        </div>
+        <div>
+            <button class="btn" type="submit">Apply</button>
+        </div>
+    </form>
+</div>
+
+<div class="card">
+    <div class="actions">
+        <a href="{% url 'checkout_create' %}">New checkout</a>
+    </div>
+    <table>
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Equipment</th>
+                <th>Quantity</th>
+                <th>User</th>
+                <th>Workplace</th>
+                <th>Cabinet</th>
+                <th>Request</th>
+                <th>Taken at</th>
+                <th>Due at</th>
+                <th>Returned at</th>
+                <th>Action</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in checkouts %}
+            <tr>
+                <td>{{ item.id }}</td>
+                <td>{{ item.equipment }}</td>
+                <td>{{ item.quantity }}</td>
+                <td>{{ item.taken_by }}</td>
+                <td>{{ item.workplace }}</td>
+                <td>{{ item.cabinet }}</td>
+                <td>{{ item.related_request }}</td>
+                <td>{{ item.taken_at }}</td>
+                <td>{{ item.due_at }}</td>
+                <td>{{ item.returned_at }}</td>
+                <td>
+                    {% if not item.returned_at %}
+                        <a class="btn secondary" href="{% url 'checkout_return' item.id %}">Mark returned</a>
+                    {% else %}
+                        <span class="muted">Returned</span>
+                    {% endif %}
+                </td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="11" class="muted">No checkouts yet.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

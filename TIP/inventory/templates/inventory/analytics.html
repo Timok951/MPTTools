@@ -1,31 +1,41 @@
-﻿{% extends "inventory/base.html" %}
+{% extends "inventory/base.html" %}
+{% load i18n inventory_extras %}
 
 {% block content %}
 <div class="card">
-    <h2>Analytics</h2>
+    {% if user|has_group:"Administrator" %}
+    <div class="actions" style="margin-bottom:10px;">
+        <a class="secondary" href="{% url 'portal_list' entity='equipment' %}">🧰 {% trans "Equipment" %}</a>
+        <a class="secondary" href="{% url 'portal_list' entity='requests' %}">{% trans "Requests" %}</a>
+        <a class="secondary" href="{% url 'portal_list' entity='usage' %}">{% trans "Usage" %}</a>
+        <a class="secondary" href="{% url 'portal_list' entity='checkouts' %}">{% trans "Checkouts" %}</a>
+        <a class="secondary" href="{% url 'portal_list' entity='timers' %}">{% trans "Timers" %}</a>
+    </div>
+    {% endif %}
+    <h2>{% trans "Analytics" %}</h2>
     <div class="grid cols-4">
         <div class="stat">
-            <div class="muted">Total equipment</div>
+            <div class="muted">{% trans "Total equipment units" %}</div>
             <strong>{{ equipment_total }}</strong>
         </div>
         <div class="stat">
-            <div class="muted">Consumables</div>
+            <div class="muted">{% trans "Consumables" %}</div>
             <strong>{{ consumables_total }}</strong>
         </div>
         <div class="stat">
-            <div class="muted">Low stock</div>
+            <div class="muted">{% trans "Low stock" %}</div>
             <strong>{{ low_stock_total }}</strong>
         </div>
         <div class="stat">
-            <div class="muted">Pending requests</div>
+            <div class="muted">{% trans "Pending requests" %}</div>
             <strong>{{ requests_pending }}</strong>
         </div>
         <div class="stat">
-            <div class="muted">Active checkouts</div>
+            <div class="muted">{% trans "Active checkouts" %}</div>
             <strong>{{ active_checkouts }}</strong>
         </div>
         <div class="stat">
-            <div class="muted">Inventory due</div>
+            <div class="muted">{% trans "Inventory due" %}</div>
             <strong>{{ inventory_due_total }}</strong>
         </div>
     </div>
@@ -34,36 +44,37 @@
 <div class="card">
     <div class="grid cols-3">
         <div>
-            <h3>Equipment by status</h3>
+            <h3>{% trans "Equipment by status" %}</h3>
             <canvas id="equipmentStatusChart" height="180"></canvas>
         </div>
         <div>
-            <h3>Requests by status</h3>
+            <h3>{% trans "Requests by status" %}</h3>
             <canvas id="requestStatusChart" height="180"></canvas>
         </div>
         <div>
-            <h3>Stock by category</h3>
+            <h3>{% trans "Stock by category" %}</h3>
             <canvas id="categoryStockChart" height="180"></canvas>
         </div>
     </div>
 </div>
 
 <div class="card">
-    <h3>Activity last 30 days</h3>
+    <h3>{% trans "Activity last 30 days" %}</h3>
     <canvas id="activityChart" height="120"></canvas>
 </div>
 
 <div class="card">
-    <h3>Recent requests</h3>
+    <h3>{% trans "Recent requests" %}</h3>
     <table>
         <thead>
             <tr>
-                <th>ID</th>
-                <th>Requester</th>
-                <th>Equipment</th>
-                <th>Qty</th>
-                <th>Status</th>
-                <th>Requested at</th>
+                <th>{% trans "ID" %}</th>
+                <th>{% trans "Requester" %}</th>
+                <th>{% trans "Equipment" %}</th>
+                <th>{% trans "Qty" %}</th>
+                <th>{% trans "Status" %}</th>
+                <th>{% trans "Requested at" %}</th>
+                {% if user|has_group:"Administrator" %}<th>Actions</th>{% endif %}
             </tr>
         </thead>
         <tbody>
@@ -75,25 +86,32 @@
                 <td>{{ item.quantity }}</td>
                 <td><span class="badge">{{ item.get_status_display }}</span></td>
                 <td>{{ item.requested_at }}</td>
+                {% if user|has_group:"Administrator" %}
+                <td class="actions">
+                    <a href="{% url 'portal_edit' entity='requests' pk=item.pk %}">✏️</a>
+                    <a class="secondary" href="{% url 'portal_delete' entity='requests' pk=item.pk %}">🗑</a>
+                </td>
+                {% endif %}
             </tr>
             {% empty %}
-            <tr><td colspan="6" class="muted">No requests yet.</td></tr>
+            <tr><td colspan="{% if user|has_group:'Administrator' %}7{% else %}6{% endif %}" class="muted">{% trans "No requests yet." %}</td></tr>
             {% endfor %}
         </tbody>
     </table>
 </div>
 
 <div class="card">
-    <h3>Recent material usage</h3>
+    <h3>{% trans "Recent material usage" %}</h3>
     <table>
         <thead>
             <tr>
-                <th>ID</th>
-                <th>Equipment</th>
-                <th>Qty</th>
-                <th>User</th>
-                <th>Workplace</th>
-                <th>Date</th>
+                <th>{% trans "ID" %}</th>
+                <th>{% trans "Equipment" %}</th>
+                <th>{% trans "Qty" %}</th>
+                <th>{% trans "User" %}</th>
+                <th>{% trans "Workplace" %}</th>
+                <th>{% trans "Date" %}</th>
+                {% if user|has_group:"Administrator" %}<th>Actions</th>{% endif %}
             </tr>
         </thead>
         <tbody>
@@ -105,9 +123,15 @@
                 <td>{{ item.used_by }}</td>
                 <td>{{ item.workplace }}</td>
                 <td>{{ item.used_at }}</td>
+                {% if user|has_group:"Administrator" %}
+                <td class="actions">
+                    <a href="{% url 'portal_edit' entity='usage' pk=item.pk %}">✏️</a>
+                    <a class="secondary" href="{% url 'portal_delete' entity='usage' pk=item.pk %}">🗑</a>
+                </td>
+                {% endif %}
             </tr>
             {% empty %}
-            <tr><td colspan="6" class="muted">No usage records yet.</td></tr>
+            <tr><td colspan="{% if user|has_group:'Administrator' %}7{% else %}6{% endif %}" class="muted">{% trans "No usage records yet." %}</td></tr>
             {% endfor %}
         </tbody>
     </table>
@@ -170,11 +194,11 @@
             data: {
                 labels: categoryStock.map(item => item.category),
                 datasets: [{
-                    label: "Available",
+                    label: "{% trans 'Available' %}",
                     data: categoryStock.map(item => item.available),
                     backgroundColor: "#0f5e4b",
                 }, {
-                    label: "Total",
+                    label: "{% trans 'Total' %}",
                     data: categoryStock.map(item => item.total),
                     backgroundColor: "#f2b84b",
                 }]
@@ -191,7 +215,7 @@
                 labels: dayLabels,
                 datasets: [
                     {
-                        label: "Requests",
+                        label: "{% trans 'Requests' %}",
                         data: requestsDaily,
                         borderColor: "#d4572a",
                         backgroundColor: "rgba(212, 87, 42, 0.2)",
@@ -199,7 +223,7 @@
                         fill: true,
                     },
                     {
-                        label: "Usage",
+                        label: "{% trans 'Usage' %}",
                         data: usageDaily,
                         borderColor: "#0f5e4b",
                         backgroundColor: "rgba(15, 94, 75, 0.2)",
@@ -207,7 +231,7 @@
                         fill: true,
                     },
                     {
-                        label: "Checkouts",
+                        label: "{% trans 'Checkouts' %}",
                         data: checkoutsDaily,
                         borderColor: "#748cab",
                         backgroundColor: "rgba(116, 140, 171, 0.2)",

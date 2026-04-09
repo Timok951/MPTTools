@@ -1,0 +1,23 @@
+{% extends "inventory/base.html" %}
+{% load i18n %}
+
+{% block content %}
+{% include "inventory/portal/_entity_tabs.html" %}
+<div class="card">
+    <h2>
+        {% if is_edit %}
+            {% trans "Edit" %}: {{ cfg.title }}
+        {% else %}
+            {% trans "Create" %}: {{ cfg.title }}
+        {% endif %}
+    </h2>
+    <form method="post" class="grid" enctype="multipart/form-data">
+        {% csrf_token %}
+        {{ form.as_p }}
+        <div class="actions">
+            <button class="btn" type="submit">{% trans "Save" %}</button>
+            <a class="secondary" href="{% url 'portal_list' entity=cfg.slug %}">{% trans "Cancel" %}</a>
+        </div>
+    </form>
+</div>
+{% endblock %}

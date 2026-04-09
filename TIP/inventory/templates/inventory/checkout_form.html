@@ -1,13 +1,56 @@
-﻿{% extends "inventory/base.html" %}
+{% extends "inventory/base.html" %}
+{% load i18n %}
 
 {% block content %}
 <div class="card">
-    <h2>Выдача оборудования</h2>
-    <p class="muted">Выдача возможна только по утверждённой заявке.</p>
-    <form method="post" class="grid">
-        {% csrf_token %}
-        {{ form.as_p }}
-        <button class="btn" type="submit">Выдать</button>
-    </form>
+    <div class="card-header">
+        <div>
+            <div class="kicker">{% trans "Checkouts" %}</div>
+            <h2>{% trans "Issue equipment" %}</h2>
+            <p class="muted">{% trans "Checkout is allowed only for an approved request, so start there first." %}</p>
+        </div>
+        <div class="actions">
+            <a class="secondary" href="{% url 'checkouts' %}">{% trans "Back to checkouts" %}</a>
+        </div>
+    </div>
+    <div class="split-layout">
+        <form method="post" class="form-shell">
+            {% csrf_token %}
+            {% if form.non_field_errors %}
+                <div class="form-errors">
+                    {% for error in form.non_field_errors %}
+                        <div>{{ error }}</div>
+                    {% endfor %}
+                </div>
+            {% endif %}
+            <div class="form-grid">
+                {% include "inventory/_form_field.html" with field=form.related_request full_width=True %}
+                {% include "inventory/_form_field.html" with field=form.equipment %}
+                {% include "inventory/_form_field.html" with field=form.quantity %}
+                {% include "inventory/_form_field.html" with field=form.workplace %}
+                {% include "inventory/_form_field.html" with field=form.cabinet %}
+                {% include "inventory/_form_field.html" with field=form.taken_at %}
+                {% include "inventory/_form_field.html" with field=form.due_at %}
+                {% include "inventory/_form_field.html" with field=form.note full_width=True %}
+            </div>
+            <div class="actions">
+                <button class="btn" type="submit">{% trans "Issue equipment" %}</button>
+            </div>
+        </form>
+        <div class="field-list">
+            <div class="aside-panel">
+                <h3>{% trans "Recommended order" %}</h3>
+                <ul>
+                    <li>{% trans "Pick the approved request first." %}</li>
+                    <li>{% trans "Then verify that the equipment matches that request." %}</li>
+                    <li>{% trans "Set a due date if the item must be returned by a target day." %}</li>
+                </ul>
+            </div>
+            <div class="aside-panel">
+                <h3>{% trans "Important" %}</h3>
+                <p class="muted">{% trans "The system will reject the form if the quantity is larger than the request or the available stock." %}</p>
+            </div>
+        </div>
+    </div>
 </div>
 {% endblock %}

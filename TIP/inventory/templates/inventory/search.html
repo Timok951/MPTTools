@@ -1,0 +1,96 @@
+{% extends "inventory/base.html" %}
+{% load i18n %}
+
+{% block content %}
+<div class="card">
+    <h2>{% trans "Search" %}</h2>
+    <form method="get" class="filters">
+        <div>
+            <label for="id_q">{% trans "Search" %}</label>
+            <input id="id_q" type="text" name="q" value="{{ q }}" placeholder="{% trans 'Name, serial, inventory' %}" />
+        </div>
+        <div>
+            <button class="btn" type="submit">{% trans "Apply" %}</button>
+        </div>
+    </form>
+</div>
+
+{% if has_query %}
+<div class="card">
+    <h3>{% trans "Equipment" %}</h3>
+    <table>
+        <thead>
+            <tr><th>{% trans "ID" %}</th><th>{% trans "Name" %}</th><th>{% trans "Inventory #" %}</th><th>{% trans "Status" %}</th></tr>
+        </thead>
+        <tbody>
+            {% for item in equipment_results %}
+            <tr><td>{{ item.pk }}</td><td>{{ item.name }}</td><td>{{ item.inventory_number }}</td><td>{{ item.get_status_display }}</td></tr>
+            {% empty %}<tr><td colspan="4" class="muted">{% trans "No records." %}</td></tr>{% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<div class="card">
+    <h3>{% trans "Requests" %}</h3>
+    <table>
+        <thead>
+            <tr><th>{% trans "ID" %}</th><th>{% trans "Requester" %}</th><th>{% trans "Equipment" %}</th><th>{% trans "Status" %}</th></tr>
+        </thead>
+        <tbody>
+            {% for item in request_results %}
+            <tr><td>{{ item.pk }}</td><td>{{ item.requester }}</td><td>{{ item.equipment }}</td><td>{{ item.get_status_display }}</td></tr>
+            {% empty %}<tr><td colspan="4" class="muted">{% trans "No records." %}</td></tr>{% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<div class="card">
+    <h3>{% trans "Usage" %}</h3>
+    <table>
+        <thead>
+            <tr><th>{% trans "ID" %}</th><th>{% trans "Equipment" %}</th><th>{% trans "User" %}</th><th>{% trans "Date" %}</th></tr>
+        </thead>
+        <tbody>
+            {% for item in usage_results %}
+            <tr><td>{{ item.pk }}</td><td>{{ item.equipment }}</td><td>{{ item.used_by }}</td><td>{{ item.used_at }}</td></tr>
+            {% empty %}<tr><td colspan="4" class="muted">{% trans "No records." %}</td></tr>{% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<div class="card">
+    <h3>{% trans "Checkouts" %}</h3>
+    <table>
+        <thead>
+            <tr><th>{% trans "ID" %}</th><th>{% trans "Equipment" %}</th><th>{% trans "User" %}</th><th>{% trans "Taken at" %}</th></tr>
+        </thead>
+        <tbody>
+            {% for item in checkout_results %}
+            <tr><td>{{ item.pk }}</td><td>{{ item.equipment }}</td><td>{{ item.taken_by }}</td><td>{{ item.taken_at }}</td></tr>
+            {% empty %}<tr><td colspan="4" class="muted">{% trans "No records." %}</td></tr>{% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<div class="grid cols-3">
+    <div class="card">
+        <h3>{% trans "Workplaces" %}</h3>
+        <ul>
+            {% for item in workplace_results %}<li>{{ item.name }}</li>{% empty %}<li class="muted">{% trans "No records." %}</li>{% endfor %}
+        </ul>
+    </div>
+    <div class="card">
+        <h3>{% trans "Cabinets" %}</h3>
+        <ul>
+            {% for item in cabinet_results %}<li>{{ item.code }} - {{ item.name }}</li>{% empty %}<li class="muted">{% trans "No records." %}</li>{% endfor %}
+        </ul>
+    </div>
+    <div class="card">
+        <h3>{% trans "Suppliers" %}</h3>
+        <ul>
+            {% for item in supplier_results %}<li>{{ item.name }}</li>{% empty %}<li class="muted">{% trans "No records." %}</li>{% endfor %}
+        </ul>
+    </div>
+</div>
+{% endif %}
+{% endblock %}

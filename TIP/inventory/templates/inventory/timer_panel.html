@@ -1,21 +1,74 @@
-﻿{% extends "inventory/base.html" %}
+{% extends "inventory/base.html" %}
+{% load i18n inventory_extras %}
 
 {% block content %}
 <div class="card">
-    <h2>Timer panel</h2>
-    <div class="actions">
-        <a href="{% url 'timer_create' %}">New timer entry</a>
+    <div class="card-header">
+        <div>
+            <div class="kicker">{% trans "Timers" %}</div>
+            <h2>{% trans "Timer panel" %}</h2>
+            <p class="muted">{% trans "Start a live timer in one click or filter the log below." %}</p>
+        </div>
+        <div class="table-meta">
+            {% if using_default_status_filter %}
+                {% trans "Using your saved default timer filter." %}
+            {% endif %}
+        </div>
+    </div>
+    <div class="split-layout" style="margin-bottom: 16px;">
+        <div class="aside-panel">
+            <h3>Быстрый запуск таймера</h3>
+            <form method="post" action="{% url 'timer_quick_start' %}" class="form-shell">
+                {% csrf_token %}
+                <div class="form-grid">
+                    {% include "inventory/_form_field.html" with field=quick_timer_form.workplace %}
+                    {% include "inventory/_form_field.html" with field=quick_timer_form.equipment %}
+                    {% include "inventory/_form_field.html" with field=quick_timer_form.note full_width=True %}
+                </div>
+                <div class="actions">
+                    <button class="btn" type="submit">Запустить сейчас</button>
+                    <a class="secondary" href="{% url 'timer_create' %}">Ручной ввод</a>
+                </div>
+            </form>
+        </div>
+        <div class="aside-panel">
+            <p class="muted">Активные таймеры: {{ active_timers_total }}</p>
+        </div>
+    </div>
+    <form method="get" class="filters" style="margin-bottom:10px;">
+        <div>
+            <label for="id_timer_status">{% trans "Status" %}</label>
+            <select id="id_timer_status" name="status">
+                <option value="">{% trans "All" %}</option>
+                <option value="active" {% if filters.status == "active" %}selected{% endif %}>{% trans "Active" %}</option>
+                <option value="finished" {% if filters.status == "finished" %}selected{% endif %}>{% trans "Finished" %}</option>
+            </select>
+        </div>
+        <div>
+            <button class="btn" type="submit">{% trans "Apply" %}</button>
+        </div>
+    </form>
+    <div class="toolbar-spread">
+        <div class="table-meta">{% trans "Showing" %}: {{ timers|length }} / {{ total_rows }}</div>
+        <div class="actions">
+        <a href="{% url 'timer_create' %}">{% trans "New timer entry" %}</a>
+        {% if user|has_group:"Administrator" %}
+        <a class="secondary" href="{% url 'portal_list' entity='timers' %}">🧰 {% trans "Manage timers" %}</a>
+        {% endif %}
+        </div>
     </div>
     <table>
         <thead>
             <tr>
-                <th>ID</th>
-                <th>User</th>
-                <th>Workplace</th>
-                <th>Equipment</th>
-                <th>Start</th>
-                <th>End</th>
-                <th>Duration (sec)</th>
+                <th>{% trans "ID" %}</th>
+                <th>{% trans "User" %}</th>
+                <th>{% trans "Workplace" %}</th>
+                <th>{% trans "Equipment" %}</th>
+                <th>{% trans "Start" %}</th>
+                <th>{% trans "End" %}</th>
+                <th>{% trans "Duration (sec)" %}</th>
+                <th>{% trans "Status" %}</th>
+                <th>{% trans "Actions" %}</th>
             </tr>
         </thead>
         <tbody>
@@ -25,14 +78,35 @@
                 <td>{{ item.user }}</td>
                 <td>{{ item.workplace }}</td>
                 <td>{{ item.equipment }}</td>
-                <td>{{ item.started_at }}</td>
-                <td>{{ item.ended_at }}</td>
-                <td>{{ item.duration_seconds }}</td>
+                <td>{{ item.started_at|date:preferred_datetime_format }}</td>
+                <td>{% if item.ended_at %}{{ item.ended_at|date:preferred_datetime_format }}{% else %}-{% endif %}</td>
+                <td>{{ item.duration_seconds_live }}</td>
+                <td>
+                    {% if item.is_active %}
+                        <span class="badge warn">{% trans "Active" %}</span>
+                    {% else %}
+                        <span class="badge">{% trans "Finished" %}</span>
+                    {% endif %}
+                </td>
+                <td class="actions">
+                    {% if item.is_active and can_manage_timers %}
+                        <a href="{% url 'timer_stop' timer_id=item.pk %}">⏹ {% trans "Stop now" %}</a>
+                    {% endif %}
+                    {% if user|has_group:"Administrator" %}
+                    <a href="{% url 'portal_edit' entity='timers' pk=item.pk %}">✏️</a>
+                    {% if item.deleted_at %}
+                        <a class="secondary" href="{% url 'portal_restore' entity='timers' pk=item.pk %}">↩</a>
+                    {% else %}
+                        <a class="secondary" href="{% url 'portal_delete' entity='timers' pk=item.pk %}">🗑</a>
+                    {% endif %}
+                    {% endif %}
+                </td>
             </tr>
             {% empty %}
-            <tr><td colspan="7" class="muted">No timers yet.</td></tr>
+            <tr><td colspan="9" class="muted">{% trans "No timers yet." %}</td></tr>
             {% endfor %}
         </tbody>
     </table>
+    {% include "inventory/_pagination.html" %}
 </div>
 {% endblock %}

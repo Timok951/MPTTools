@@ -1,6 +1,7 @@
-﻿from django.conf import settings
+from django.conf import settings
 from django.db import models
 from django.utils import timezone
+from django.utils.translation import gettext_lazy as _
 
 ROLE_ADMIN = "admin"
 ROLE_WAREHOUSE = "warehouse"
@@ -112,3 +113,82 @@ class WorkplaceMember(SoftDeleteModel):
 
     def __str__(self) -> str:
         return f"{self.workplace} - {self.user} ({self.role})"
+
+
+class UserPreference(models.Model):
+    THEME_DEFAULT = "default"
+    THEME_CONTRAST = "contrast"
+    THEME_CHOICES = [
+        (THEME_DEFAULT, _("Soft light")),
+        (THEME_CONTRAST, _("High contrast")),
+    ]
+
+    DATE_FORMAT_COMPACT = "compact"
+    DATE_FORMAT_ISO = "iso"
+    DATE_FORMAT_VERBOSE = "verbose"
+    DATE_FORMAT_CHOICES = [
+        (DATE_FORMAT_COMPACT, _("DD.MM.YYYY HH:MM")),
+        (DATE_FORMAT_ISO, _("YYYY-MM-DD HH:MM")),
+        (DATE_FORMAT_VERBOSE, _("Verbose locale format")),
+    ]
+
+    TIMER_FILTER_ALL = ""
+    TIMER_FILTER_ACTIVE = "active"
+    TIMER_FILTER_FINISHED = "finished"
+    TIMER_FILTER_CHOICES = [
+        (TIMER_FILTER_ALL, _("All timers")),
+        (TIMER_FILTER_ACTIVE, _("Active timers")),
+        (TIMER_FILTER_FINISHED, _("Finished timers")),
+    ]
+
+    PAGE_SIZE_CHOICES = [
+        (10, "10"),
+        (25, "25"),
+        (50, "50"),
+        (100, "100"),
+    ]
+    CHECKOUT_FILTER_ALL = ""
+    CHECKOUT_FILTER_RETURNED = "returned"
+    CHECKOUT_FILTER_CHOICES = [
+        (CHECKOUT_FILTER_ALL, _("All checkouts")),
+        (TIMER_FILTER_ACTIVE, _("Active checkouts")),
+        (CHECKOUT_FILTER_RETURNED, _("Returned checkouts")),
+    ]
+
+    user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="preferences")
+    theme_variant = models.CharField(max_length=20, choices=THEME_CHOICES, default=THEME_DEFAULT)
+    page_size = models.PositiveSmallIntegerField(choices=PAGE_SIZE_CHOICES, default=25)
+    preferred_language = models.CharField(max_length=10, default="ru")
+    date_display_format = models.CharField(max_length=20, choices=DATE_FORMAT_CHOICES, default=DATE_FORMAT_COMPACT)
+    default_timer_status = models.CharField(max_length=20, choices=TIMER_FILTER_CHOICES, blank=True, default=TIMER_FILTER_ALL)
+    default_request_status = models.CharField(max_length=20, blank=True, default="")
+    default_request_kind = models.CharField(max_length=20, blank=True, default="")
+    default_usage_period_days = models.PositiveSmallIntegerField(default=30)
+    default_checkout_status = models.CharField(max_length=20, choices=CHECKOUT_FILTER_CHOICES, blank=True, default=CHECKOUT_FILTER_ALL)
+    hotkeys_enabled = models.BooleanField(default=True)
+    show_hotkey_legend = models.BooleanField(default=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["user__username"]
+        verbose_name = "User preference"
+        verbose_name_plural = "User preferences"
+
+    def __str__(self) -> str:
+        return f"Preferences for {self.user}"
+
+    @property
+    def datetime_format(self) -> str:
+        return {
+            self.DATE_FORMAT_COMPACT: "d.m.Y H:i",
+            self.DATE_FORMAT_ISO: "Y-m-d H:i",
+            self.DATE_FORMAT_VERBOSE: "j E Y, H:i",
+        }.get(self.date_display_format, "d.m.Y H:i")
+
+    @property
+    def date_format(self) -> str:
+        return {
+            self.DATE_FORMAT_COMPACT: "d.m.Y",
+            self.DATE_FORMAT_ISO: "Y-m-d",
+            self.DATE_FORMAT_VERBOSE: "j E Y",
+        }.get(self.date_display_format, "d.m.Y")

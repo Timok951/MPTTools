@@ -1,37 +1,51 @@
-﻿{% extends "inventory/base.html" %}
+{% extends "inventory/base.html" %}
+{% load i18n inventory_extras %}
 
 {% block content %}
 <div class="card">
-    <h2>Usage history</h2>
+    <div class="card-header">
+        <div>
+            <div class="kicker">{% trans "Usage" %}</div>
+            <h2>{% trans "Usage history" %}</h2>
+        </div>
+        <div class="table-meta">{% trans "Rows per page" %}: {{ page_size }}</div>
+    </div>
     <form method="get" class="filters">
         <div>
-            <label for="id_from">From</label>
+            <label for="id_from">{% trans "From" %}</label>
             <input id="id_from" type="date" name="from" value="{{ filters.from }}" />
         </div>
         <div>
-            <label for="id_to">To</label>
+            <label for="id_to">{% trans "To" %}</label>
             <input id="id_to" type="date" name="to" value="{{ filters.to }}" />
         </div>
         <div>
-            <button class="btn" type="submit">Apply</button>
+            <button class="btn" type="submit">{% trans "Apply" %}</button>
         </div>
     </form>
 </div>
 
 <div class="card">
-    <div class="actions">
-        <a href="{% url 'usage_create' %}">Record usage</a>
+    <div class="toolbar-spread">
+        <div class="table-meta">{% trans "Showing" %}: {{ usage|length }} / {{ total_rows }}</div>
+        <div class="actions">
+            <a href="{% url 'usage_create' %}">{% trans "Record usage" %}</a>
+            {% if user|has_group:"Administrator" %}
+            <a class="secondary" href="{% url 'portal_list' entity='usage' %}">🧰 {% trans "Manage usage" %}</a>
+            {% endif %}
+        </div>
     </div>
     <table>
         <thead>
             <tr>
-                <th>ID</th>
-                <th>Equipment</th>
-                <th>Qty</th>
-                <th>User</th>
-                <th>Workplace</th>
-                <th>Date</th>
-                <th>Request</th>
+                <th>{% trans "ID" %}</th>
+                <th>{% trans "Equipment" %}</th>
+                <th>{% trans "Qty" %}</th>
+                <th>{% trans "User" %}</th>
+                <th>{% trans "Workplace" %}</th>
+                <th>{% trans "Date" %}</th>
+                <th>{% trans "Request" %}</th>
+                {% if user|has_group:"Administrator" %}<th>Actions</th>{% endif %}
             </tr>
         </thead>
         <tbody>
@@ -42,13 +56,20 @@
                 <td>{{ item.quantity }}</td>
                 <td>{{ item.used_by }}</td>
                 <td>{{ item.workplace }}</td>
-                <td>{{ item.used_at }}</td>
+                <td>{{ item.used_at|date:preferred_datetime_format }}</td>
                 <td>{{ item.related_request }}</td>
+                {% if user|has_group:"Administrator" %}
+                <td class="actions">
+                    <a href="{% url 'portal_edit' entity='usage' pk=item.pk %}">✏️</a>
+                    <a class="secondary" href="{% url 'portal_delete' entity='usage' pk=item.pk %}">🗑</a>
+                </td>
+                {% endif %}
             </tr>
             {% empty %}
-            <tr><td colspan="7" class="muted">No usage history yet.</td></tr>
+            <tr><td colspan="{% if user|has_group:'Administrator' %}8{% else %}7{% endif %}" class="muted">{% trans "No usage history yet." %}</td></tr>
             {% endfor %}
         </tbody>
     </table>
+    {% include "inventory/_pagination.html" %}
 </div>
 {% endblock %}

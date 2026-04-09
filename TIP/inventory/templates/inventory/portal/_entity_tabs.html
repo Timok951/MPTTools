@@ -1,0 +1,22 @@
+{% load i18n %}
+<div class="card" style="padding:12px 14px;">
+    <div class="actions">
+        {% if current_entity_slug == "__home" %}
+            <a href="{% url 'portal_home' %}">{% trans "Portal home" %}</a>
+        {% else %}
+            <a class="secondary" href="{% url 'portal_home' %}">{% trans "Portal home" %}</a>
+        {% endif %}
+        {% if current_entity_slug == "__logs" %}
+            <a href="{% url 'portal_logs' %}">{% trans "Portal action log" %}</a>
+        {% else %}
+            <a class="secondary" href="{% url 'portal_logs' %}">{% trans "Portal action log" %}</a>
+        {% endif %}
+        {% for e in entities %}
+            {% if current_entity_slug == e.slug %}
+                <a href="{% url 'portal_list' entity=e.slug %}" title="{{ e.title }}">{{ e.title }}</a>
+            {% else %}
+                <a class="secondary" href="{% url 'portal_list' entity=e.slug %}" title="{{ e.title }}">{{ e.title }}</a>
+            {% endif %}
+        {% endfor %}
+    </div>
+</div>

@@ -1,4 +1,4 @@
-﻿from django.contrib import admin
+from django.contrib import admin
 from django.utils import timezone
 
 from core.admin_utils import SoftDeleteAdmin

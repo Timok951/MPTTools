@@ -1,0 +1,36 @@
+{% extends "inventory/base.html" %}
+{% load i18n %}
+
+{% block content %}
+{% include "inventory/portal/_entity_tabs.html" %}
+<div class="card">
+    <h2>{% trans "Portal action log" %}</h2>
+    <p class="muted">{% trans "Records who used the administrator portal and what they changed (last 500 entries)." %}</p>
+    <table>
+        <thead>
+            <tr>
+                <th>{% trans "Time" %}</th>
+                <th>{% trans "User" %}</th>
+                <th>{% trans "Action" %}</th>
+                <th>{% trans "Entity" %}</th>
+                <th>{% trans "Object" %}</th>
+                <th>{% trans "Path" %}</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in logs %}
+            <tr>
+                <td>{{ item.created_at }}</td>
+                <td>{{ item.actor|default:"-" }}</td>
+                <td>{{ item.action }}</td>
+                <td>{{ item.entity_slug }}</td>
+                <td>{{ item.object_repr }}</td>
+                <td>{{ item.path }}</td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="6" class="muted">{% trans "No records." %}</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

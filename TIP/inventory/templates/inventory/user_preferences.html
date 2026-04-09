@@ -1,0 +1,39 @@
+{% extends "inventory/base.html" %}
+{% load i18n %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header">
+        <div>
+            <div class="kicker">Настройки</div>
+            <h2>Пользовательские настройки</h2>
+            <p class="muted">Эти настройки хранятся на сервере и загружаются при каждом входе.</p>
+        </div>
+    </div>
+    <form method="post" class="form-shell">
+        {% csrf_token %}
+        {% if form.non_field_errors %}
+            <div class="form-errors">
+                {% for error in form.non_field_errors %}
+                    <div>{{ error }}</div>
+                {% endfor %}
+            </div>
+        {% endif %}
+        <div class="form-grid">
+            {% include "inventory/_form_field.html" with field=form.theme_variant %}
+            {% include "inventory/_form_field.html" with field=form.page_size %}
+            {% include "inventory/_form_field.html" with field=form.date_display_format %}
+            {% include "inventory/_form_field.html" with field=form.default_timer_status %}
+            {% include "inventory/_form_field.html" with field=form.default_request_status %}
+            {% include "inventory/_form_field.html" with field=form.default_request_kind %}
+            {% include "inventory/_form_field.html" with field=form.default_usage_period_days %}
+            {% include "inventory/_form_field.html" with field=form.default_checkout_status %}
+            {% include "inventory/_form_field.html" with field=form.hotkeys_enabled %}
+            {% include "inventory/_form_field.html" with field=form.show_hotkey_legend %}
+        </div>
+        <div class="actions">
+            <button class="btn" type="submit">Сохранить настройки</button>
+        </div>
+    </form>
+</div>
+{% endblock %}

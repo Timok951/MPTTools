@@ -1,0 +1,10 @@
+{% extends "inventory/base.html" %}
+{% load i18n inventory_extras %}
+
+{% block content %}
+{% include "inventory/portal/_entity_tabs.html" %}
+<div class="card">
+    <h2>{% trans "Administrator portal" %}</h2>
+    <p class="muted">{% trans "Central CRUD access for all tables, including staff, users and roles." %}</p>
+</div>
+{% endblock %}

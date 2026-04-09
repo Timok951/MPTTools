@@ -1,0 +1,241 @@
+from dataclasses import dataclass
+from typing import Any
+
+from django.contrib import messages
+from django.contrib.auth.decorators import login_required
+from django.contrib.auth.models import Group, User
+from django.db import models
+from django.db import IntegrityError
+from django.db.models import ProtectedError
+from django.shortcuts import get_object_or_404, redirect, render
+from django.utils.translation import gettext_lazy as _
+
+from assets.models import Equipment, EquipmentCheckout, InventoryAdjustment
+from core.models import Cabinet, EquipmentCategory, Supplier, Workplace, WorkplaceMember
+from operations.models import EquipmentRequest, MaterialUsage, WorkTimer
+from audit.models import AdminPortalLog
+from audit.portal_log import log_portal_action
+
+from .authz import is_portal_admin
+from .portal_forms import (
+    PortalCabinetForm,
+    PortalEquipmentCategoryForm,
+    PortalEquipmentCheckoutForm,
+    PortalEquipmentForm,
+    PortalEquipmentRequestForm,
+    PortalGroupForm,
+    PortalInventoryAdjustmentForm,
+    PortalMaterialUsageForm,
+    PortalSupplierForm,
+    PortalUserForm,
+    PortalWorkplaceForm,
+    PortalWorkplaceMemberForm,
+    PortalWorkTimerForm,
+)
+from .views import forbidden
+
+
+@dataclass(frozen=True)
+class PortalEntity:
+    slug: str
+    model: type[models.Model]
+    form_class: type
+    list_fields: tuple[str, ...]
+    title: Any
+
+
+PORTAL_ENTITIES: tuple[PortalEntity, ...] = (
+    PortalEntity("equipment", Equipment, PortalEquipmentForm, ("name", "inventory_number", "status", "quantity_available", "deleted_at"), _("Equipment")),
+    PortalEntity("categories", EquipmentCategory, PortalEquipmentCategoryForm, ("name", "deleted_at"), _("Categories")),
+    PortalEntity("suppliers", Supplier, PortalSupplierForm, ("name", "phone", "deleted_at"), _("Suppliers")),
+    PortalEntity("workplaces", Workplace, PortalWorkplaceForm, ("name", "location", "deleted_at"), _("Workplaces")),
+    PortalEntity("cabinets", Cabinet, PortalCabinetForm, ("code", "name", "workplace", "deleted_at"), _("Cabinets")),
+    PortalEntity("workplace-members", WorkplaceMember, PortalWorkplaceMemberForm, ("workplace", "user", "role", "deleted_at"), _("Employees")),
+    PortalEntity("adjustments", InventoryAdjustment, PortalInventoryAdjustmentForm, ("equipment", "delta", "reason", "created_at", "deleted_at"), _("Adjustments")),
+    PortalEntity("checkouts", EquipmentCheckout, PortalEquipmentCheckoutForm, ("equipment", "quantity", "taken_by", "returned_at", "deleted_at"), _("Checkouts")),
+    PortalEntity("requests", EquipmentRequest, PortalEquipmentRequestForm, ("requester", "equipment", "quantity", "status", "deleted_at"), _("Requests")),
+    PortalEntity("usage", MaterialUsage, PortalMaterialUsageForm, ("equipment", "quantity", "used_by", "used_at", "deleted_at"), _("Usage")),
+    PortalEntity("timers", WorkTimer, PortalWorkTimerForm, ("user", "equipment", "started_at", "ended_at", "deleted_at"), _("Timers")),
+    PortalEntity("users", User, PortalUserForm, ("username", "email", "is_active", "is_staff", "is_superuser"), _("Users")),
+    PortalEntity("groups", Group, PortalGroupForm, ("name",), _("Groups and roles")),
+)
+PORTAL_BY_SLUG = {e.slug: e for e in PORTAL_ENTITIES}
+
+
+def _portal_nav_context(current_slug: str | None = None):
+    return {"entities": PORTAL_ENTITIES, "current_entity_slug": current_slug}
+
+
+def _manager(model):
+    return getattr(model, "all_objects", model.objects)
+
+
+def _portal_guard(request):
+    if not is_portal_admin(request.user):
+        return forbidden(request, "Portal is only for administrators.")
+    return None
+
+
+def _get_entity_or_404(slug: str) -> PortalEntity:
+    if slug not in PORTAL_BY_SLUG:
+        from django.http import Http404
+
+        raise Http404("Unknown entity")
+    return PORTAL_BY_SLUG[slug]
+
+
+def _list_headers(model: type[models.Model], fields: tuple[str, ...]):
+    headers = []
+    for name in fields:
+        try:
+            headers.append(model._meta.get_field(name).verbose_name)
+        except Exception:
+            headers.append(name.replace("_", " ").title())
+    return headers
+
+
+def _friendly_integrity_message(exc: Exception) -> str:
+    text = str(exc)
+    if "inventory_number" in text:
+        return _("Inventory number already exists. Choose another one.")
+    return _("Could not save due to duplicate or invalid unique field value.")
+
+
+@login_required
+def portal_dashboard(request):
+    if resp := _portal_guard(request):
+        return resp
+    return render(request, "inventory/portal/dashboard.html", _portal_nav_context("__home"))
+
+
+@login_required
+def portal_logs(request):
+    if resp := _portal_guard(request):
+        return resp
+    logs = AdminPortalLog.objects.select_related("actor").all()[:500]
+    return render(
+        request,
+        "inventory/portal/logs.html",
+        {
+            **_portal_nav_context("__logs"),
+            "logs": logs,
+        },
+    )
+
+
+@login_required
+def portal_list(request, entity: str):
+    if resp := _portal_guard(request):
+        return resp
+    cfg = _get_entity_or_404(entity)
+    show_deleted = bool(request.session.get("show_deleted_global", False))
+    has_soft_delete = any(f.name == "deleted_at" for f in cfg.model._meta.fields)
+    qs = _manager(cfg.model).all()
+    if has_soft_delete and not show_deleted:
+        qs = qs.filter(deleted_at__isnull=True)
+    ordering = getattr(cfg.model._meta, "ordering", None) or ("-pk",)
+    qs = qs.order_by(*ordering)
+    return render(
+        request,
+        "inventory/portal/object_list.html",
+        {
+            **_portal_nav_context(cfg.slug),
+            "cfg": cfg,
+            "objects": qs,
+            "show_deleted": show_deleted,
+            "has_soft_delete": has_soft_delete,
+            "list_headers": _list_headers(cfg.model, cfg.list_fields),
+        },
+    )
+
+
+@login_required
+def portal_create(request, entity: str):
+    if resp := _portal_guard(request):
+        return resp
+    cfg = _get_entity_or_404(entity)
+    Form = cfg.form_class
+    if request.method == "POST":
+        form = Form(request.POST, request.FILES)
+        if form.is_valid():
+            try:
+                obj = form.save(commit=False)
+                if hasattr(obj, "_actor"):
+                    obj._actor = request.user
+                obj.save()
+                if hasattr(form, "save_m2m"):
+                    form.save_m2m()
+                log_portal_action(request, "create", cfg.slug, obj=obj, meta={"pk": obj.pk})
+                return redirect("portal_list", entity=cfg.slug)
+            except IntegrityError as exc:
+                form.add_error(None, _friendly_integrity_message(exc))
+    else:
+        form = Form()
+    return render(request, "inventory/portal/object_form.html", {**_portal_nav_context(cfg.slug), "cfg": cfg, "form": form, "is_edit": False})
+
+
+@login_required
+def portal_edit(request, entity: str, pk: int):
+    if resp := _portal_guard(request):
+        return resp
+    cfg = _get_entity_or_404(entity)
+    obj = get_object_or_404(_manager(cfg.model), pk=pk)
+    Form = cfg.form_class
+    if request.method == "POST":
+        form = Form(request.POST, request.FILES, instance=obj)
+        if form.is_valid():
+            try:
+                saved = form.save(commit=False)
+                if hasattr(saved, "_actor"):
+                    saved._actor = request.user
+                saved.save()
+                if hasattr(form, "save_m2m"):
+                    form.save_m2m()
+                log_portal_action(request, "update", cfg.slug, obj=saved, meta={"pk": saved.pk})
+                return redirect("portal_list", entity=cfg.slug)
+            except IntegrityError as exc:
+                form.add_error(None, _friendly_integrity_message(exc))
+    else:
+        form = Form(instance=obj)
+    return render(request, "inventory/portal/object_form.html", {**_portal_nav_context(cfg.slug), "cfg": cfg, "form": form, "is_edit": True, "object": obj})
+
+
+@login_required
+def portal_delete(request, entity: str, pk: int):
+    if resp := _portal_guard(request):
+        return resp
+    cfg = _get_entity_or_404(entity)
+    obj = get_object_or_404(_manager(cfg.model), pk=pk)
+    if cfg.model is User and obj.pk == request.user.pk:
+        messages.error(request, "You cannot delete your own account.")
+        return redirect("portal_list", entity=cfg.slug)
+    if request.method == "POST":
+        if hasattr(obj, "_actor"):
+            obj._actor = request.user
+        obj_repr = str(obj)
+        obj_pk = obj.pk
+        try:
+            obj.delete()
+            log_portal_action(request, "delete", cfg.slug, obj=obj_repr, meta={"pk": obj_pk})
+            return redirect("portal_list", entity=cfg.slug)
+        except ProtectedError:
+            messages.error(request, _("This record cannot be deleted because it is used by related data."))
+            return redirect("portal_list", entity=cfg.slug)
+    return render(request, "inventory/portal/object_confirm_delete.html", {**_portal_nav_context(cfg.slug), "cfg": cfg, "object": obj})
+
+
+@login_required
+def portal_restore(request, entity: str, pk: int):
+    if resp := _portal_guard(request):
+        return resp
+    cfg = _get_entity_or_404(entity)
+    if not hasattr(cfg.model, "restore"):
+        from django.http import Http404
+
+        raise Http404()
+    obj = get_object_or_404(cfg.model.all_objects, pk=pk)
+    if request.method == "POST":
+        obj.restore()
+        log_portal_action(request, "restore", cfg.slug, obj=obj, meta={"pk": obj.pk})
+        return redirect("portal_list", entity=cfg.slug)
+    return render(request, "inventory/portal/object_confirm_restore.html", {**_portal_nav_context(cfg.slug), "cfg": cfg, "object": obj})

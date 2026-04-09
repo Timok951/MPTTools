@@ -1,12 +1,62 @@
-﻿{% extends "inventory/base.html" %}
+{% extends "inventory/base.html" %}
+{% load i18n %}
 
 {% block content %}
 <div class="card">
-    <h2>New timer entry</h2>
-    <form method="post" class="grid">
-        {% csrf_token %}
-        {{ form.as_p }}
-        <button class="btn" type="submit">Save</button>
-    </form>
+    <div class="card-header">
+        <div>
+            <div class="kicker">{% trans "Timers" %}</div>
+            <h2>Новая запись таймера</h2>
+            <p class="muted">Используйте быстрый запуск для текущей работы или заполните даты вручную для записи задним числом.</p>
+        </div>
+        <div class="actions">
+            <a class="secondary" href="{% url 'timer_panel' %}">Назад к таймерам</a>
+        </div>
+    </div>
+    <div class="split-layout">
+        <form method="post" class="form-shell">
+            {% csrf_token %}
+            {% if form.non_field_errors %}
+                <div class="form-errors">
+                    {% for error in form.non_field_errors %}
+                        <div>{{ error }}</div>
+                    {% endfor %}
+                </div>
+            {% endif %}
+            <div class="form-grid">
+                {% include "inventory/_form_field.html" with field=form.workplace %}
+                {% include "inventory/_form_field.html" with field=form.equipment %}
+                {% include "inventory/_form_field.html" with field=form.started_at %}
+                {% include "inventory/_form_field.html" with field=form.ended_at %}
+                {% include "inventory/_form_field.html" with field=form.note full_width=True %}
+            </div>
+            <div class="actions">
+                <button class="btn" type="submit">Сохранить запись</button>
+            </div>
+        </form>
+        <div class="field-list">
+            <div class="aside-panel">
+                <h3>Быстрый запуск</h3>
+                <p class="muted">Нужно начать отслеживание прямо сейчас? Используйте быструю форму ниже.</p>
+                <form method="post" action="{% url 'timer_quick_start' %}" class="form-shell">
+                    {% csrf_token %}
+                    {% include "inventory/_form_field.html" with field=quick_form.workplace %}
+                    {% include "inventory/_form_field.html" with field=quick_form.equipment %}
+                    {% include "inventory/_form_field.html" with field=quick_form.note %}
+                    <div class="actions">
+                        <button class="btn" type="submit">Запустить сейчас</button>
+                    </div>
+                </form>
+            </div>
+            <div class="aside-panel">
+                <h3>Как это работает</h3>
+                <ul>
+                    <li>Оставьте время окончания пустым, если таймер должен остаться активным.</li>
+                    <li>Используйте ручной режим, когда нужно внести работу задним числом.</li>
+                    <li>Таймер можно остановить позже из панели таймеров.</li>
+                </ul>
+            </div>
+        </div>
+    </div>
 </div>
 {% endblock %}

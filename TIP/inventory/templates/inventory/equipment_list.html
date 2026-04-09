@@ -1,106 +1,117 @@
-﻿{% extends "inventory/base.html" %}
+{% extends "inventory/base.html" %}
+{% load i18n inventory_extras %}
 
 {% block content %}
 <div class="card">
-    <h2>Equipment</h2>
+    <h2>{% trans "Equipment" %}</h2>
     <form method="get" class="filters">
         <div>
-            <label for="id_q">Search</label>
-            <input id="id_q" type="text" name="q" value="{{ filters.q }}" placeholder="Name, serial, inventory" />
+            <label for="id_q">{% trans "Search" %}</label>
+            <input id="id_q" type="text" name="q" value="{{ filters.q }}" placeholder="{% trans 'Name, serial, inventory' %}" />
         </div>
         <div>
-            <label for="id_status">Status</label>
+            <label for="id_status">{% trans "Status" %}</label>
             <select id="id_status" name="status">
-                <option value="">All</option>
+                <option value="">{% trans "All" %}</option>
                 {% for value, label in status_choices %}
                 <option value="{{ value }}" {% if filters.status == value %}selected{% endif %}>{{ label }}</option>
                 {% endfor %}
             </select>
         </div>
         <div>
-            <label for="id_category">Category</label>
+            <label for="id_category">{% trans "Category" %}</label>
             <select id="id_category" name="category">
-                <option value="">All</option>
+                <option value="">{% trans "All" %}</option>
                 {% for item in categories %}
                 <option value="{{ item.id }}" {% if filters.category == item.id|stringformat:"s" %}selected{% endif %}>{{ item.name }}</option>
                 {% endfor %}
             </select>
         </div>
         <div>
-            <label for="id_workplace">Workplace</label>
+            <label for="id_workplace">{% trans "Workplaces" %}</label>
             <select id="id_workplace" name="workplace">
-                <option value="">All</option>
+                <option value="">{% trans "All" %}</option>
                 {% for item in workplaces %}
                 <option value="{{ item.id }}" {% if filters.workplace == item.id|stringformat:"s" %}selected{% endif %}>{{ item.name }}</option>
                 {% endfor %}
             </select>
         </div>
         <div>
-            <label for="id_cabinet">Cabinet</label>
+            <label for="id_cabinet">{% trans "Cabinet" %}</label>
             <select id="id_cabinet" name="cabinet">
-                <option value="">All</option>
+                <option value="">{% trans "All" %}</option>
                 {% for item in cabinets %}
                 <option value="{{ item.id }}" {% if filters.cabinet == item.id|stringformat:"s" %}selected{% endif %}>{{ item.code }}</option>
                 {% endfor %}
             </select>
         </div>
         <div>
-            <label for="id_supplier">Supplier</label>
+            <label for="id_supplier">{% trans "Suppliers" %}</label>
             <select id="id_supplier" name="supplier">
-                <option value="">All</option>
+                <option value="">{% trans "All" %}</option>
                 {% for item in suppliers %}
                 <option value="{{ item.id }}" {% if filters.supplier == item.id|stringformat:"s" %}selected{% endif %}>{{ item.name }}</option>
                 {% endfor %}
             </select>
         </div>
         <div>
-            <label for="id_consumable">Consumable</label>
+            <label for="id_consumable">{% trans "Consumable" %}</label>
             <select id="id_consumable" name="consumable">
-                <option value="">All</option>
-                <option value="1" {% if filters.consumable == "1" %}selected{% endif %}>Yes</option>
-                <option value="0" {% if filters.consumable == "0" %}selected{% endif %}>No</option>
+                <option value="">{% trans "All" %}</option>
+                <option value="1" {% if filters.consumable == "1" %}selected{% endif %}>{% trans "Yes" %}</option>
+                <option value="0" {% if filters.consumable == "0" %}selected{% endif %}>{% trans "No" %}</option>
             </select>
         </div>
         <div>
-            <label for="id_low_stock">Low stock</label>
+            <label for="id_low_stock">{% trans "Low stock" %}</label>
             <select id="id_low_stock" name="low_stock">
-                <option value="">All</option>
-                <option value="1" {% if filters.low_stock == "1" %}selected{% endif %}>Only low stock</option>
+                <option value="">{% trans "All" %}</option>
+                <option value="1" {% if filters.low_stock == "1" %}selected{% endif %}>{% trans "Only low stock" %}</option>
             </select>
         </div>
         <div>
-            <label for="id_inventory_due">Inventory due</label>
+            <label for="id_inventory_due">{% trans "Inventory" %}</label>
             <select id="id_inventory_due" name="inventory_due">
-                <option value="">All</option>
-                <option value="1" {% if filters.inventory_due == "1" %}selected{% endif %}>Due now</option>
+                <option value="">{% trans "All" %}</option>
+                <option value="1" {% if filters.inventory_due == "1" %}selected{% endif %}>{% trans "Due now" %}</option>
             </select>
         </div>
         <div>
-            <button class="btn" type="submit">Apply filters</button>
+            <button class="btn" type="submit">{% trans "Apply" %}</button>
         </div>
     </form>
 </div>
 
 <div class="card">
-    <div class="actions">
-        <a href="{% url 'request_create' %}">New request</a>
-        <a class="secondary" href="{% url 'adjustment_create' %}">Adjust stock</a>
-        <a class="secondary" href="{% url 'checkout_create' %}">Checkout equipment</a>
+    <div class="toolbar-spread">
+        <div class="table-meta">{% trans "Showing" %}: {{ equipment|length }} / {{ total_rows }}</div>
+        <div class="actions">
+            {% if user|has_group:"Administrator" %}
+                <a href="{% url 'portal_create' entity='equipment' %}">➕ {% trans "Add" %}</a>
+                <a class="secondary" href="{% url 'portal_list' entity='equipment' %}">🧰 {% trans "Manage equipment" %}</a>
+            {% endif %}
+            {% if user|has_group:"Administrator" or user|has_group:"Warehouse" %}
+                <a class="secondary" href="{% url 'adjustment_create' %}">{% trans "Adjust stock" %}</a>
+            {% endif %}
+        </div>
     </div>
     <table>
         <thead>
             <tr>
-                <th>Name</th>
-                <th>Inventory #</th>
-                <th>Category</th>
-                <th>Workplace</th>
-                <th>Cabinet</th>
-                <th>Total</th>
-                <th>Available</th>
-                <th>Consumable</th>
-                <th>Status</th>
-                <th>Low stock</th>
-                <th>Inventory due</th>
+                <th>{% trans "Name" %}</th>
+                <th>{% trans "Inventory #" %}</th>
+                <th>{% trans "Category" %}</th>
+                <th>{% trans "Workplaces" %}</th>
+                <th>{% trans "Cabinet" %}</th>
+                <th>{% trans "Total" %}</th>
+                <th>{% trans "Available" %}</th>
+                <th>{% trans "Consumable" %}</th>
+                <th>{% trans "Status" %}</th>
+                <th>{% trans "Low stock" %}</th>
+                <th>{% trans "Inventory" %}</th>
+                {% if user|has_group:"Administrator" %}
+                <th>{% trans "Actions" %}</th>
+                {% endif %}
             </tr>
         </thead>
         <tbody>
@@ -113,27 +124,38 @@
                 <td>{{ item.cabinet }}</td>
                 <td>{{ item.quantity_total }}</td>
                 <td>{{ item.quantity_available }}</td>
-                <td>{{ item.is_consumable|yesno:"Yes,No" }}</td>
+                <td>{% if item.is_consumable %}{% trans "Yes" %}{% else %}{% trans "No" %}{% endif %}</td>
                 <td>{{ item.get_status_display }}</td>
                 <td>
                     {% if item.is_low_stock %}
-                        <span class="badge warn">Low</span>
+                        <span class="badge warn">{% trans "Low stock" %}</span>
                     {% else %}
                         <span class="badge">OK</span>
                     {% endif %}
                 </td>
                 <td>
                     {% if item.is_inventory_due %}
-                        <span class="badge warn">Due</span>
+                        <span class="badge warn">{% trans "Due now" %}</span>
                     {% else %}
                         <span class="badge">OK</span>
                     {% endif %}
                 </td>
+                {% if user|has_group:"Administrator" %}
+                <td class="actions">
+                    <a href="{% url 'portal_edit' entity='equipment' pk=item.pk %}">✏️</a>
+                    {% if item.deleted_at %}
+                        <a class="secondary" href="{% url 'portal_restore' entity='equipment' pk=item.pk %}">↩</a>
+                    {% else %}
+                        <a class="secondary" href="{% url 'portal_delete' entity='equipment' pk=item.pk %}">🗑</a>
+                    {% endif %}
+                </td>
+                {% endif %}
             </tr>
             {% empty %}
-            <tr><td colspan="11" class="muted">No equipment found.</td></tr>
+            <tr><td colspan="{% if user|has_group:'Administrator' %}12{% else %}11{% endif %}" class="muted">{% trans "No equipment found." %}</td></tr>
             {% endfor %}
         </tbody>
     </table>
+    {% include "inventory/_pagination.html" %}
 </div>
 {% endblock %}

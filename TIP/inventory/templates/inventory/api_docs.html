@@ -1,0 +1,24 @@
+{% extends "inventory/base.html" %}
+{% load i18n %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header">
+        <div>
+            <div class="kicker">API</div>
+            <h2>Документация API</h2>
+        </div>
+        <div class="actions">
+            <a class="secondary" href="{% url 'api-schema' %}">Открыть схему</a>
+        </div>
+    </div>
+    <div class="aside-panel">
+        <p><code>/api/v1/</code></p>
+        <div class="grid cols-2">
+            {% for endpoint in endpoints %}
+                <div class="badge">{{ endpoint }}</div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+{% endblock %}

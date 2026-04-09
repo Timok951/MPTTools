@@ -1,0 +1,17 @@
+{% extends "inventory/base.html" %}
+{% load i18n %}
+
+{% block content %}
+{% include "inventory/portal/_entity_tabs.html" %}
+<div class="card">
+    <h2>{% trans "Delete" %}: {{ cfg.title }}</h2>
+    <p>{% trans "Confirm deletion" %}: <strong>{{ object }}</strong>.</p>
+    <form method="post">
+        {% csrf_token %}
+        <div class="actions">
+            <button class="btn" type="submit">{% trans "Delete" %}</button>
+            <a class="secondary" href="{% url 'portal_list' entity=cfg.slug %}">{% trans "Cancel" %}</a>
+        </div>
+    </form>
+</div>
+{% endblock %}

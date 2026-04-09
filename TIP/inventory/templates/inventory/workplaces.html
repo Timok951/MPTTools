@@ -1,12 +1,29 @@
-﻿{% extends "inventory/base.html" %}
+{% extends "inventory/base.html" %}
 {% load inventory_extras %}
 
 {% block content %}
 <div class="card">
     <h2>Workplaces</h2>
+    {% if user|has_group:"Administrator" %}
+    <div class="actions" style="margin-bottom: 8px;">
+        <a href="{% url 'portal_create' entity='workplaces' %}">➕ Add</a>
+        <a class="secondary" href="{% url 'portal_list' entity='workplaces' %}">🧰 Manage workplaces</a>
+        <a class="secondary" href="{% url 'portal_list' entity='workplace-members' %}">Manage staff assignments</a>
+    </div>
+    {% endif %}
     {% for workplace in workplaces %}
         <div class="card">
             <strong>{{ workplace.name }}</strong>
+            {% if user|has_group:"Administrator" %}
+                <span class="actions" style="display:inline-flex;margin-left:8px;">
+                    <a href="{% url 'portal_edit' entity='workplaces' pk=workplace.pk %}">✏️</a>
+                    {% if workplace.deleted_at %}
+                        <a class="secondary" href="{% url 'portal_restore' entity='workplaces' pk=workplace.pk %}">↩</a>
+                    {% else %}
+                        <a class="secondary" href="{% url 'portal_delete' entity='workplaces' pk=workplace.pk %}">🗑</a>
+                    {% endif %}
+                </span>
+            {% endif %}
             <div class="muted">{{ workplace.location }}</div>
             <div>{{ workplace.description }}</div>
             <table>

@@ -1,8 +1,15 @@
-﻿{% extends "inventory/base.html" %}
+{% extends "inventory/base.html" %}
+{% load inventory_extras %}
 
 {% block content %}
 <div class="card">
     <h2>Cabinets</h2>
+    {% if user|has_group:"Administrator" %}
+    <div class="actions" style="margin-bottom: 8px;">
+        <a href="{% url 'portal_create' entity='cabinets' %}">➕ Add</a>
+        <a class="secondary" href="{% url 'portal_list' entity='cabinets' %}">🧰 Manage cabinets</a>
+    </div>
+    {% endif %}
     <table>
         <thead>
             <tr>
@@ -11,6 +18,9 @@
                 <th>Workplace</th>
                 <th>Floor</th>
                 <th>Description</th>
+                {% if user|has_group:"Administrator" %}
+                <th>Actions</th>
+                {% endif %}
             </tr>
         </thead>
         <tbody>
@@ -21,9 +31,19 @@
                 <td>{{ cabinet.workplace }}</td>
                 <td>{{ cabinet.floor }}</td>
                 <td>{{ cabinet.description }}</td>
+                {% if user|has_group:"Administrator" %}
+                <td class="actions">
+                    <a href="{% url 'portal_edit' entity='cabinets' pk=cabinet.pk %}">✏️</a>
+                    {% if cabinet.deleted_at %}
+                        <a class="secondary" href="{% url 'portal_restore' entity='cabinets' pk=cabinet.pk %}">↩</a>
+                    {% else %}
+                        <a class="secondary" href="{% url 'portal_delete' entity='cabinets' pk=cabinet.pk %}">🗑</a>
+                    {% endif %}
+                </td>
+                {% endif %}
             </tr>
             {% empty %}
-            <tr><td colspan="5" class="muted">No cabinets yet.</td></tr>
+            <tr><td colspan="{% if user|has_group:'Administrator' %}6{% else %}5{% endif %}" class="muted">No cabinets yet.</td></tr>
             {% endfor %}
         </tbody>
     </table>

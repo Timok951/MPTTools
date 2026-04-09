@@ -1,8 +1,14 @@
-﻿{% extends "inventory/base.html" %}
+{% extends "inventory/base.html" %}
+{% load inventory_extras %}
 
 {% block content %}
 <div class="card">
     <h2>History timeline</h2>
+    {% if user|has_group:"Administrator" %}
+    <div class="actions" style="margin-bottom: 8px;">
+        <a class="secondary" href="{% url 'portal_home' %}">🧰 Portal CRUD</a>
+    </div>
+    {% endif %}
     <form method="get" class="filters">
         <div>
             <label for="id_action">Action</label>

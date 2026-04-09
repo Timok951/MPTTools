@@ -1,8 +1,17 @@
-﻿from django.urls import path
+from django.urls import include, path
 
 from . import views
 
 urlpatterns = [
+    path("portal/", include("inventory.portal_urls")),
+    path("show-deleted/toggle/", views.toggle_show_deleted, name="toggle_show_deleted"),
+    path("accounts/preferences/", views.user_preferences_view, name="user_preferences"),
+    path("api/docs/", views.api_docs, name="api_docs"),
+    path("tools/data/", views.data_tools, name="data_tools"),
+    path("tools/data/import-json/", views.import_json_backup, name="import_json_backup"),
+    path("tools/data/backup-json/", views.download_json_backup, name="download_json_backup"),
+    path("tools/data/backup-sqlite/", views.download_sqlite_backup, name="download_sqlite_backup"),
+    path("tools/data/export-portal-logs/", views.export_portal_logs_csv, name="export_portal_logs_csv"),
     path("", views.analytics, name="analytics"),
     path("equipment/", views.equipment_list, name="equipment_list"),
     path("usage/", views.usage_history, name="usage_history"),
@@ -11,6 +20,8 @@ urlpatterns = [
     path("requests/new/", views.request_create, name="request_create"),
     path("timer/", views.timer_panel, name="timer_panel"),
     path("timer/new/", views.timer_create, name="timer_create"),
+    path("timer/quick-start/", views.timer_quick_start, name="timer_quick_start"),
+    path("timer/<int:timer_id>/stop/", views.timer_stop, name="timer_stop"),
     path("search/", views.inventory_search, name="inventory_search"),
     path("workplaces/", views.workplaces, name="workplaces"),
     path("cabinets/", views.cabinets, name="cabinets"),

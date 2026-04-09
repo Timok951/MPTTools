@@ -1,7 +1,7 @@
-﻿from django.contrib import admin
+from django.contrib import admin
 
 from .admin_utils import SoftDeleteAdmin
-from .models import Cabinet, EquipmentCategory, Supplier, Workplace, WorkplaceMember
+from .models import Cabinet, EquipmentCategory, Supplier, UserPreference, Workplace, WorkplaceMember
 
 
 @admin.register(Supplier)
@@ -33,3 +33,10 @@ class WorkplaceMemberAdmin(SoftDeleteAdmin):
     list_display = ("workplace", "user", "role", "assigned_at", "deleted_at")
     list_filter = ("role", "workplace", "deleted_at")
     search_fields = ("workplace__name", "user__username", "user__email")
+
+
+@admin.register(UserPreference)
+class UserPreferenceAdmin(admin.ModelAdmin):
+    list_display = ("user", "theme_variant", "page_size", "date_display_format", "default_timer_status", "updated_at")
+    list_filter = ("theme_variant", "page_size", "date_display_format", "default_timer_status")
+    search_fields = ("user__username", "user__email")

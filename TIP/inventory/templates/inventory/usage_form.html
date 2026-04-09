@@ -1,12 +1,49 @@
-﻿{% extends "inventory/base.html" %}
+{% extends "inventory/base.html" %}
+{% load i18n %}
 
 {% block content %}
 <div class="card">
-    <h2>Record usage</h2>
-    <form method="post" class="grid">
-        {% csrf_token %}
-        {{ form.as_p }}
-        <button class="btn" type="submit">Save</button>
-    </form>
+    <div class="card-header">
+        <div>
+            <div class="kicker">{% trans "Usage" %}</div>
+            <h2>{% trans "Record usage" %}</h2>
+            <p class="muted">{% trans "Use this form only for consumables written off from stock." %}</p>
+        </div>
+        <div class="actions">
+            <a class="secondary" href="{% url 'usage_history' %}">{% trans "Back to usage history" %}</a>
+        </div>
+    </div>
+    <div class="split-layout">
+        <form method="post" class="form-shell">
+            {% csrf_token %}
+            {% if form.non_field_errors %}
+                <div class="form-errors">
+                    {% for error in form.non_field_errors %}
+                        <div>{{ error }}</div>
+                    {% endfor %}
+                </div>
+            {% endif %}
+            <div class="form-grid">
+                {% include "inventory/_form_field.html" with field=form.equipment %}
+                {% include "inventory/_form_field.html" with field=form.workplace %}
+                {% include "inventory/_form_field.html" with field=form.quantity %}
+                {% include "inventory/_form_field.html" with field=form.related_request %}
+                {% include "inventory/_form_field.html" with field=form.note full_width=True %}
+            </div>
+            <div class="actions">
+                <button class="btn" type="submit">{% trans "Save usage" %}</button>
+            </div>
+        </form>
+        <div class="field-list">
+            <div class="aside-panel">
+                <h3>{% trans "Before saving" %}</h3>
+                <ul>
+                    <li>{% trans "Select a consumable item, not reusable equipment." %}</li>
+                    <li>{% trans "Link a related request when this write-off fulfills a planned task." %}</li>
+                    <li>{% trans "If the quantity is rejected, check current available stock first." %}</li>
+                </ul>
+            </div>
+        </div>
+    </div>
 </div>
 {% endblock %}

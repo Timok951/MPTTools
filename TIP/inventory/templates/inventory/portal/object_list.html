@@ -1,0 +1,43 @@
+{% extends "inventory/base.html" %}
+{% load i18n inventory_extras %}
+
+{% block content %}
+{% include "inventory/portal/_entity_tabs.html" %}
+<div class="card">
+    <h2>{{ cfg.title }}</h2>
+    <div class="actions">
+        <a href="{% url 'portal_create' entity=cfg.slug %}">➕ {% trans "Add" %}</a>
+    </div>
+    <table>
+        <thead>
+            <tr>
+                <th>{% trans "ID" %}</th>
+                {% for h in list_headers %}
+                    <th>{{ h }}</th>
+                {% endfor %}
+                <th>{% trans "Actions" %}</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for obj in objects %}
+            <tr>
+                <td>{{ obj.pk }}</td>
+                {% for field in cfg.list_fields %}
+                    <td>{{ obj|get_attr:field }}</td>
+                {% endfor %}
+                <td class="actions">
+                    <a href="{% url 'portal_edit' entity=cfg.slug pk=obj.pk %}">✏️</a>
+                    {% if has_soft_delete and obj.deleted_at %}
+                        <a class="secondary" href="{% url 'portal_restore' entity=cfg.slug pk=obj.pk %}">↩</a>
+                    {% else %}
+                        <a class="secondary" href="{% url 'portal_delete' entity=cfg.slug pk=obj.pk %}">🗑</a>
+                    {% endif %}
+                </td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="99" class="muted">{% trans "No records." %}</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

@@ -1,0 +1,1226 @@
+# Russian translations for TIP.
+# Copyright (C) 2026 ORGANIZATION
+# This file is distributed under the same license as the TIP project.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2026.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: TIP VERSION\n"
+"Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
+"POT-Creation-Date: 2026-04-10 00:02+0300\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language: ru\n"
+"Language-Team: ru <LL@li.org>\n"
+"Plural-Forms: nplurals=3; plural=(n%10==1 && n%100!=11 ? 0 : n%10>=2 && n%10<=4 && (n%100<10 || "
+"n%100>=20) ? 1 : 2);\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.18.0\n"
+
+msgid "MPT Inventory"
+msgstr "Учёт МПТ"
+
+msgid "Inventory and materials for the technical college"
+msgstr "Инвентаризация и материалы техникума"
+
+msgid "Analytics"
+msgstr "Аналитика"
+
+msgid "Equipment"
+msgstr "Оборудование"
+
+msgid "Search"
+msgstr "Поиск"
+
+msgid "Requests"
+msgstr "Заявки"
+
+msgid "Usage"
+msgstr "Списания"
+
+msgid "Checkouts"
+msgstr "Выдачи"
+
+msgid "Timers"
+msgstr "Таймеры"
+
+msgid "Workplaces"
+msgstr "Рабочие места"
+
+msgid "Cabinets"
+msgstr "Кабинеты"
+
+msgid "Suppliers"
+msgstr "Поставщики"
+
+msgid "History"
+msgstr "История"
+
+msgid "Reports"
+msgstr "Отчёты"
+
+msgid "Admin portal"
+msgstr "Портал администратора"
+
+msgid "Roles"
+msgstr "Роли"
+
+msgid "Django admin"
+msgstr "Админка"
+
+msgid "Logout"
+msgstr "Выход"
+
+msgid "Login"
+msgstr "Вход"
+
+msgid "Register"
+msgstr "Регистрация"
+
+msgid "Language"
+msgstr "Язык"
+
+msgid "Not signed in"
+msgstr "Не авторизован"
+
+msgid "Full data and role management is available in Django admin."
+msgstr "Полное редактирование данных и ролей — в разделе «Админка» Django."
+
+msgid "Full data and role management are available in the Administrator Portal and Django admin."
+msgstr "Полное управление данными и ролями доступно в Портале администратора и в админке Django."
+
+msgid "Russian"
+msgstr "Русский"
+
+msgid "English"
+msgstr "Английский"
+
+msgid "Username"
+msgstr "Имя пользователя"
+
+msgid "Password"
+msgstr "Пароль"
+
+msgid "Password confirmation"
+msgstr "Подтверждение пароля"
+
+msgid "Required. 150 characters or fewer."
+msgstr "Обязательно. Не более 150 символов."
+
+msgid "Enter the same password again for verification."
+msgstr "Введите пароль ещё раз для проверки."
+
+msgid "Sign in"
+msgstr "Вход"
+
+msgid "Use your college account to access the site."
+msgstr "Используйте учётную запись колледжа для доступа."
+
+msgid "Sign in button"
+msgstr "Войти"
+
+msgid "No account yet?"
+msgstr "Нет аккаунта?"
+
+msgid "Create account"
+msgstr "Создать"
+
+msgid "Registration"
+msgstr "Регистрация"
+
+msgid "After registration an administrator will assign a role."
+msgstr "После регистрации администратор назначит роль."
+
+msgid "Create account button"
+msgstr "Создать аккаунт"
+
+msgid "Already have an account?"
+msgstr "Уже есть аккаунт?"
+
+msgid "Access denied"
+msgstr "Доступ ограничен"
+
+msgid "Go back"
+msgstr "Вернуться назад"
+
+msgid "Home"
+msgstr "На главную"
+
+msgid "Administrator portal"
+msgstr "Портал администратора"
+
+msgid "Full CRUD for inventory-related models. Actions are logged below and on the portal log page."
+msgstr "Полный CRUD по моделям учёта. Действия фиксируются ниже и на странице журнала портала."
+
+msgid "Portal action log"
+msgstr "Журнал действий портала"
+
+msgid "Data change timeline (AuditLog)"
+msgstr "Хронология изменений данных (AuditLog)"
+
+msgid "Entity management"
+msgstr "Управление сущностями"
+
+msgid "Section"
+msgstr "Раздел"
+
+msgid "Actions"
+msgstr "Действия"
+
+msgid "List"
+msgstr "Список"
+
+msgid "Add"
+msgstr "Добавить"
+
+msgid "What is available"
+msgstr "Что доступно"
+
+msgid ""
+"Public UI: analytics, equipment list, requests, usage, checkouts, timers, read-only reference "
+"lists, reports export."
+msgstr ""
+"Публичный интерфейс: аналитика, список оборудования, заявки, списания, выдачи, таймеры, "
+"справочники только для чтения, экспорт отчётов."
+
+msgid ""
+"This portal: create / edit / soft-delete / restore for all main models (same fields as in the "
+"database, except soft-delete timestamp on forms)."
+msgstr ""
+"Этот портал: создание / правка / мягкое удаление / восстановление для всех основных моделей (те "
+"же поля, что в БД, кроме метки мягкого удаления в формах)."
+
+msgid "Django Admin: users, groups, permissions, and low-level access to all tables."
+msgstr "Django Admin: пользователи, группы, права и низкоуровневый доступ ко всем таблицам."
+
+msgid ""
+"AuditLog (History): automatic change tracking when _actor is set (portal and forms set it on "
+"save)."
+msgstr ""
+"AuditLog (История): автоматическая фиксация изменений, когда задан _actor (портал и формы задают "
+"его при сохранении)."
+
+msgid "AdminPortalLog: explicit log of portal create / update / delete / restore with user and path."
+msgstr ""
+"AdminPortalLog: явный журнал создания / обновления / удаления / восстановления в портале с "
+"пользователем и путём."
+
+msgid "Possible improvements"
+msgstr "Возможные улучшения"
+
+msgid "Theme"
+msgstr "Тема"
+
+msgid "Page size"
+msgstr "Размер страницы"
+
+msgid "Date format"
+msgstr "Формат даты"
+
+msgid "Default timer filter"
+msgstr "Фильтр таймеров по умолчанию"
+
+msgid "Default checkout filter"
+msgstr "Фильтр выдач по умолчанию"
+
+msgid "Enable hotkeys"
+msgstr "Включить горячие клавиши"
+
+msgid "Show hotkey help"
+msgstr "Показывать подсказку по горячим клавишам"
+
+msgid "Default request status"
+msgstr "Статус заявок по умолчанию"
+
+msgid "All requests"
+msgstr "Все заявки"
+
+msgid "Default request type"
+msgstr "Тип заявок по умолчанию"
+
+msgid "All request types"
+msgstr "Все типы заявок"
+
+msgid "Auto-fill usage history date range from today."
+msgstr "Автоматически подставлять период истории списаний от сегодняшней даты."
+
+msgid "Enable global keyboard shortcuts outside form fields."
+msgstr "Включить глобальные горячие клавиши вне полей формы."
+
+msgid "Show the hotkey helper panel in the interface."
+msgstr "Показывать в интерфейсе панель-подсказку по горячим клавишам."
+
+msgid "API docs"
+msgstr "Документация API"
+
+msgid "API"
+msgstr "API"
+
+msgid "API documentation"
+msgstr "Документация API"
+
+msgid "This page gives quick access to the OpenAPI schema and the read-only API routes."
+msgstr "Эта страница даёт быстрый доступ к OpenAPI-схеме и маршрутам API только для чтения."
+
+msgid "Open raw schema"
+msgstr "Открыть схему"
+
+msgid "Base URL"
+msgstr "Базовый URL"
+
+msgid "Available endpoints"
+msgstr "Доступные endpoints"
+
+msgid "Authentication"
+msgstr "Аутентификация"
+
+msgid "The API currently uses the same authenticated session as the web interface and is read-only."
+msgstr "API сейчас использует ту же авторизованную сессию, что и веб-интерфейс, и работает только на чтение."
+
+msgid "How to use it"
+msgstr "Как использовать"
+
+msgid "Sign in through the web interface first."
+msgstr "Сначала войдите через веб-интерфейс."
+
+msgid "Open the schema link to inspect available paths and fields."
+msgstr "Откройте ссылку на схему, чтобы посмотреть доступные пути и поля."
+
+msgid "Use the listed endpoints for read access to inventory and operations data."
+msgstr "Используйте перечисленные endpoints для доступа на чтение к данным учёта и операций."
+
+msgid "Quick start timer"
+msgstr "Быстрый запуск таймера"
+
+msgid "Manual entry"
+msgstr "Ручной ввод"
+
+msgid "Active timers"
+msgstr "Активные таймеры"
+
+msgid "Data and role management are available in the Administrator Portal."
+msgstr "Управление данными и ролями доступно в Портале администратора."
+
+msgid "Workplace"
+msgstr "Рабочее место"
+
+msgid "Select workplace"
+msgstr "Выберите рабочее место"
+
+msgid "Note"
+msgstr "Примечание"
+
+msgid "What are you working on?"
+msgstr "Над чем вы сейчас работаете?"
+
+msgid "Theme"
+msgstr "Тема"
+
+msgid "Page size"
+msgstr "Размер страницы"
+
+msgid "Date format"
+msgstr "Формат даты"
+
+msgid "Default timer filter"
+msgstr "Фильтр таймеров по умолчанию"
+
+msgid "Default checkout filter"
+msgstr "Фильтр выдач по умолчанию"
+
+msgid "Enable hotkeys"
+msgstr "Включить горячие клавиши"
+
+msgid "Show hotkey help"
+msgstr "Показывать подсказку по горячим клавишам"
+
+msgid "REST or GraphQL API with token authentication."
+msgstr "REST или GraphQL API с токен-аутентификацией."
+
+msgid "Bulk import / export (CSV) from the portal."
+msgstr "Массовый импорт / экспорт (CSV) из портала."
+
+msgid "Email or messenger notifications for low stock and pending requests."
+msgstr "Уведомления по почте или мессенджеру о низком остатке и заявках в ожидании."
+
+msgid "Finer permissions (per-model) instead of a single Administrator group."
+msgstr "Более тонкие права (по моделям) вместо одной группы Administrator."
+
+msgid "Attachment versioning and image thumbnails for equipment photos."
+msgstr "Версионирование вложений и миниатюры для фото оборудования."
+
+msgid "Full-text search across notes and serial numbers."
+msgstr "Полнотекстовый поиск по примечаниям и серийным номерам."
+
+msgid "Recent portal actions"
+msgstr "Последние действия в портале"
+
+msgid "Time"
+msgstr "Время"
+
+msgid "User"
+msgstr "Пользователь"
+
+msgid "Action"
+msgstr "Действие"
+
+msgid "Entity"
+msgstr "Сущность"
+
+msgid "Object"
+msgstr "Объект"
+
+msgid "No portal actions yet."
+msgstr "Действий в портале пока нет."
+
+msgid "Records who used the administrator portal and what they changed (last 500 entries)."
+msgstr "Кто пользовался порталом администратора и что менял (последние 500 записей)."
+
+msgid "Back to portal"
+msgstr "К порталу"
+
+msgid "Path"
+msgstr "Путь"
+
+msgid "No records."
+msgstr "Нет записей."
+
+msgid "Show deleted (soft)"
+msgstr "Показать удалённые (мягко)"
+
+msgid "Apply"
+msgstr "Применить"
+
+msgid "ID"
+msgstr "№"
+
+msgid "Edit"
+msgstr "Изменить"
+
+msgid "Restore"
+msgstr "Восстановить"
+
+msgid "Delete"
+msgstr "Удалить"
+
+msgid "Portal home"
+msgstr "Главная портала"
+
+msgid "Create"
+msgstr "Создать"
+
+msgid "Adjustments"
+msgstr "Корректировки"
+
+msgid "Save"
+msgstr "Сохранить"
+
+msgid "Cancel"
+msgstr "Отмена"
+
+msgid "Confirm deletion"
+msgstr "Подтвердите удаление"
+
+msgid "The record will be soft-deleted (hidden from normal lists) if the model supports it."
+msgstr "Запись будет мягко удалена (скрыта из обычных списков), если модель это поддерживает."
+
+msgid "Restore record"
+msgstr "Восстановить запись"
+
+msgid "Status"
+msgstr "Статус"
+
+msgid "All"
+msgstr "Все"
+
+msgid "Category"
+msgstr "Категория"
+
+msgid "Cabinet"
+msgstr "Кабинет"
+
+msgid "Consumable"
+msgstr "Расходник"
+
+msgid "Yes"
+msgstr "Да"
+
+msgid "No"
+msgstr "Нет"
+
+msgid "Low stock"
+msgstr "Мало на складе"
+
+msgid "Only low stock"
+msgstr "Только мало на складе"
+
+msgid "Inventory"
+msgstr "Инвентаризация"
+
+msgid "Due now"
+msgstr "Просрочена / пора"
+
+msgid "New request"
+msgstr "Новая заявка"
+
+msgid "Adjust stock"
+msgstr "Корректировка остатка"
+
+msgid "Checkout equipment"
+msgstr "Выдать оборудование"
+
+msgid "Manage equipment"
+msgstr "Управление оборудованием"
+
+msgid "Categories"
+msgstr "Категории"
+
+msgid "Manage requests"
+msgstr "Управление заявками"
+
+msgid "Manage usage"
+msgstr "Управление списаниями"
+
+msgid "Manage checkouts"
+msgstr "Управление выдачами"
+
+msgid "Manage timers"
+msgstr "Управление таймерами"
+
+msgid "Manage workplaces"
+msgstr "Управление рабочими местами"
+
+msgid "Manage staff assignments"
+msgstr "Управление назначениями сотрудников"
+
+msgid "Manage cabinets"
+msgstr "Управление кабинетами"
+
+msgid "Manage suppliers"
+msgstr "Управление поставщиками"
+
+msgid "Download-only mode for safety. Use JSON restore to import data."
+msgstr "Режим только скачивания для безопасности. Для импорта данных используйте восстановление из JSON."
+
+msgid "Photo"
+msgstr "Фото"
+
+msgid "Name"
+msgstr "Название"
+
+msgid "Inv. #"
+msgstr "Инв. №"
+
+msgid "Total"
+msgstr "Всего"
+
+msgid "Available"
+msgstr "Доступно"
+
+msgid "Low"
+msgstr "Мало"
+
+msgid "OK"
+msgstr "ОК"
+
+msgid "Due"
+msgstr "Пора"
+
+msgid "No equipment found."
+msgstr "Оборудование не найдено."
+
+msgid "No photo"
+msgstr "Нет фото"
+
+msgid "Name, serial, inventory number"
+msgstr "Название, серийный, инв. номер"
+
+msgid "Supplier"
+msgstr "Поставщик"
+
+msgid "Total equipment units"
+msgstr "Всего единиц оборудования"
+
+msgid "Consumables"
+msgstr "Расходники"
+
+msgid "Pending requests"
+msgstr "Заявки в ожидании"
+
+msgid "Active checkouts"
+msgstr "Активные выдачи"
+
+msgid "Inventory due"
+msgstr "Пора инвентаризации"
+
+msgid "Equipment by status"
+msgstr "Оборудование по статусам"
+
+msgid "Requests by status"
+msgstr "Заявки по статусам"
+
+msgid "Stock by category"
+msgstr "Остатки по категориям"
+
+msgid "Activity last 30 days"
+msgstr "Активность за 30 дней"
+
+msgid "Recent requests"
+msgstr "Последние заявки"
+
+msgid "Requester"
+msgstr "Заявитель"
+
+msgid "Qty"
+msgstr "Кол-во"
+
+msgid "Requested at"
+msgstr "Создана"
+
+msgid "No requests yet."
+msgstr "Заявок пока нет."
+
+msgid "Recent material usage"
+msgstr "Последние списания материалов"
+
+msgid "Date"
+msgstr "Дата"
+
+msgid "No usage records yet."
+msgstr "Списаний пока нет."
+
+msgid "Analytics is only available to administrators."
+msgstr "Аналитика доступна только администратору."
+
+msgid "Requests are only available to authorized roles."
+msgstr "Заявки доступны только уполномоченным ролям."
+
+msgid "Usage recording is only available to authorized roles."
+msgstr "Списание доступно только уполномоченным ролям."
+
+msgid "Adjustments are only available to authorized roles."
+msgstr "Корректировки доступны только уполномоченным ролям."
+
+msgid "Timers are only available to authorized roles."
+msgstr "Таймер доступен только уполномоченным ролям."
+
+msgid "Checkouts are only available to authorized roles."
+msgstr "Выдача доступна только уполномоченным ролям."
+
+msgid "Role assignment is only available to administrators."
+msgstr "Выдача ролей доступна только администратору."
+
+msgid "The administrator portal is only available to users in the Administrator group."
+msgstr "Портал администратора доступен только пользователям в группе Administrator."
+
+msgid "Uncategorized"
+msgstr "Без категории"
+
+msgid "Items"
+msgstr "Позиций"
+
+msgid "Total qty"
+msgstr "Всего шт."
+
+msgid "Available qty"
+msgstr "Доступно шт."
+
+msgid "Material"
+msgstr "Материал"
+
+msgid "Inventory #"
+msgstr "Инв. номер"
+
+msgid "Used"
+msgstr "Использовано"
+
+msgid "Unknown report type"
+msgstr "Неизвестный тип отчёта"
+
+msgid "Full access, analytics and oversight."
+msgstr "Полный доступ, аналитика и контроль."
+
+msgid "Warehouse stock, adjustments and material issuance."
+msgstr "Учёт склада, корректировки и выдача материалов."
+
+msgid "Maintenance and equipment requests."
+msgstr "Техническое обслуживание и заявки на оборудование."
+
+msgid "Requests and usage of construction equipment."
+msgstr "Заявки и расход строительного оборудования."
+
+msgid "Administrator"
+msgstr "Администратор"
+
+msgid "Warehouse"
+msgstr "Склад"
+
+msgid "Sysadmin"
+msgstr "Системный администратор"
+
+msgid "Builder"
+msgstr "Строитель"
+
+msgid "Workplace"
+msgstr "Рабочее место"
+
+msgid "Request type"
+msgstr "Тип заявки"
+
+msgid "Needed by"
+msgstr "Нужно к дате"
+
+msgid "Comment"
+msgstr "Комментарий"
+
+msgid "Equipment / material"
+msgstr "Оборудование / материал"
+
+msgid "Related request"
+msgstr "Связанная заявка"
+
+msgid "Note"
+msgstr "Примечание"
+
+msgid "Change (+/−)"
+msgstr "Изменение (+/−)"
+
+msgid "Reason"
+msgstr "Причина"
+
+msgid "Start"
+msgstr "Начало"
+
+msgid "End"
+msgstr "Окончание"
+
+msgid "Taken at"
+msgstr "Выдано"
+
+msgid "Due back"
+msgstr "Вернуть до"
+
+msgid "Cabinet / shelf"
+msgstr "Кабинет / шкаф"
+
+msgid "Code"
+msgstr "Код"
+
+msgid "Floor"
+msgstr "Этаж"
+
+msgid "Description"
+msgstr "Описание"
+
+msgid "No cabinets yet."
+msgstr "Кабинетов пока нет."
+
+msgid "College staff"
+msgstr "Сотрудники колледжа"
+
+msgid "Role"
+msgstr "Роль"
+
+msgid "Assigned at"
+msgstr "Назначен"
+
+msgid "No staff assigned."
+msgstr "Сотрудники не назначены."
+
+msgid "No workplaces defined."
+msgstr "Рабочие места не заведены."
+
+msgid "Contact"
+msgstr "Контакт"
+
+msgid "Phone"
+msgstr "Телефон"
+
+msgid "Address"
+msgstr "Адрес"
+
+msgid "No suppliers yet."
+msgstr "Поставщиков пока нет."
+
+msgid "Users"
+msgstr "Пользователи"
+
+msgid "Groups / roles"
+msgstr "Группы / роли"
+
+msgid "Groups and roles"
+msgstr "Группы и роли"
+
+msgid "Tip: create role groups here, then assign them to users in the Users section."
+msgstr "Совет: создавайте группы ролей здесь, затем назначайте их пользователям в разделе «Пользователи»."
+
+msgid "Tip: manage user roles via group membership, and optionally fine-tune direct permissions."
+msgstr ""
+"Совет: управляйте ролями пользователя через группы, а при необходимости тонко настройте прямые "
+"права."
+
+msgid "You cannot delete your own account from the portal."
+msgstr "Нельзя удалить собственную учётную запись из портала."
+
+msgid "New password"
+msgstr "Новый пароль"
+
+msgid "Repeat password"
+msgstr "Повторите пароль"
+
+msgid "Leave empty to keep current password."
+msgstr "Оставьте пустым, чтобы сохранить текущий пароль."
+
+msgid "Repeat password."
+msgstr "Повторите пароль."
+
+msgid "Password is required."
+msgstr "Требуется пароль."
+
+msgid "Passwords do not match."
+msgstr "Пароли не совпадают."
+
+msgid "Request"
+msgstr "Заявка"
+
+msgid "Quantity must be positive."
+msgstr "Количество должно быть больше нуля."
+
+msgid "Requested quantity exceeds available stock."
+msgstr "Запрошенное количество превышает доступный остаток."
+
+msgid "Not enough available stock."
+msgstr "Недостаточно доступного остатка."
+
+msgid "Adjustment would make stock negative."
+msgstr "Корректировка привела бы к отрицательному остатку."
+
+msgid "End time cannot be before start time."
+msgstr "Время окончания не может быть раньше времени начала."
+
+msgid "Not enough available stock for checkout."
+msgstr "Недостаточно доступного остатка для выдачи."
+
+msgid "Only consumables can be written off. Use checkout/return for reusable tools."
+msgstr "Списывать можно только расходники. Для многоразового инструмента используйте выдачу/возврат."
+
+msgid "Request must be approved."
+msgstr "Заявка должна быть одобрена."
+
+msgid "Equipment must match the approved request."
+msgstr "Оборудование должно совпадать с одобренной заявкой."
+
+msgid "Checkout quantity exceeds request."
+msgstr "Количество выдачи превышает заявку."
+
+msgid "Due time cannot be before taken time."
+msgstr "Срок возврата не может быть раньше времени выдачи."
+
+msgid "In stock"
+msgstr "На складе"
+
+msgid "Assigned"
+msgstr "Закреплено"
+
+msgid "Checked out"
+msgstr "Выдано"
+
+msgid "Repair"
+msgstr "В ремонте"
+
+msgid "Retired"
+msgstr "Списано"
+
+msgid "Pending"
+msgstr "Ожидает"
+
+msgid "Approved"
+msgstr "Одобрена"
+
+msgid "Rejected"
+msgstr "Отклонена"
+
+msgid "Issued"
+msgstr "Выдана"
+
+msgid "Closed"
+msgstr "Закрыта"
+
+msgid "Sysadmin request"
+msgstr "Системный администратор"
+
+msgid "Builder request"
+msgstr "Строитель"
+
+msgid "Equipment item"
+msgstr "Единица оборудования"
+
+msgid "Equipment categories"
+msgstr "Категории оборудования"
+
+msgid "Equipment category"
+msgstr "Категория оборудования"
+
+msgid "Equipment request"
+msgstr "Заявка на оборудование"
+
+msgid "Equipment requests"
+msgstr "Заявки на оборудование"
+
+msgid "Material usage"
+msgstr "Списание материала"
+
+msgid "Material usage records"
+msgstr "Записи списания материалов"
+
+msgid "Work timer"
+msgstr "Таймер работы"
+
+msgid "Work timers"
+msgstr "Таймеры работы"
+
+msgid "Workplace member"
+msgstr "Участник рабочего места"
+
+msgid "Workplace members"
+msgstr "Участники рабочих мест"
+
+msgid "Inventory adjustment"
+msgstr "Корректировка остатка"
+
+msgid "Inventory adjustments"
+msgstr "Корректировки остатков"
+
+msgid "Equipment checkout"
+msgstr "Выдача оборудования"
+
+msgid "Equipment checkouts"
+msgstr "Выдачи оборудования"
+
+msgid "Available quantity cannot exceed total quantity."
+msgstr "Доступное количество не может превышать общее."
+
+msgid "Return time cannot be earlier than taken time."
+msgstr "Время возврата не может быть раньше времени выдачи."
+
+msgid "An approved request is required for checkout."
+msgstr "Для выдачи требуется одобренная заявка."
+
+msgid "Checkout requires an approved request."
+msgstr "Выдача возможна только по одобренной заявке."
+
+msgid "Checkout equipment must match the request."
+msgstr "Оборудование должно совпадать с заявкой."
+
+msgid "Checkout quantity exceeds the request quantity."
+msgstr "Количество выдачи превышает количество в заявке."
+
+msgid "Usage quantity exceeds available stock."
+msgstr "Количество списания превышает доступный остаток."
+
+msgid "Admin portal log entry"
+msgstr "Запись журнала портала администратора"
+
+msgid "Admin portal log"
+msgstr "Журнал портала администратора"
+
+msgid "Role assignment"
+msgstr "Выдача ролей"
+
+msgid "Assign a role to each user. The role defines access level."
+msgstr "Назначьте роль каждому пользователю. Роль определяет уровень доступа."
+
+msgid "Current role"
+msgstr "Текущая роль"
+
+msgid "Assign role"
+msgstr "Назначить роль"
+
+msgid "No role"
+msgstr "Без роли"
+
+msgid "Assign"
+msgstr "Назначить"
+
+msgid "Administrator (superuser)"
+msgstr "Администратор (суперпользователь)"
+
+msgid "Checkout is only possible with an approved request."
+msgstr "Выдача возможна только по утверждённой заявке."
+
+msgid "Issue"
+msgstr "Выдать"
+
+msgid "Backup / PDF"
+msgstr "Бэкап / PDF"
+
+msgid "Backup, restore & PDF"
+msgstr "Резервное копирование, восстановление и PDF"
+
+msgid ""
+"Administrator only. JSON backup is the recommended way to move data between servers. SQLite file "
+"copy only applies when the project uses SQLite."
+msgstr ""
+"Только для администратора. JSON — рекомендуемый способ переноса данных между серверами. "
+"Копирование файла SQLite — только если в проекте используется SQLite."
+
+msgid "JSON backup (all apps except sessions)"
+msgstr "Резервная копия JSON (все приложения, кроме сессий)"
+
+msgid "Download a fixture you can restore on another machine with the same app version."
+msgstr "Файл фикстуры для восстановления на другой машине с той же версией приложения."
+
+msgid "Download JSON"
+msgstr "Скачать JSON"
+
+msgid "JSON restore"
+msgstr "Восстановление из JSON"
+
+msgid ""
+"Without “clear database”, existing rows may cause conflicts (duplicate keys). With “clear "
+"database”, all data is erased first — irreversible."
+msgstr ""
+"Без «очистки базы» возможны конфликты (дубли ключей). С «очисткой» все данные сначала удаляются —"
+" необратимо."
+
+msgid "JSON file"
+msgstr "Файл JSON"
+
+msgid "Clear database before import (flush)"
+msgstr "Очистить базу перед импортом (flush)"
+
+msgid "Type RESTORE to confirm when flush is checked"
+msgstr "Введите RESTORE для подтверждения при включённой очистке"
+
+msgid "Import JSON"
+msgstr "Импортировать JSON"
+
+msgid "SQLite file (raw)"
+msgstr "Файл SQLite (как есть)"
+
+msgid "Copies the database file as-is. After upload, restart the application if connections break."
+msgstr "Копирует файл БД как есть. После загрузки при сбоях соединений перезапустите приложение."
+
+msgid "Download SQLite"
+msgstr "Скачать SQLite"
+
+msgid "SQLite file"
+msgstr "Файл SQLite"
+
+msgid "Type SQLITE to confirm file replacement"
+msgstr "Введите SQLITE для подтверждения замены файла"
+
+msgid "Replace SQLite file"
+msgstr "Заменить файл SQLite"
+
+msgid ""
+"Raw file backup is only available when DATABASE_ENGINE is sqlite3. For PostgreSQL/MySQL use JSON "
+"backup or native pg_dump / mysqldump on the server."
+msgstr ""
+"Копирование файла БД доступно только при DATABASE_ENGINE=sqlite3. Для PostgreSQL/MySQL "
+"используйте JSON или pg_dump/mysqldump на сервере."
+
+msgid "PDF export"
+msgstr "Экспорт PDF"
+
+msgid "Human-readable reports. Cyrillic needs a system font (e.g. Arial on Windows, DejaVu on Linux)."
+msgstr "Отчёты для печати. Для кириллицы нужен системный шрифт (например Arial в Windows, DejaVu в Linux)."
+
+msgid "Equipment (PDF)"
+msgstr "Оборудование (PDF)"
+
+msgid "Reports summary (PDF)"
+msgstr "Сводка отчётов (PDF)"
+
+msgid "On the Reports page you can download the same summary PDF with the selected date range."
+msgstr "На странице «Отчёты» можно скачать ту же сводку в PDF с выбранным диапазоном дат."
+
+msgid "PDF import"
+msgstr "Импорт PDF"
+
+msgid "Central CRUD access for all tables, including staff, users and roles."
+msgstr "Единый CRUD-доступ ко всем таблицам, включая сотрудников, пользователей и роли."
+
+msgid "Name, serial, inventory"
+msgstr "Название, серийный, инвентарный"
+
+msgid "Inventory #"
+msgstr "Инв. №"
+
+msgid "Total"
+msgstr "Всего"
+
+msgid "Available"
+msgstr "Доступно"
+
+msgid "No equipment found."
+msgstr "Оборудование не найдено."
+
+msgid "No records."
+msgstr "Нет записей."
+
+msgid "Employees"
+msgstr "Сотрудники"
+
+msgid "Download JSON backup"
+msgstr "Скачать JSON-бэкап"
+
+msgid ""
+"Tables in PDF are not machine-readable reliably. Use JSON restore for full data, or add rows via "
+"the portal / Django admin."
+msgstr ""
+"Таблицы из PDF нельзя надёжно распознать автоматически. Для полных данных используйте "
+"восстановление из JSON, либо вносите строки через портал или админку Django."
+
+msgid "Try upload (info only)"
+msgstr "Загрузить (только информация)"
+
+msgid "Could not save due to duplicate or invalid unique field value."
+msgstr "Не удалось сохранить: дублирующееся или недопустимое уникальное значение."
+
+msgid "Inventory number already exists. Choose another one."
+msgstr "Инвентарный номер уже существует. Укажите другой."
+
+msgid "This record cannot be deleted because it is used by related data."
+msgstr "Эту запись нельзя удалить, потому что она используется в связанных данных."
+
+msgid "Active"
+msgstr "Активные"
+
+msgid "Returned"
+msgstr "Возвращённые"
+
+msgid "New checkout"
+msgstr "Новая выдача"
+
+msgid "Quantity"
+msgstr "Количество"
+
+msgid "Due at"
+msgstr "Срок возврата"
+
+msgid "Returned at"
+msgstr "Возвращено"
+
+msgid "Mark returned"
+msgstr "Отметить возврат"
+
+msgid "No checkouts yet."
+msgstr "Выдач пока нет."
+
+msgid "No cabinet data."
+msgstr "Нет данных по кабинетам."
+
+msgid "No materials data."
+msgstr "Нет данных по материалам."
+
+msgid "Export cabinets (Excel)"
+msgstr "Экспорт кабинетов (Excel)"
+
+msgid "Export materials (Excel)"
+msgstr "Экспорт материалов (Excel)"
+
+msgid "Timer panel"
+msgstr "Панель таймеров"
+
+msgid "Finished"
+msgstr "Завершённые"
+
+msgid "Active timers"
+msgstr "Активные таймеры"
+
+msgid "New timer entry"
+msgstr "Новая запись таймера"
+
+msgid "Duration (sec)"
+msgstr "Длительность (сек)"
+
+msgid "Stop now"
+msgstr "Остановить сейчас"
+
+msgid "Download SQLite backup"
+msgstr "Скачать SQLite-бэкап"
+
+msgid "Export portal logs (CSV)"
+msgstr "Экспорт журнала портала (CSV)"
+
+msgid "From"
+msgstr "С"
+
+msgid "To"
+msgstr "По"
+
+msgid "SQLite backup is available only for sqlite3 engine."
+msgstr "Резервная копия SQLite доступна только при движке sqlite3."
+
+msgid "SQLite file not found."
+msgstr "Файл SQLite не найден."
+
+msgid "This page is only for administrators."
+msgstr "Эта страница только для администраторов."
+
+msgid "Not using SQLite."
+msgstr "Используется не SQLite."
+
+msgid "Database file not found."
+msgstr "Файл базы данных не найден."
+
+msgid "No file uploaded."
+msgstr "Файл не загружен."
+
+msgid "Type RESTORE in the confirmation field to replace all data."
+msgstr "Введите RESTORE в поле подтверждения для полной замены данных."
+
+msgid "JSON import finished successfully."
+msgstr "Импорт JSON успешно завершён."
+
+#, python-format
+msgid "Import failed: %(err)s"
+msgstr "Ошибка импорта: %(err)s"
+
+msgid "Type SQLITE to confirm replacing the SQLite database file."
+msgstr "Введите SQLITE для подтверждения замены файла SQLite."
+
+#, python-format
+msgid ""
+"SQLite file replaced. If the app misbehaves, restart the server and restore from %(bak)s if "
+"needed."
+msgstr "Файл SQLite заменён. При сбоях перезапустите сервер; при необходимости восстановите из %(bak)s."
+
+#, python-format
+msgid "SQLite restore failed: %(err)s"
+msgstr "Ошибка восстановления SQLite: %(err)s"
+
+msgid ""
+"Structured import from PDF is not supported. Use JSON backup restore, or enter data via the admin"
+" portal / forms."
+msgstr ""
+"Структурированный импорт из PDF не поддерживается. Используйте восстановление из JSON-резервной "
+"копии или ввод данных через портал администратора / формы."
+
+#, python-format
+msgid "Equipment list — %(date)s"
+msgstr "Список оборудования — %(date)s"
+
+msgid "Avail."
+msgstr "Дост."
+
+#, python-format
+msgid "Reports — %(df)s — %(dt)s"
+msgstr "Отчёты — %(df)s — %(dt)s"
+
+msgid "(no from date)"
+msgstr "(без даты «с»)"
+
+msgid "(no to date)"
+msgstr "(без даты «по»)"
+
+msgid "Cabinet summary"
+msgstr "Сводка по кабинетам"
+
+msgid "Consumables usage"
+msgstr "Расход материалов"
+

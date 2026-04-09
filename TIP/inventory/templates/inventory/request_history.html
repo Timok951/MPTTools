@@ -1,56 +1,70 @@
-﻿{% extends "inventory/base.html" %}
+{% extends "inventory/base.html" %}
+{% load i18n inventory_extras %}
 
 {% block content %}
 <div class="card">
-    <h2>Requests</h2>
+    <div class="card-header">
+        <div>
+            <div class="kicker">{% trans "Requests" %}</div>
+            <h2>{% trans "Requests" %}</h2>
+        </div>
+        <div class="table-meta">{% trans "Rows per page" %}: {{ page_size }}</div>
+    </div>
     <form method="get" class="filters">
         <div>
-            <label for="id_status">Status</label>
+            <label for="id_status">{% trans "Status" %}</label>
             <select id="id_status" name="status">
-                <option value="">All</option>
+                <option value="">{% trans "All" %}</option>
                 {% for value, label in status_choices %}
                 <option value="{{ value }}" {% if filters.status == value %}selected{% endif %}>{{ label }}</option>
                 {% endfor %}
             </select>
         </div>
         <div>
-            <label for="id_kind">Kind</label>
+            <label for="id_kind">{% trans "Request type" %}</label>
             <select id="id_kind" name="kind">
-                <option value="">All</option>
+                <option value="">{% trans "All" %}</option>
                 {% for value, label in kind_choices %}
                 <option value="{{ value }}" {% if filters.kind == value %}selected{% endif %}>{{ label }}</option>
                 {% endfor %}
             </select>
         </div>
         <div>
-            <label for="id_from">From</label>
+            <label for="id_from">{% trans "From" %}</label>
             <input id="id_from" type="date" name="from" value="{{ filters.from }}" />
         </div>
         <div>
-            <label for="id_to">To</label>
+            <label for="id_to">{% trans "To" %}</label>
             <input id="id_to" type="date" name="to" value="{{ filters.to }}" />
         </div>
         <div>
-            <button class="btn" type="submit">Apply</button>
+            <button class="btn" type="submit">{% trans "Apply" %}</button>
         </div>
     </form>
 </div>
 
 <div class="card">
-    <div class="actions">
-        <a href="{% url 'request_create' %}">New request</a>
+    <div class="toolbar-spread">
+        <div class="table-meta">{% trans "Showing" %}: {{ requests|length }} / {{ total_rows }}</div>
+        <div class="actions">
+            <a href="{% url 'request_create' %}">{% trans "New request" %}</a>
+            {% if user|has_group:"Administrator" %}
+            <a class="secondary" href="{% url 'portal_list' entity='requests' %}">🧰 {% trans "Manage requests" %}</a>
+            {% endif %}
+        </div>
     </div>
     <table>
         <thead>
             <tr>
-                <th>ID</th>
-                <th>Requester</th>
-                <th>Kind</th>
-                <th>Equipment</th>
-                <th>Qty</th>
-                <th>Status</th>
-                <th>Requested at</th>
-                <th>Needed by</th>
+                <th>{% trans "ID" %}</th>
+                <th>{% trans "Requester" %}</th>
+                <th>{% trans "Request type" %}</th>
+                <th>{% trans "Equipment" %}</th>
+                <th>{% trans "Qty" %}</th>
+                <th>{% trans "Status" %}</th>
+                <th>{% trans "Requested at" %}</th>
+                <th>{% trans "Needed by" %}</th>
+                {% if user|has_group:"Administrator" %}<th>Actions</th>{% endif %}
             </tr>
         </thead>
         <tbody>
@@ -62,13 +76,20 @@
                 <td>{{ item.equipment }}</td>
                 <td>{{ item.quantity }}</td>
                 <td><span class="badge">{{ item.get_status_display }}</span></td>
-                <td>{{ item.requested_at }}</td>
-                <td>{{ item.needed_by }}</td>
+                <td>{{ item.requested_at|date:preferred_datetime_format }}</td>
+                <td>{% if item.needed_by %}{{ item.needed_by|date:preferred_date_format }}{% else %}-{% endif %}</td>
+                {% if user|has_group:"Administrator" %}
+                <td class="actions">
+                    <a href="{% url 'portal_edit' entity='requests' pk=item.pk %}">✏️</a>
+                    <a class="secondary" href="{% url 'portal_delete' entity='requests' pk=item.pk %}">🗑</a>
+                </td>
+                {% endif %}
             </tr>
             {% empty %}
-            <tr><td colspan="8" class="muted">No requests yet.</td></tr>
+            <tr><td colspan="{% if user|has_group:'Administrator' %}9{% else %}8{% endif %}" class="muted">{% trans "No requests yet." %}</td></tr>
             {% endfor %}
         </tbody>
     </table>
+    {% include "inventory/_pagination.html" %}
 </div>
 {% endblock %}

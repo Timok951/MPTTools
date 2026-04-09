@@ -1,41 +1,55 @@
-﻿{% extends "inventory/base.html" %}
+{% extends "inventory/base.html" %}
+{% load i18n inventory_extras %}
 
 {% block content %}
 <div class="card">
-    <h2>Equipment checkouts</h2>
+    <div class="card-header">
+        <div>
+            <div class="kicker">{% trans "Checkouts" %}</div>
+            <h2>{% trans "Equipment checkouts" %}</h2>
+        </div>
+        <div class="table-meta">{% trans "Rows per page" %}: {{ page_size }}</div>
+    </div>
     <form method="get" class="filters">
         <div>
-            <label for="id_status">Status</label>
+            <label for="id_status">{% trans "Status" %}</label>
             <select id="id_status" name="status">
-                <option value="">All</option>
-                <option value="active" {% if filters.status == "active" %}selected{% endif %}>Active</option>
-                <option value="returned" {% if filters.status == "returned" %}selected{% endif %}>Returned</option>
+                <option value="">{% trans "All" %}</option>
+                <option value="active" {% if filters.status == "active" %}selected{% endif %}>{% trans "Active" %}</option>
+                <option value="returned" {% if filters.status == "returned" %}selected{% endif %}>{% trans "Returned" %}</option>
             </select>
         </div>
         <div>
-            <button class="btn" type="submit">Apply</button>
+            <button class="btn" type="submit">{% trans "Apply" %}</button>
         </div>
     </form>
 </div>
 
 <div class="card">
-    <div class="actions">
-        <a href="{% url 'checkout_create' %}">New checkout</a>
+    <div class="toolbar-spread">
+        <div class="table-meta">{% trans "Showing" %}: {{ checkouts|length }} / {{ total_rows }}</div>
+        <div class="actions">
+            <a href="{% url 'checkout_create' %}">{% trans "New checkout" %}</a>
+            {% if user|has_group:"Administrator" %}
+            <a class="secondary" href="{% url 'portal_list' entity='checkouts' %}">🧰 {% trans "Manage checkouts" %}</a>
+            {% endif %}
+        </div>
     </div>
     <table>
         <thead>
             <tr>
-                <th>ID</th>
-                <th>Equipment</th>
-                <th>Quantity</th>
-                <th>User</th>
-                <th>Workplace</th>
-                <th>Cabinet</th>
-                <th>Request</th>
-                <th>Taken at</th>
-                <th>Due at</th>
-                <th>Returned at</th>
-                <th>Action</th>
+                <th>{% trans "ID" %}</th>
+                <th>{% trans "Equipment" %}</th>
+                <th>{% trans "Quantity" %}</th>
+                <th>{% trans "User" %}</th>
+                <th>{% trans "Workplace" %}</th>
+                <th>{% trans "Cabinet" %}</th>
+                <th>{% trans "Request" %}</th>
+                <th>{% trans "Taken at" %}</th>
+                <th>{% trans "Due at" %}</th>
+                <th>{% trans "Returned at" %}</th>
+                <th>{% trans "Action" %}</th>
+                {% if user|has_group:"Administrator" %}<th>{% trans "Actions" %}</th>{% endif %}
             </tr>
         </thead>
         <tbody>
@@ -48,21 +62,36 @@
                 <td>{{ item.workplace }}</td>
                 <td>{{ item.cabinet }}</td>
                 <td>{{ item.related_request }}</td>
-                <td>{{ item.taken_at }}</td>
-                <td>{{ item.due_at }}</td>
-                <td>{{ item.returned_at }}</td>
+                <td>{{ item.taken_at|date:preferred_datetime_format }}</td>
+                <td>{% if item.due_at %}{{ item.due_at|date:preferred_datetime_format }}{% else %}-{% endif %}</td>
+                <td>{% if item.returned_at %}{{ item.returned_at|date:preferred_datetime_format }}{% else %}-{% endif %}</td>
                 <td>
                     {% if not item.returned_at %}
-                        <a class="btn secondary" href="{% url 'checkout_return' item.id %}">Mark returned</a>
+                        {% if not item.deleted_at %}
+                        <a class="btn secondary" href="{% url 'checkout_return' item.id %}">{% trans "Mark returned" %}</a>
+                        {% else %}
+                        <span class="muted">{% trans "Deleted" %}</span>
+                        {% endif %}
                     {% else %}
-                        <span class="muted">Returned</span>
+                        <span class="muted">{% trans "Returned" %}</span>
                     {% endif %}
                 </td>
+                {% if user|has_group:"Administrator" %}
+                <td class="actions">
+                    <a href="{% url 'portal_edit' entity='checkouts' pk=item.pk %}">✏️</a>
+                    {% if item.deleted_at %}
+                        <a class="secondary" href="{% url 'portal_restore' entity='checkouts' pk=item.pk %}">↩</a>
+                    {% else %}
+                        <a class="secondary" href="{% url 'portal_delete' entity='checkouts' pk=item.pk %}">🗑</a>
+                    {% endif %}
+                </td>
+                {% endif %}
             </tr>
             {% empty %}
-            <tr><td colspan="11" class="muted">No checkouts yet.</td></tr>
+            <tr><td colspan="{% if user|has_group:'Administrator' %}12{% else %}11{% endif %}" class="muted">{% trans "No checkouts yet." %}</td></tr>
             {% endfor %}
         </tbody>
     </table>
+    {% include "inventory/_pagination.html" %}
 </div>
 {% endblock %}

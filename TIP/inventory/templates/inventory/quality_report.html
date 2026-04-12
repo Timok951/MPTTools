@@ -1,0 +1,85 @@
+{% extends "inventory/base.html" %}
+{% load inventory_extras %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header">
+        <div>
+            <div class="kicker">{% ui_text "Качество" "Quality" %}</div>
+            <h2>{% ui_text "Результаты проверок сайта" "Site validation results" %}</h2>
+            <p class="muted">{% ui_text "Страница показывает последний сохранённый прогон проверок, тестов и системной валидации." "This page shows the latest saved run of checks, tests, and system validation." %}</p>
+        </div>
+        <div class="actions">
+            <form method="post">
+                {% csrf_token %}
+                <button class="btn" type="submit">{% ui_text "Обновить отчёт" "Refresh report" %}</button>
+            </form>
+        </div>
+    </div>
+</div>
+
+{% if report %}
+<div class="card">
+    <div class="grid cols-4">
+        <div class="stat">
+            <div class="muted">{% ui_text "Общий статус" "Overall status" %}</div>
+            <strong>{% if report.summary.overall_status == "passed" %}{% ui_text "Успешно" "Passed" %}{% else %}{% ui_text "Есть ошибки" "Failed" %}{% endif %}</strong>
+        </div>
+        <div class="stat">
+            <div class="muted">{% ui_text "Команд выполнено" "Commands run" %}</div>
+            <strong>{{ report.summary.total_commands }}</strong>
+        </div>
+        <div class="stat">
+            <div class="muted">{% ui_text "Успешных команд" "Passed commands" %}</div>
+            <strong>{{ report.summary.passed_commands }}</strong>
+        </div>
+        <div class="stat">
+            <div class="muted">{% ui_text "Тестов выполнено" "Tests run" %}</div>
+            <strong>{{ report.summary.total_tests_ran }}</strong>
+        </div>
+    </div>
+    <p class="muted" style="margin-top: 14px;">
+        {% ui_text "Сформировано" "Generated at" %}: {{ report.generated_at }}
+    </p>
+</div>
+
+{% for item in report.checks %}
+<div class="card">
+    <div class="toolbar-spread">
+        <div>
+            <h3 style="margin-bottom: 6px;">{{ item.title }}</h3>
+            <div class="muted"><code>{{ item.command }}</code></div>
+        </div>
+        <div class="badge {% if item.status != 'passed' %}warn{% endif %}">
+            {% if item.status == "passed" %}{% ui_text "Успешно" "Passed" %}{% else %}{% ui_text "Ошибка" "Failed" %}{% endif %}
+        </div>
+    </div>
+    <div class="grid cols-3" style="margin-top: 12px;">
+        <div>
+            <div class="muted">{% ui_text "Код возврата" "Return code" %}</div>
+            <strong>{{ item.returncode }}</strong>
+        </div>
+        <div>
+            <div class="muted">{% ui_text "Время выполнения, сек" "Duration, sec" %}</div>
+            <strong>{{ item.duration_seconds }}</strong>
+        </div>
+        <div>
+            <div class="muted">{% ui_text "Тестов" "Tests" %}</div>
+            <strong>{{ item.tests_ran }}</strong>
+        </div>
+    </div>
+    {% if item.output_tail %}
+    <div class="aside-panel" style="margin-top: 14px;">
+        <strong>{% ui_text "Последний вывод" "Recent output" %}</strong>
+        <pre style="white-space: pre-wrap; margin: 10px 0 0;">{% for line in item.output_tail %}{{ line }}
+{% endfor %}</pre>
+    </div>
+    {% endif %}
+</div>
+{% endfor %}
+{% else %}
+<div class="card">
+    <p class="muted">{% ui_text "Отчёт ещё не сформирован. Нажмите кнопку выше, чтобы выполнить проверки и сохранить результаты." "The report has not been generated yet. Use the button above to run checks and save the results." %}</p>
+</div>
+{% endif %}
+{% endblock %}

@@ -5,33 +5,35 @@
 <div class="card">
     <div class="card-header">
         <div>
-            <div class="kicker">{% trans "Checkouts" %}</div>
-            <h2>{% trans "Equipment checkouts" %}</h2>
+            <div class="kicker">Выдачи</div>
+            <h2>Выдачи оборудования</h2>
         </div>
-        <div class="table-meta">{% trans "Rows per page" %}: {{ page_size }}</div>
+        <div class="table-meta">Строк на странице: {{ page_size }}</div>
     </div>
     <form method="get" class="filters">
         <div>
-            <label for="id_status">{% trans "Status" %}</label>
+            <label for="id_status">Статус</label>
             <select id="id_status" name="status">
-                <option value="">{% trans "All" %}</option>
-                <option value="active" {% if filters.status == "active" %}selected{% endif %}>{% trans "Active" %}</option>
-                <option value="returned" {% if filters.status == "returned" %}selected{% endif %}>{% trans "Returned" %}</option>
+                <option value="">Все</option>
+                <option value="active" {% if filters.status == "active" %}selected{% endif %}>Активные</option>
+                <option value="returned" {% if filters.status == "returned" %}selected{% endif %}>Возвращённые</option>
             </select>
         </div>
         <div>
-            <button class="btn" type="submit">{% trans "Apply" %}</button>
+            <button class="btn" type="submit">Применить</button>
         </div>
     </form>
 </div>
 
 <div class="card">
     <div class="toolbar-spread">
-        <div class="table-meta">{% trans "Showing" %}: {{ checkouts|length }} / {{ total_rows }}</div>
+        <div class="table-meta">Показано: {{ checkouts|length }} / {{ total_rows }}</div>
         <div class="actions">
-            <a href="{% url 'checkout_create' %}">{% trans "New checkout" %}</a>
+            {% if can_create_checkout %}
+            <a href="{% url 'checkout_create' %}">➕ Добавить</a>
+            {% endif %}
             {% if user|has_group:"Administrator" %}
-            <a class="secondary" href="{% url 'portal_list' entity='checkouts' %}">🧰 {% trans "Manage checkouts" %}</a>
+            <a class="secondary" href="{% url 'portal_list' entity='checkouts' %}">🧰 Управление выдачами</a>
             {% endif %}
         </div>
     </div>
@@ -39,17 +41,17 @@
         <thead>
             <tr>
                 <th>{% trans "ID" %}</th>
-                <th>{% trans "Equipment" %}</th>
-                <th>{% trans "Quantity" %}</th>
-                <th>{% trans "User" %}</th>
-                <th>{% trans "Workplace" %}</th>
-                <th>{% trans "Cabinet" %}</th>
-                <th>{% trans "Request" %}</th>
-                <th>{% trans "Taken at" %}</th>
-                <th>{% trans "Due at" %}</th>
-                <th>{% trans "Returned at" %}</th>
-                <th>{% trans "Action" %}</th>
-                {% if user|has_group:"Administrator" %}<th>{% trans "Actions" %}</th>{% endif %}
+                <th>Оборудование</th>
+                <th>Количество</th>
+                <th>Кем выдано</th>
+                <th>Рабочее место</th>
+                <th>Шкаф</th>
+                <th>Заявка</th>
+                <th>Выдано</th>
+                <th>Срок возврата</th>
+                <th>Возвращено</th>
+                <th>Операция</th>
+                {% if user|has_group:"Administrator" %}<th>Действия</th>{% endif %}
             </tr>
         </thead>
         <tbody>
@@ -66,14 +68,19 @@
                 <td>{% if item.due_at %}{{ item.due_at|date:preferred_datetime_format }}{% else %}-{% endif %}</td>
                 <td>{% if item.returned_at %}{{ item.returned_at|date:preferred_datetime_format }}{% else %}-{% endif %}</td>
                 <td>
-                    {% if not item.returned_at %}
-                        {% if not item.deleted_at %}
-                        <a class="btn secondary" href="{% url 'checkout_return' item.id %}">{% trans "Mark returned" %}</a>
+                    {% if item.can_return %}
+                        <form method="post" action="{% url 'checkout_return' item.id %}" style="display:inline;">
+                            {% csrf_token %}
+                            <button class="btn secondary" type="submit">Отметить как возвращённое</button>
+                        </form>
+                    {% elif not item.returned_at %}
+                        {% if item.deleted_at %}
+                        <span class="muted">Удалено</span>
                         {% else %}
-                        <span class="muted">{% trans "Deleted" %}</span>
+                        <span class="muted">Недоступно</span>
                         {% endif %}
                     {% else %}
-                        <span class="muted">{% trans "Returned" %}</span>
+                        <span class="muted">Возвращено</span>
                     {% endif %}
                 </td>
                 {% if user|has_group:"Administrator" %}
@@ -88,7 +95,7 @@
                 {% endif %}
             </tr>
             {% empty %}
-            <tr><td colspan="{% if user|has_group:'Administrator' %}12{% else %}11{% endif %}" class="muted">{% trans "No checkouts yet." %}</td></tr>
+            <tr><td colspan="{% if user|has_group:'Administrator' %}12{% else %}11{% endif %}" class="muted">Нет записей.</td></tr>
             {% endfor %}
         </tbody>
     </table>

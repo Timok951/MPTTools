@@ -1,13 +1,13 @@
 {% extends "inventory/base.html" %}
-{% load i18n %}
+{% load i18n inventory_extras %}
 
 {% block content %}
 <div class="card">
     <div class="card-header">
         <div>
-            <div class="kicker">Настройки</div>
-            <h2>Пользовательские настройки</h2>
-            <p class="muted">Эти настройки хранятся на сервере и загружаются при каждом входе.</p>
+            <div class="kicker">{% ui_text "Настройки" "Settings" %}</div>
+            <h2>{% ui_text "Пользовательские настройки" "User preferences" %}</h2>
+            <p class="muted">{% ui_text "Эти настройки хранятся на сервере и загружаются при каждом входе." "These settings are stored on the server and loaded each time you sign in." %}</p>
         </div>
     </div>
     <form method="post" class="form-shell">
@@ -33,7 +33,7 @@
             {% include "inventory/_form_field.html" with field=form.show_hotkey_legend %}
         </div>
         <div class="actions">
-            <button class="btn" type="submit">Сохранить настройки</button>
+            <button class="btn" type="submit">{% ui_text "Сохранить настройки" "Save settings" %}</button>
         </div>
     </form>
 </div>

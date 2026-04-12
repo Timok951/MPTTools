@@ -13,19 +13,19 @@ REQUEST_ISSUED = "issued"
 REQUEST_CLOSED = "closed"
 
 REQUEST_STATUS_CHOICES = [
-    (REQUEST_PENDING, "Pending"),
-    (REQUEST_APPROVED, "Approved"),
-    (REQUEST_REJECTED, "Rejected"),
-    (REQUEST_ISSUED, "Issued"),
-    (REQUEST_CLOSED, "Closed"),
+    (REQUEST_PENDING, "На рассмотрении"),
+    (REQUEST_APPROVED, "Одобрена"),
+    (REQUEST_REJECTED, "Отклонена"),
+    (REQUEST_ISSUED, "Выдана"),
+    (REQUEST_CLOSED, "Закрыта"),
 ]
 
 REQUEST_KIND_SYSADMIN = "sysadmin"
 REQUEST_KIND_BUILDER = "builder"
 
 REQUEST_KIND_CHOICES = [
-    (REQUEST_KIND_SYSADMIN, "Sysadmin"),
-    (REQUEST_KIND_BUILDER, "Builder"),
+    (REQUEST_KIND_SYSADMIN, "Сисадмин"),
+    (REQUEST_KIND_BUILDER, "Стройка"),
 ]
 
 

@@ -52,19 +52,19 @@ class PortalEntity:
 
 
 PORTAL_ENTITIES: tuple[PortalEntity, ...] = (
-    PortalEntity("equipment", Equipment, PortalEquipmentForm, ("name", "inventory_number", "status", "quantity_available", "deleted_at"), _("Equipment")),
-    PortalEntity("categories", EquipmentCategory, PortalEquipmentCategoryForm, ("name", "deleted_at"), _("Categories")),
-    PortalEntity("suppliers", Supplier, PortalSupplierForm, ("name", "phone", "deleted_at"), _("Suppliers")),
-    PortalEntity("workplaces", Workplace, PortalWorkplaceForm, ("name", "location", "deleted_at"), _("Workplaces")),
-    PortalEntity("cabinets", Cabinet, PortalCabinetForm, ("code", "name", "workplace", "deleted_at"), _("Cabinets")),
-    PortalEntity("workplace-members", WorkplaceMember, PortalWorkplaceMemberForm, ("workplace", "user", "role", "deleted_at"), _("Employees")),
-    PortalEntity("adjustments", InventoryAdjustment, PortalInventoryAdjustmentForm, ("equipment", "delta", "reason", "created_at", "deleted_at"), _("Adjustments")),
-    PortalEntity("checkouts", EquipmentCheckout, PortalEquipmentCheckoutForm, ("equipment", "quantity", "taken_by", "returned_at", "deleted_at"), _("Checkouts")),
-    PortalEntity("requests", EquipmentRequest, PortalEquipmentRequestForm, ("requester", "equipment", "quantity", "status", "deleted_at"), _("Requests")),
-    PortalEntity("usage", MaterialUsage, PortalMaterialUsageForm, ("equipment", "quantity", "used_by", "used_at", "deleted_at"), _("Usage")),
-    PortalEntity("timers", WorkTimer, PortalWorkTimerForm, ("user", "equipment", "started_at", "ended_at", "deleted_at"), _("Timers")),
-    PortalEntity("users", User, PortalUserForm, ("username", "email", "is_active", "is_staff", "is_superuser"), _("Users")),
-    PortalEntity("groups", Group, PortalGroupForm, ("name",), _("Groups and roles")),
+    PortalEntity("equipment", Equipment, PortalEquipmentForm, ("name", "inventory_number", "status", "quantity_available", "deleted_at"), "Оборудование"),
+    PortalEntity("categories", EquipmentCategory, PortalEquipmentCategoryForm, ("name", "deleted_at"), "Категории"),
+    PortalEntity("suppliers", Supplier, PortalSupplierForm, ("name", "phone", "deleted_at"), "Поставщики"),
+    PortalEntity("workplaces", Workplace, PortalWorkplaceForm, ("name", "location", "deleted_at"), "Рабочие места"),
+    PortalEntity("cabinets", Cabinet, PortalCabinetForm, ("code", "name", "workplace", "deleted_at"), "Шкафы"),
+    PortalEntity("workplace-members", WorkplaceMember, PortalWorkplaceMemberForm, ("workplace", "user", "role", "deleted_at"), "Сотрудники"),
+    PortalEntity("adjustments", InventoryAdjustment, PortalInventoryAdjustmentForm, ("equipment", "delta", "reason", "created_at", "deleted_at"), "Корректировки"),
+    PortalEntity("checkouts", EquipmentCheckout, PortalEquipmentCheckoutForm, ("equipment", "quantity", "taken_by", "returned_at", "deleted_at"), "Выдачи"),
+    PortalEntity("requests", EquipmentRequest, PortalEquipmentRequestForm, ("requester", "equipment", "quantity", "status", "deleted_at"), "Заявки"),
+    PortalEntity("usage", MaterialUsage, PortalMaterialUsageForm, ("equipment", "quantity", "used_by", "used_at", "deleted_at"), "Списания"),
+    PortalEntity("timers", WorkTimer, PortalWorkTimerForm, ("user", "equipment", "started_at", "ended_at", "deleted_at"), "Таймеры"),
+    PortalEntity("users", User, PortalUserForm, ("username", "email", "is_active", "is_staff", "is_superuser"), "Пользователи"),
+    PortalEntity("groups", Group, PortalGroupForm, ("name",), "Группы и роли"),
 )
 PORTAL_BY_SLUG = {e.slug: e for e in PORTAL_ENTITIES}
 
@@ -77,20 +77,20 @@ def _procedure_cards():
     return [
         {
             "slug": "reject_stale_requests",
-            "title": _("Reject stale requests"),
-            "description": _("Marks old pending requests as rejected and records who processed them."),
+            "title": _("Отклонить старые заявки"),
+            "description": _("Помечает старые необработанные заявки как отклонённые и фиксирует, кто их обработал."),
             "form": RejectStaleRequestsProcedureForm(prefix="reject"),
         },
         {
             "slug": "finish_abandoned_timers",
-            "title": _("Finish abandoned timers"),
-            "description": _("Closes long-running active timers that were left unfinished."),
+            "title": _("Завершить брошенные таймеры"),
+            "description": _("Закрывает давно запущенные таймеры, которые остались незавершёнными."),
             "form": FinishAbandonedTimersProcedureForm(prefix="timers"),
         },
         {
             "slug": "restock_low_stock_consumables",
-            "title": _("Restock low-stock consumables"),
-            "description": _("Creates stock adjustments for consumables below their threshold."),
+            "title": _("Пополнить расходники с низким остатком"),
+            "description": _("Создаёт корректировки остатков для расходников, которые опустились ниже порога."),
             "form": None,
         },
     ]
@@ -102,7 +102,7 @@ def _manager(model):
 
 def _portal_guard(request):
     if not is_portal_admin(request.user):
-        return forbidden(request, "Portal is only for administrators.")
+        return forbidden(request, "Портал доступен только администраторам.")
     return None
 
 
@@ -127,8 +127,8 @@ def _list_headers(model: type[models.Model], fields: tuple[str, ...]):
 def _friendly_integrity_message(exc: Exception) -> str:
     text = str(exc)
     if "inventory_number" in text:
-        return _("Inventory number already exists. Choose another one.")
-    return _("Could not save due to duplicate or invalid unique field value.")
+        return _("Такой инвентарный номер уже существует. Укажите другой.")
+    return _("Не удалось сохранить запись из-за дублирующегося или некорректного уникального значения.")
 
 
 @login_required
@@ -244,7 +244,7 @@ def portal_delete(request, entity: str, pk: int):
     cfg = _get_entity_or_404(entity)
     obj = get_object_or_404(_manager(cfg.model), pk=pk)
     if cfg.model is User and obj.pk == request.user.pk:
-        messages.error(request, "You cannot delete your own account.")
+        messages.error(request, "Нельзя удалить собственную учётную запись.")
         return redirect("portal_list", entity=cfg.slug)
     if request.method == "POST":
         if hasattr(obj, "_actor"):
@@ -256,7 +256,7 @@ def portal_delete(request, entity: str, pk: int):
             log_portal_action(request, "delete", cfg.slug, obj=obj_repr, meta={"pk": obj_pk})
             return redirect("portal_list", entity=cfg.slug)
         except ProtectedError:
-            messages.error(request, _("This record cannot be deleted because it is used by related data."))
+            messages.error(request, _("Эту запись нельзя удалить, потому что она используется связанными данными."))
             return redirect("portal_list", entity=cfg.slug)
     return render(request, "inventory/portal/object_confirm_delete.html", {**_portal_nav_context(cfg.slug), "cfg": cfg, "object": obj})
 
@@ -288,19 +288,19 @@ def portal_procedure_run(request, slug: str):
     if slug == "reject_stale_requests":
         form = RejectStaleRequestsProcedureForm(request.POST, prefix="reject")
         if not form.is_valid():
-            messages.error(request, _("Enter a valid stale period for requests."))
+            messages.error(request, _("Укажите корректный срок давности для заявок."))
             return redirect("portal_home")
         result = reject_stale_requests(actor=request.user, stale_days=form.cleaned_data["stale_days"])
     elif slug == "finish_abandoned_timers":
         form = FinishAbandonedTimersProcedureForm(request.POST, prefix="timers")
         if not form.is_valid():
-            messages.error(request, _("Enter a valid stale period for timers."))
+            messages.error(request, _("Укажите корректный срок давности для таймеров."))
             return redirect("portal_home")
         result = finish_abandoned_timers(actor=request.user, stale_hours=form.cleaned_data["stale_hours"])
     elif slug == "restock_low_stock_consumables":
         result = restock_low_stock_consumables(actor=request.user)
     else:
-        messages.error(request, _("Unknown procedure."))
+        messages.error(request, _("Неизвестная процедура."))
         return redirect("portal_home")
 
     log_portal_action(

@@ -3,23 +3,23 @@
 
 {% block content %}
 <div class="card">
-    <h2>Suppliers</h2>
+    <h2>Поставщики</h2>
     {% if user|has_group:"Administrator" %}
     <div class="actions" style="margin-bottom: 8px;">
-        <a href="{% url 'portal_create' entity='suppliers' %}">➕ Add</a>
-        <a class="secondary" href="{% url 'portal_list' entity='suppliers' %}">🧰 Manage suppliers</a>
+        <a href="{% url 'portal_create' entity='suppliers' %}">➕ Добавить</a>
+        <a class="secondary" href="{% url 'portal_list' entity='suppliers' %}">🧰 Управление поставщиками</a>
     </div>
     {% endif %}
     <table>
         <thead>
             <tr>
-                <th>Name</th>
-                <th>Contact</th>
-                <th>Phone</th>
+                <th>Название</th>
+                <th>Контактное лицо</th>
+                <th>Телефон</th>
                 <th>Email</th>
-                <th>Address</th>
+                <th>Адрес</th>
                 {% if user|has_group:"Administrator" %}
-                <th>Actions</th>
+                <th>Действия</th>
                 {% endif %}
             </tr>
         </thead>
@@ -43,7 +43,7 @@
                 {% endif %}
             </tr>
             {% empty %}
-            <tr><td colspan="{% if user|has_group:'Administrator' %}6{% else %}5{% endif %}" class="muted">No suppliers yet.</td></tr>
+            <tr><td colspan="{% if user|has_group:'Administrator' %}6{% else %}5{% endif %}" class="muted">Поставщиков пока нет.</td></tr>
             {% endfor %}
         </tbody>
     </table>

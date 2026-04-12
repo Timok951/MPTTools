@@ -134,22 +134,6 @@
         body.theme-dark .header-tools a.admin-quick-muted {
             color: var(--ink);
         }
-        .header-tools form.lang-form {
-            display: inline-flex;
-            align-items: center;
-            gap: 8px;
-            margin: 0;
-            padding: 4px 8px;
-            border: 1px solid var(--border);
-            border-radius: 999px;
-            background: var(--surface);
-        }
-        .header-tools form.lang-form label {
-            margin: 0;
-            font-size: 12px;
-            font-weight: 600;
-            color: var(--ink);
-        }
         .brand {
             display: grid;
             gap: 6px;
@@ -699,38 +683,47 @@
             <div class="topbar">
                 <div class="header-main">
                     <div class="brand">
-                        <h1>{% trans "MPT Inventory" %}</h1>
-                        <span>{% trans "Inventory and materials for the technical college" %}</span>
+                        <h1>{% ui_text "МПТ Инвентарь" "MPT Inventory" %}</h1>
+                        <span>{% ui_text "Учёт оборудования и материалов для колледжа" "Equipment and materials tracking for the college" %}</span>
                     </div>
                     <nav>
-                        <a href="{% url 'analytics' %}">{% trans "Analytics" %}</a>
-                        <a href="{% url 'equipment_list' %}">{% trans "Equipment" %}</a>
-                        <a href="{% url 'inventory_search' %}">{% trans "Search" %}</a>
-                        <a href="{% url 'request_history' %}">{% trans "Requests" %}</a>
-                        <a href="{% url 'usage_history' %}">{% trans "Usage" %}</a>
-                        <a href="{% url 'checkouts' %}">{% trans "Checkouts" %}</a>
-                        <a href="{% url 'timer_panel' %}">{% trans "Timers" %}</a>
-                        <a href="{% url 'workplaces' %}">{% trans "Workplaces" %}</a>
-                        <a href="{% url 'cabinets' %}">{% trans "Cabinets" %}</a>
-                        <a href="{% url 'suppliers' %}">{% trans "Suppliers" %}</a>
-                        <a href="{% url 'history' %}">{% trans "History" %}</a>
-                        <a href="{% url 'reports' %}">{% trans "Reports" %}</a>
+                        {% if user|has_group:"Administrator" %}
+                        <a href="{% url 'analytics' %}">{% ui_text "Аналитика" "Analytics" %}</a>
+                        {% endif %}
+                        <a href="{% url 'equipment_list' %}">{% ui_text "Оборудование" "Equipment" %}</a>
+                        <a href="{% url 'inventory_search' %}">{% ui_text "Поиск" "Search" %}</a>
+                        <a href="{% url 'request_history' %}">{% ui_text "Заявки" "Requests" %}</a>
+                        <a href="{% url 'usage_history' %}">{% ui_text "Списания" "Usage" %}</a>
+                        <a href="{% url 'checkouts' %}">{% ui_text "Выдачи" "Checkouts" %}</a>
+                        <a href="{% url 'timer_panel' %}">{% ui_text "Таймеры" "Timers" %}</a>
+                        <a href="{% url 'workplaces' %}">{% ui_text "Рабочие места" "Workplaces" %}</a>
+                        <a href="{% url 'cabinets' %}">{% ui_text "Кабинеты" "Cabinets" %}</a>
+                        <a href="{% url 'suppliers' %}">{% ui_text "Поставщики" "Suppliers" %}</a>
+                        {% if user|has_group:"Administrator" %}
+                        <a href="{% url 'history' %}">{% ui_text "История" "History" %}</a>
+                        {% endif %}
+                        {% if user|has_group:"Administrator" or user|has_group:"Warehouse" or user|has_group:"Sysadmin" %}
+                        <a href="{% url 'reports' %}">{% ui_text "Отчёты" "Reports" %}</a>
+                        {% endif %}
                     </nav>
                 </div>
 
                 <div class="header-tools">
-                    {% if user|has_group:"Administrator" %}
-                        <a class="admin-quick" href="{% url 'portal_home' %}">{% trans "Admin portal" %}</a>
-                        <a class="admin-quick admin-quick-muted" href="{% url 'role_assignment' %}">{% trans "Roles" %}</a>
-                        <a class="admin-quick admin-quick-muted" href="{% url 'data_tools' %}">{% trans "Backup / PDF" %}</a>
-                        <a class="admin-quick admin-quick-muted" href="{% url 'api_docs' %}">{% trans "API docs" %}</a>
+                    {% if user|has_group:"Administrator" or user|has_group:"Sysadmin" %}
+                        {% if user|has_group:"Administrator" %}
+                        <a class="admin-quick" href="{% url 'portal_home' %}">{% ui_text "Портал администратора" "Administrator portal" %}</a>
+                        <a class="admin-quick admin-quick-muted" href="{% url 'role_assignment' %}">{% ui_text "Роли" "Roles" %}</a>
+                        {% endif %}
+                        <a class="admin-quick admin-quick-muted" href="{% url 'quality_report' %}">{% ui_text "Качество сайта" "Site quality" %}</a>
+                        <a class="admin-quick admin-quick-muted" href="{% url 'data_tools' %}">{% ui_text "Резервные копии / PDF" "Backups / PDF" %}</a>
+                        <a class="admin-quick admin-quick-muted" href="{% url 'api_docs' %}">{% ui_text "Документация API" "API docs" %}</a>
                     {% endif %}
 
                     <div class="user-chip">
                         {% if user.is_authenticated %}
-                            {% trans "User" %}: {{ user.username }}
+                            {% ui_text "Пользователь" "User" %}: {{ user.username }}
                         {% else %}
-                            {% trans "Not signed in" %}
+                            {% ui_text "Вход не выполнен" "Not signed in" %}
                         {% endif %}
                     </div>
 
@@ -743,12 +736,12 @@
                                 <span class="switch-dot"></span>
                             </span>
                             <span class="switch-copy">
-                                <span class="switch-title">{% trans "Show deleted (soft)" %}</span>
+                                <span class="switch-title">{% ui_text "Показать удалённые" "Show deleted" %}</span>
                                 <span class="switch-state">
                                     {% if request.session.show_deleted_global %}
-                                        {% trans "Enabled" %}
+                                        {% ui_text "Включено" "Enabled" %}
                                     {% else %}
-                                        {% trans "Disabled" %}
+                                        {% ui_text "Выключено" "Disabled" %}
                                     {% endif %}
                                 </span>
                             </span>
@@ -756,34 +749,12 @@
                     </form>
                     {% endif %}
 
-                    <form method="post" action="{% url 'set_language' %}" class="lang-form">
-                        {% csrf_token %}
-                        <input type="hidden" name="next" value="{{ request.get_full_path }}">
-                        <label for="id_lang">{% trans "Language" %}</label>
-                        <select id="id_lang" name="language" onchange="this.form.submit()" style="width:auto;">
-                            {% if ui_preferences and ui_preferences.preferred_language %}
-                                {% with ui_preferences.preferred_language as CURRENT_LANGUAGE %}
-                                    {% get_available_languages as LANGUAGES %}
-                                    {% for code, name in LANGUAGES %}
-                                        <option value="{{ code }}" {% if code == CURRENT_LANGUAGE %}selected{% endif %}>{{ name }}</option>
-                                    {% endfor %}
-                                {% endwith %}
-                            {% else %}
-                            {% get_current_language as CURRENT_LANGUAGE %}
-                            {% get_available_languages as LANGUAGES %}
-                            {% for code, name in LANGUAGES %}
-                                <option value="{{ code }}" {% if code == CURRENT_LANGUAGE %}selected{% endif %}>{{ name }}</option>
-                            {% endfor %}
-                            {% endif %}
-                        </select>
-                    </form>
-
                     {% if user.is_authenticated %}
-                        <a class="admin-quick admin-quick-muted" href="{% url 'user_preferences' %}">Настройки</a>
-                        <a class="admin-quick admin-quick-muted" href="{% url 'logout' %}">{% trans "Logout" %}</a>
+                        <a class="admin-quick admin-quick-muted" href="{% url 'user_preferences' %}">{% ui_text "Настройки" "Preferences" %}</a>
+                        <a class="admin-quick admin-quick-muted" href="{% url 'logout' %}">{% ui_text "Выйти" "Logout" %}</a>
                     {% else %}
-                        <a class="admin-quick admin-quick-muted" href="{% url 'login' %}">{% trans "Login" %}</a>
-                        <a class="admin-quick admin-quick-muted" href="{% url 'register' %}">{% trans "Register" %}</a>
+                        <a class="admin-quick admin-quick-muted" href="{% url 'login' %}">{% ui_text "Войти" "Login" %}</a>
+                        <a class="admin-quick admin-quick-muted" href="{% url 'register' %}">{% ui_text "Регистрация" "Register" %}</a>
                     {% endif %}
                 </div>
             </div>
@@ -798,23 +769,23 @@
             {% endif %}
             {% if user.is_authenticated and show_hotkey_legend %}
                 <div class="hotkey-legend">
-                    <strong>Горячие клавиши</strong>
+                    <strong>{% ui_text "Горячие клавиши" "Hotkeys" %}</strong>
                     <div class="hotkey-grid">
-                        <div class="hotkey-item"><code>G</code><code>E</code> Оборудование</div>
-                        <div class="hotkey-item"><code>G</code><code>R</code> Заявки</div>
-                        <div class="hotkey-item"><code>G</code><code>U</code> Списания</div>
-                        <div class="hotkey-item"><code>G</code><code>C</code> Выдачи</div>
-                        <div class="hotkey-item"><code>G</code><code>T</code> Таймеры</div>
-                        <div class="hotkey-item"><code>G</code><code>S</code> Поиск</div>
-                        <div class="hotkey-item"><code>N</code><code>R</code> Новая заявка</div>
-                        <div class="hotkey-item"><code>N</code><code>T</code> Новый таймер</div>
-                        <div class="hotkey-item"><code>?</code> Показать или скрыть подсказку</div>
+                        <div class="hotkey-item"><code>G</code><code>E</code> {% ui_text "Оборудование" "Equipment" %}</div>
+                        <div class="hotkey-item"><code>G</code><code>R</code> {% ui_text "Заявки" "Requests" %}</div>
+                        <div class="hotkey-item"><code>G</code><code>U</code> {% ui_text "Списания" "Usage" %}</div>
+                        <div class="hotkey-item"><code>G</code><code>C</code> {% ui_text "Выдачи" "Checkouts" %}</div>
+                        <div class="hotkey-item"><code>G</code><code>T</code> {% ui_text "Таймеры" "Timers" %}</div>
+                        <div class="hotkey-item"><code>G</code><code>S</code> {% ui_text "Поиск" "Search" %}</div>
+                        <div class="hotkey-item"><code>N</code><code>R</code> {% ui_text "Новая заявка" "New request" %}</div>
+                        <div class="hotkey-item"><code>N</code><code>T</code> {% ui_text "Новый таймер" "New timer" %}</div>
+                        <div class="hotkey-item"><code>?</code> {% ui_text "Показать или скрыть подсказку" "Show or hide help" %}</div>
                     </div>
                 </div>
             {% endif %}
             {% block content %}{% endblock %}
         </main>
-        <footer>{% trans "Data and role management are available in the Administrator Portal." %}</footer>
+        <footer>{% ui_text "Управление данными и ролями доступно в административном портале." "Data and role management are available in the administrator portal." %}</footer>
     </div>
     {% if user.is_authenticated and hotkeys_enabled %}
     <script>

@@ -14,11 +14,11 @@ STATUS_REPAIR = "repair"
 STATUS_RETIRED = "retired"
 
 EQUIPMENT_STATUS_CHOICES = [
-    (STATUS_IN_STOCK, "In stock"),
-    (STATUS_ASSIGNED, "Assigned"),
-    (STATUS_CHECKED_OUT, "Checked out"),
-    (STATUS_REPAIR, "Repair"),
-    (STATUS_RETIRED, "Retired"),
+    (STATUS_IN_STOCK, "На складе"),
+    (STATUS_ASSIGNED, "Закреплено"),
+    (STATUS_CHECKED_OUT, "Выдано"),
+    (STATUS_REPAIR, "В ремонте"),
+    (STATUS_RETIRED, "Списано"),
 ]
 
 

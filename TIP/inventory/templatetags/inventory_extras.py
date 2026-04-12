@@ -52,3 +52,12 @@ def querystring(context, **kwargs):
             query[key] = value
     return query.urlencode()
 
+
+@register.simple_tag(takes_context=True)
+def ui_text(context, ru_text: str, en_text: str):
+    request = context.get("request")
+    language_code = getattr(request, "LANGUAGE_CODE", "") if request else ""
+    if str(language_code).lower().startswith("en"):
+        return en_text
+    return ru_text
+

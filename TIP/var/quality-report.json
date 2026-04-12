@@ -1,0 +1,145 @@
+{
+  "generated_at": "2026-04-12T19:54:41.399529+00:00",
+  "started_at": "2026-04-12T19:51:53.270630+00:00",
+  "python_executable": "G:\\Programming\\Django\\MPTTools\\.venv\\Scripts\\python.exe",
+  "report_path": "G:\\Programming\\Django\\MPTTools\\TIP\\var\\quality-report.json",
+  "summary": {
+    "total_commands": 7,
+    "passed_commands": 7,
+    "failed_commands": 0,
+    "total_tests_ran": 41,
+    "overall_status": "passed"
+  },
+  "checks": [
+    {
+      "slug": "django_check",
+      "title": "Django system check",
+      "command": "G:\\Programming\\Django\\MPTTools\\.venv\\Scripts\\python.exe G:\\Programming\\Django\\MPTTools\\TIP\\manage.py check",
+      "status": "passed",
+      "returncode": 0,
+      "duration_seconds": 0.73,
+      "tests_ran": 0,
+      "output_tail": [
+        "System check identified no issues (0 silenced)."
+      ]
+    },
+    {
+      "slug": "preferences_and_i18n",
+      "title": "Preferences and language tests",
+      "command": "G:\\Programming\\Django\\MPTTools\\.venv\\Scripts\\python.exe G:\\Programming\\Django\\MPTTools\\TIP\\manage.py test inventory.tests.TimerAndPreferenceViewTests --noinput",
+      "status": "passed",
+      "returncode": 0,
+      "duration_seconds": 7.105,
+      "tests_ran": 4,
+      "output_tail": [
+        "Found 4 test(s).",
+        "System check identified no issues (0 silenced).",
+        "Creating test database for alias 'default'...",
+        "....",
+        "----------------------------------------------------------------------",
+        "Ran 4 tests in 3.734s",
+        "OK",
+        "Destroying test database for alias 'default'..."
+      ]
+    },
+    {
+      "slug": "performance",
+      "title": "Lightweight performance tests",
+      "command": "G:\\Programming\\Django\\MPTTools\\.venv\\Scripts\\python.exe G:\\Programming\\Django\\MPTTools\\TIP\\manage.py test inventory.tests.LightweightPerformanceTests --noinput",
+      "status": "passed",
+      "returncode": 0,
+      "duration_seconds": 5.604,
+      "tests_ran": 2,
+      "output_tail": [
+        "Found 2 test(s).",
+        "System check identified no issues (0 silenced).",
+        "Creating test database for alias 'default'...",
+        "..",
+        "----------------------------------------------------------------------",
+        "Ran 2 tests in 2.019s",
+        "OK",
+        "Destroying test database for alias 'default'..."
+      ]
+    },
+    {
+      "slug": "admin_procedures",
+      "title": "Admin procedure tests",
+      "command": "G:\\Programming\\Django\\MPTTools\\.venv\\Scripts\\python.exe G:\\Programming\\Django\\MPTTools\\TIP\\manage.py test inventory.tests.AdminProcedureTests --noinput",
+      "status": "passed",
+      "returncode": 0,
+      "duration_seconds": 13.45,
+      "tests_ran": 5,
+      "output_tail": [
+        "Found 5 test(s).",
+        "System check identified no issues (0 silenced).",
+        "Creating test database for alias 'default'...",
+        ".....",
+        "----------------------------------------------------------------------",
+        "Ran 5 tests in 8.533s",
+        "OK",
+        "Destroying test database for alias 'default'..."
+      ]
+    },
+    {
+      "slug": "web_roles",
+      "title": "Web role enforcement tests",
+      "command": "G:\\Programming\\Django\\MPTTools\\.venv\\Scripts\\python.exe G:\\Programming\\Django\\MPTTools\\TIP\\manage.py test inventory.tests.RoleEnforcementWebTests --noinput",
+      "status": "passed",
+      "returncode": 0,
+      "duration_seconds": 36.42,
+      "tests_ran": 8,
+      "output_tail": [
+        "Found 8 test(s).",
+        "System check identified no issues (0 silenced).",
+        "Creating test database for alias 'default'...",
+        "........",
+        "----------------------------------------------------------------------",
+        "Ran 8 tests in 33.560s",
+        "OK",
+        "Destroying test database for alias 'default'..."
+      ]
+    },
+    {
+      "slug": "api_roles",
+      "title": "API role and CRUD tests",
+      "command": "G:\\Programming\\Django\\MPTTools\\.venv\\Scripts\\python.exe G:\\Programming\\Django\\MPTTools\\TIP\\manage.py test inventory.tests.InventoryApiTests --noinput",
+      "status": "passed",
+      "returncode": 0,
+      "duration_seconds": 100.94,
+      "tests_ran": 19,
+      "output_tail": [
+        "Found 19 test(s).",
+        "System check identified no issues (0 silenced).",
+        "Creating test database for alias 'default'...",
+        "...................",
+        "----------------------------------------------------------------------",
+        "Ran 19 tests in 97.917s",
+        "OK",
+        "Destroying test database for alias 'default'..."
+      ]
+    },
+    {
+      "slug": "backup",
+      "title": "Backup command tests",
+      "command": "G:\\Programming\\Django\\MPTTools\\.venv\\Scripts\\python.exe G:\\Programming\\Django\\MPTTools\\TIP\\manage.py test inventory.tests.BackupCommandTests --noinput",
+      "status": "passed",
+      "returncode": 0,
+      "duration_seconds": 3.88,
+      "tests_ran": 3,
+      "output_tail": [
+        "Found 3 test(s).",
+        "System check identified no issues (0 silenced).",
+        "Backup created: C:\\Users\\timof\\AppData\\Local\\Temp\\tmpy6he9m8h\\mpttools_20260412_195440_server.dump",
+        "No old backups were removed.",
+        "Creating test database for alias 'default'...",
+        "C:\\Program Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\unittest\\case.py:115: UserWarning: Overriding setting DATABASES can lead to unexpected behavior.",
+        "  result = enter(cm)",
+        "...",
+        "----------------------------------------------------------------------",
+        "Ran 3 tests in 0.075s",
+        "OK",
+        "Destroying test database for alias 'default'..."
+      ]
+    }
+  ]
+}

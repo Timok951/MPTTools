@@ -1,17 +1,18 @@
 {% extends "inventory/base.html" %}
+{% load inventory_extras %}
 
 {% block content %}
 <div class="card auth-card">
-    <h2>Регистрация</h2>
-    <p class="muted">После регистрации администратор назначит роль.</p>
+    <h2>{% ui_text "Регистрация" "Registration" %}</h2>
+    <p class="muted">{% ui_text "После регистрации администратор назначит роль." "An administrator will assign a role after registration." %}</p>
     <form method="post" class="grid">
         {% csrf_token %}
         {{ form.as_p }}
-        <button class="btn" type="submit">Создать аккаунт</button>
+        <button class="btn" type="submit">{% ui_text "Создать аккаунт" "Create account" %}</button>
     </form>
     <div class="inline-links">
-        <span>Уже есть аккаунт?</span>
-        <a href="{% url 'login' %}">Войти</a>
+        <span>{% ui_text "Уже есть аккаунт?" "Already have an account?" %}</span>
+        <a href="{% url 'login' %}">{% ui_text "Войти" "Sign in" %}</a>
     </div>
 </div>
 {% endblock %}

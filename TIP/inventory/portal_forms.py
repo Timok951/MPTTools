@@ -213,14 +213,10 @@ class PortalUserForm(forms.ModelForm):
             "last_name",
             "email",
             "is_active",
-            "is_staff",
-            "is_superuser",
             "groups",
-            "user_permissions",
         ]
         widgets = {
             "groups": forms.SelectMultiple(attrs={"size": 8}),
-            "user_permissions": forms.SelectMultiple(attrs={"size": 10}),
         }
         labels = {
             "username": "Имя пользователя",
@@ -228,11 +224,14 @@ class PortalUserForm(forms.ModelForm):
             "last_name": "Фамилия",
             "email": "Почта",
             "is_active": "Активен",
-            "is_staff": "Staff",
-            "is_superuser": "Суперпользователь",
             "groups": "Группы",
-            "user_permissions": "Права пользователя",
         }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["groups"].queryset = Group.objects.filter(
+            name__in=["Administrator", "Warehouse", "Sysadmin", "Builder"]
+        ).order_by("name")
 
     def clean(self):
         cleaned = super().clean()

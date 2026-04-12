@@ -120,27 +120,27 @@ class UserPreference(models.Model):
     THEME_CONTRAST = "contrast"
     THEME_DARK = "dark"
     THEME_CHOICES = [
-        (THEME_DEFAULT, _("Soft light")),
-        (THEME_CONTRAST, _("High contrast")),
-        (THEME_DARK, _("Dark night")),
+        (THEME_DEFAULT, _("Мягкая светлая")),
+        (THEME_CONTRAST, _("Контрастная")),
+        (THEME_DARK, _("Тёмная")),
     ]
 
     DATE_FORMAT_COMPACT = "compact"
     DATE_FORMAT_ISO = "iso"
     DATE_FORMAT_VERBOSE = "verbose"
     DATE_FORMAT_CHOICES = [
-        (DATE_FORMAT_COMPACT, _("DD.MM.YYYY HH:MM")),
-        (DATE_FORMAT_ISO, _("YYYY-MM-DD HH:MM")),
-        (DATE_FORMAT_VERBOSE, _("Verbose locale format")),
+        (DATE_FORMAT_COMPACT, _("ДД.ММ.ГГГГ ЧЧ:ММ")),
+        (DATE_FORMAT_ISO, _("ГГГГ-ММ-ДД ЧЧ:ММ")),
+        (DATE_FORMAT_VERBOSE, _("Развёрнутый локальный формат")),
     ]
 
     TIMER_FILTER_ALL = ""
     TIMER_FILTER_ACTIVE = "active"
     TIMER_FILTER_FINISHED = "finished"
     TIMER_FILTER_CHOICES = [
-        (TIMER_FILTER_ALL, _("All timers")),
-        (TIMER_FILTER_ACTIVE, _("Active timers")),
-        (TIMER_FILTER_FINISHED, _("Finished timers")),
+        (TIMER_FILTER_ALL, _("Все таймеры")),
+        (TIMER_FILTER_ACTIVE, _("Активные таймеры")),
+        (TIMER_FILTER_FINISHED, _("Завершённые таймеры")),
     ]
 
     PAGE_SIZE_CHOICES = [
@@ -152,9 +152,9 @@ class UserPreference(models.Model):
     CHECKOUT_FILTER_ALL = ""
     CHECKOUT_FILTER_RETURNED = "returned"
     CHECKOUT_FILTER_CHOICES = [
-        (CHECKOUT_FILTER_ALL, _("All checkouts")),
-        (TIMER_FILTER_ACTIVE, _("Active checkouts")),
-        (CHECKOUT_FILTER_RETURNED, _("Returned checkouts")),
+        (CHECKOUT_FILTER_ALL, _("Все выдачи")),
+        (TIMER_FILTER_ACTIVE, _("Активные выдачи")),
+        (CHECKOUT_FILTER_RETURNED, _("Возвращённые выдачи")),
     ]
 
     user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="preferences")

@@ -5,13 +5,13 @@
 <div class="card">
     <div class="card-header">
         <div>
-            <div class="kicker">{% trans "Timers" %}</div>
-            <h2>{% trans "Timer panel" %}</h2>
-            <p class="muted">{% trans "Start a live timer in one click or filter the log below." %}</p>
+            <div class="kicker">Таймеры</div>
+            <h2>Панель таймеров</h2>
+            <p class="muted">Запустите таймер в один клик или отфильтруйте историю ниже.</p>
         </div>
         <div class="table-meta">
             {% if using_default_status_filter %}
-                {% trans "Using your saved default timer filter." %}
+                Используется сохранённый фильтр таймеров по умолчанию.
             {% endif %}
         </div>
     </div>
@@ -26,8 +26,12 @@
                     {% include "inventory/_form_field.html" with field=quick_timer_form.note full_width=True %}
                 </div>
                 <div class="actions">
+                    {% if can_create_timer %}
                     <button class="btn" type="submit">Запустить сейчас</button>
                     <a class="secondary" href="{% url 'timer_create' %}">Ручной ввод</a>
+                    {% else %}
+                    <span class="muted">Создание таймеров недоступно для вашей роли.</span>
+                    {% endif %}
                 </div>
             </form>
         </div>
@@ -39,21 +43,23 @@
         <div>
             <label for="id_timer_status">{% trans "Status" %}</label>
             <select id="id_timer_status" name="status">
-                <option value="">{% trans "All" %}</option>
-                <option value="active" {% if filters.status == "active" %}selected{% endif %}>{% trans "Active" %}</option>
-                <option value="finished" {% if filters.status == "finished" %}selected{% endif %}>{% trans "Finished" %}</option>
+                <option value="">Все</option>
+                <option value="active" {% if filters.status == "active" %}selected{% endif %}>Активные</option>
+                <option value="finished" {% if filters.status == "finished" %}selected{% endif %}>Завершённые</option>
             </select>
         </div>
         <div>
-            <button class="btn" type="submit">{% trans "Apply" %}</button>
+            <button class="btn" type="submit">Применить</button>
         </div>
     </form>
     <div class="toolbar-spread">
-        <div class="table-meta">{% trans "Showing" %}: {{ timers|length }} / {{ total_rows }}</div>
+        <div class="table-meta">Показано: {{ timers|length }} / {{ total_rows }}</div>
         <div class="actions">
-        <a href="{% url 'timer_create' %}">{% trans "New timer entry" %}</a>
+        {% if can_create_timer %}
+        <a href="{% url 'timer_create' %}">Новая запись таймера</a>
+        {% endif %}
         {% if user|has_group:"Administrator" %}
-        <a class="secondary" href="{% url 'portal_list' entity='timers' %}">🧰 {% trans "Manage timers" %}</a>
+        <a class="secondary" href="{% url 'portal_list' entity='timers' %}">🧰 Управление таймерами</a>
         {% endif %}
         </div>
     </div>
@@ -61,14 +67,14 @@
         <thead>
             <tr>
                 <th>{% trans "ID" %}</th>
-                <th>{% trans "User" %}</th>
-                <th>{% trans "Workplace" %}</th>
-                <th>{% trans "Equipment" %}</th>
-                <th>{% trans "Start" %}</th>
-                <th>{% trans "End" %}</th>
-                <th>{% trans "Duration (sec)" %}</th>
-                <th>{% trans "Status" %}</th>
-                <th>{% trans "Actions" %}</th>
+                <th>Пользователь</th>
+                <th>Рабочее место</th>
+                <th>Оборудование</th>
+                <th>Начало</th>
+                <th>Завершение</th>
+                <th>Длительность (сек)</th>
+                <th>Статус</th>
+                <th>Действия</th>
             </tr>
         </thead>
         <tbody>
@@ -83,14 +89,14 @@
                 <td>{{ item.duration_seconds_live }}</td>
                 <td>
                     {% if item.is_active %}
-                        <span class="badge warn">{% trans "Active" %}</span>
+                        <span class="badge warn">Активен</span>
                     {% else %}
-                        <span class="badge">{% trans "Finished" %}</span>
+                        <span class="badge">Завершён</span>
                     {% endif %}
                 </td>
                 <td class="actions">
-                    {% if item.is_active and can_manage_timers %}
-                        <a href="{% url 'timer_stop' timer_id=item.pk %}">⏹ {% trans "Stop now" %}</a>
+                    {% if item.is_active and item.can_stop %}
+                        <a href="{% url 'timer_stop' timer_id=item.pk %}">⏹ Остановить</a>
                     {% endif %}
                     {% if user|has_group:"Administrator" %}
                     <a href="{% url 'portal_edit' entity='timers' pk=item.pk %}">✏️</a>
@@ -103,7 +109,7 @@
                 </td>
             </tr>
             {% empty %}
-            <tr><td colspan="9" class="muted">{% trans "No timers yet." %}</td></tr>
+            <tr><td colspan="9" class="muted">Таймеров пока нет.</td></tr>
             {% endfor %}
         </tbody>
     </table>

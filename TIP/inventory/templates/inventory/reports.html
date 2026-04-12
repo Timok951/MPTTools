@@ -27,7 +27,7 @@
 
 <div class="card">
     <div class="actions">
-        <a href="{% url 'reports_export' 'cabinets' %}?from={{ filters.from }}&to={{ filters.to }}">{% trans "Export cabinets (Excel)" %}</a>
+        <a href="{% url 'reports_export' 'cabinets' %}?from={{ filters.from }}&to={{ filters.to }}">Экспорт кабинетов (CSV)</a>
     </div>
     <h3>{% trans "Cabinet summary" %}</h3>
     <table>
@@ -58,7 +58,7 @@
 
 <div class="card">
     <div class="actions">
-        <a href="{% url 'reports_export' 'materials' %}?from={{ filters.from }}&to={{ filters.to }}">{% trans "Export materials (Excel)" %}</a>
+        <a href="{% url 'reports_export' 'materials' %}?from={{ filters.from }}&to={{ filters.to }}">Экспорт материалов (CSV)</a>
     </div>
     <h3>{% trans "Consumables usage" %}</h3>
     <table>

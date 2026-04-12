@@ -5,33 +5,35 @@
 <div class="card">
     <div class="card-header">
         <div>
-            <div class="kicker">{% trans "Usage" %}</div>
-            <h2>{% trans "Usage history" %}</h2>
+            <div class="kicker">Списания</div>
+            <h2>История списаний</h2>
         </div>
-        <div class="table-meta">{% trans "Rows per page" %}: {{ page_size }}</div>
+        <div class="table-meta">Строк на странице: {{ page_size }}</div>
     </div>
     <form method="get" class="filters">
         <div>
-            <label for="id_from">{% trans "From" %}</label>
+            <label for="id_from">С</label>
             <input id="id_from" type="date" name="from" value="{{ filters.from }}" />
         </div>
         <div>
-            <label for="id_to">{% trans "To" %}</label>
+            <label for="id_to">По</label>
             <input id="id_to" type="date" name="to" value="{{ filters.to }}" />
         </div>
         <div>
-            <button class="btn" type="submit">{% trans "Apply" %}</button>
+            <button class="btn" type="submit">Применить</button>
         </div>
     </form>
 </div>
 
 <div class="card">
     <div class="toolbar-spread">
-        <div class="table-meta">{% trans "Showing" %}: {{ usage|length }} / {{ total_rows }}</div>
+        <div class="table-meta">Показано: {{ usage|length }} / {{ total_rows }}</div>
         <div class="actions">
-            <a href="{% url 'usage_create' %}">{% trans "Record usage" %}</a>
+            {% if can_create_usage %}
+            <a href="{% url 'usage_create' %}">Списать материал</a>
+            {% endif %}
             {% if user|has_group:"Administrator" %}
-            <a class="secondary" href="{% url 'portal_list' entity='usage' %}">🧰 {% trans "Manage usage" %}</a>
+            <a class="secondary" href="{% url 'portal_list' entity='usage' %}">🧰 Управление списаниями</a>
             {% endif %}
         </div>
     </div>
@@ -45,7 +47,7 @@
                 <th>{% trans "Workplace" %}</th>
                 <th>{% trans "Date" %}</th>
                 <th>{% trans "Request" %}</th>
-                {% if user|has_group:"Administrator" %}<th>Actions</th>{% endif %}
+                {% if user|has_group:"Administrator" %}<th>Действия</th>{% endif %}
             </tr>
         </thead>
         <tbody>
@@ -66,7 +68,7 @@
                 {% endif %}
             </tr>
             {% empty %}
-            <tr><td colspan="{% if user|has_group:'Administrator' %}8{% else %}7{% endif %}" class="muted">{% trans "No usage history yet." %}</td></tr>
+            <tr><td colspan="{% if user|has_group:'Administrator' %}8{% else %}7{% endif %}" class="muted">История списаний пока пуста.</td></tr>
             {% endfor %}
         </tbody>
     </table>

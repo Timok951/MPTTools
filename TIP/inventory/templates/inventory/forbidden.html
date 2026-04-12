@@ -1,12 +1,13 @@
 {% extends "inventory/base.html" %}
+{% load inventory_extras %}
 
 {% block content %}
 <div class="card auth-card">
-    <h2>Доступ ограничен</h2>
+    <h2>{% ui_text "Доступ ограничен" "Access denied" %}</h2>
     <p class="muted">{{ message }}</p>
     <div class="actions">
-        <a class="btn" href="{{ back_url }}">Вернуться назад</a>
-        <a class="btn secondary" href="{% url 'analytics' %}">На главную</a>
+        <a class="btn" href="{{ back_url }}">{% ui_text "Вернуться назад" "Go back" %}</a>
+        <a class="btn secondary" href="{% url 'analytics' %}">{% ui_text "На главную" "Home" %}</a>
     </div>
 </div>
 {% endblock %}

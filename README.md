@@ -35,6 +35,9 @@ The project now ships PostgreSQL-oriented database objects via migrations:
 - `inventory_db_audit_event` with row-level audit triggers
 
 These objects are created by `inventory` migration `0001_postgresql_database_objects`.
+If you want to run the SQL objects manually on PostgreSQL, use:
+
+`db/postgresql/001_inventory_objects.sql`
 
 ## Backup / restore regulation
 
@@ -51,6 +54,66 @@ Example commands:
 pg_dump -h localhost -p 5432 -U postgres -d mpttools -Fc -f backup.dump
 pg_restore -h localhost -p 5432 -U postgres -d mpttools --clean --if-exists backup.dump
 ```
+
+Manual SQL apply:
+
+```bash
+psql -h localhost -p 5432 -U postgres -d mpttools -f db/postgresql/001_inventory_objects.sql
+```
+
+## Automatic server backup
+
+The project includes a Django management command for PostgreSQL backups:
+
+```bash
+.venv\Scripts\python.exe TIP\manage.py create_server_backup
+```
+
+Optional arguments:
+
+- `--label nightly` adds a suffix to the dump filename
+- `--keep 14` keeps only the latest 14 dump files
+- `--output-dir G:\Backups\MPTTools` stores dumps outside the project folder
+- `--pg-dump-path "C:\Program Files\PostgreSQL\17\bin\pg_dump.exe"` uses an explicit PostgreSQL client path
+
+Environment variables in `TIP/.env`:
+
+- `BACKUP_DIR` - backup directory, default `TIP/backups/postgresql`
+- `BACKUP_KEEP_COUNT` - number of recent `.dump` files to keep, default `14`
+- `PG_DUMP_PATH` - path to `pg_dump`, default `pg_dump`
+- `BACKUP_CRON_SCHEDULE` - cron schedule for Docker backup container, default `0 2 * * *`
+
+Docker automatic backup:
+
+1. Make sure your PostgreSQL credentials are present in `TIP/.env`.
+2. Start the dedicated backup container:
+
+```bash
+docker compose -f docker-compose.backup.yml up -d --build
+```
+
+3. Backups will be written to:
+
+`backups/postgresql`
+
+4. To inspect logs:
+
+```bash
+docker logs -f mpttools-backup
+```
+
+5. To stop the auto-backup container:
+
+```bash
+docker compose -f docker-compose.backup.yml down
+```
+
+Included Docker files:
+
+- `docker-compose.backup.yml`
+- `docker/backup/Dockerfile`
+- `docker/backup/backup-cron.sh`
+- `docker/backup/docker-entrypoint.sh`
 
 ## Validation
 

@@ -3,6 +3,7 @@ from django.db.models import F
 from django.utils import timezone
 from rest_framework import viewsets
 from rest_framework.exceptions import PermissionDenied, ValidationError
+from rest_framework.response import Response
 
 from assets.models import Equipment, EquipmentCheckout, InventoryAdjustment
 from core.models import Cabinet, EquipmentCategory, Supplier, Workplace
@@ -42,7 +43,9 @@ class InventoryModelViewSet(viewsets.ModelViewSet):
     }
     privileged_update_roles = ()
     privileged_delete_roles = ()
+    privileged_read_roles = ()
     owner_field = None
+    owner_read_roles = ()
     owner_update_roles = ()
     owner_delete_roles = ()
 
@@ -60,9 +63,28 @@ class InventoryModelViewSet(viewsets.ModelViewSet):
     def get_allowed_roles(self, api_action):
         return self.role_matrix.get(api_action, ())
 
+    def get_queryset(self):
+        return super().get_queryset()
+
+    def scope_queryset_for_user(self, queryset):
+        return queryset
+
+    def filter_queryset_by_role(self, queryset):
+        if user_in_group(self.request.user, GROUP_ADMIN) or user_in_group(self.request.user, GROUP_WAREHOUSE):
+            return queryset
+        return self.scope_queryset_for_user(queryset)
+
+    def list(self, request, *args, **kwargs):
+        queryset = self.filter_queryset(self.filter_queryset_by_role(self.get_queryset()))
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
+
     def has_api_object_access(self, user, api_action, obj):
-        if api_action == "read":
-            return True
         if user_in_group(user, GROUP_ADMIN):
             return True
 
@@ -155,8 +177,10 @@ class EquipmentRequestViewSet(InventoryModelViewSet):
         "update": (GROUP_ADMIN, GROUP_WAREHOUSE, GROUP_SYSADMIN, GROUP_BUILDER),
         "delete": (GROUP_ADMIN,),
     }
+    privileged_read_roles = (GROUP_WAREHOUSE,)
     privileged_update_roles = (GROUP_ADMIN, GROUP_WAREHOUSE)
     owner_field = "requester"
+    owner_read_roles = (GROUP_SYSADMIN, GROUP_BUILDER)
     owner_update_roles = (GROUP_SYSADMIN, GROUP_BUILDER)
     owner_editable_fields = {"workplace", "equipment", "quantity", "needed_by", "comment"}
 
@@ -175,6 +199,9 @@ class EquipmentRequestViewSet(InventoryModelViewSet):
         if user_in_group(self.request.user, GROUP_SYSADMIN):
             return REQUEST_KIND_SYSADMIN
         return None
+
+    def scope_queryset_for_user(self, queryset):
+        return queryset.filter(requester=self.request.user)
 
     def perform_create(self, serializer):
         extra_kwargs = {"requester": self.request.user}
@@ -210,9 +237,14 @@ class MaterialUsageViewSet(InventoryModelViewSet):
         "update": ALL_API_ROLES,
         "delete": (GROUP_ADMIN,),
     }
+    privileged_read_roles = (GROUP_WAREHOUSE,)
     privileged_update_roles = (GROUP_ADMIN, GROUP_WAREHOUSE)
     owner_field = "used_by"
+    owner_read_roles = (GROUP_SYSADMIN, GROUP_BUILDER)
     owner_update_roles = (GROUP_SYSADMIN, GROUP_BUILDER)
+
+    def scope_queryset_for_user(self, queryset):
+        return queryset.filter(used_by=self.request.user)
 
     def perform_create(self, serializer):
         self._save_with_actor(serializer, used_by=self.request.user)
@@ -280,10 +312,15 @@ class EquipmentCheckoutViewSet(InventoryModelViewSet):
         "update": (GROUP_ADMIN, GROUP_SYSADMIN, GROUP_BUILDER),
         "delete": (GROUP_ADMIN,),
     }
+    privileged_read_roles = (GROUP_WAREHOUSE,)
     privileged_update_roles = (GROUP_ADMIN,)
     owner_field = "taken_by"
+    owner_read_roles = (GROUP_SYSADMIN, GROUP_BUILDER)
     owner_update_roles = (GROUP_SYSADMIN, GROUP_BUILDER)
     editable_fields = {"workplace", "cabinet", "due_at", "returned_at", "note"}
+
+    def scope_queryset_for_user(self, queryset):
+        return queryset.filter(taken_by=self.request.user)
 
     def perform_create(self, serializer):
         with transaction.atomic():
@@ -321,9 +358,14 @@ class WorkTimerViewSet(InventoryModelViewSet):
         "update": (GROUP_ADMIN, GROUP_SYSADMIN, GROUP_BUILDER),
         "delete": (GROUP_ADMIN,),
     }
+    privileged_read_roles = (GROUP_WAREHOUSE,)
     privileged_update_roles = (GROUP_ADMIN,)
     owner_field = "user"
+    owner_read_roles = (GROUP_SYSADMIN, GROUP_BUILDER)
     owner_update_roles = (GROUP_SYSADMIN, GROUP_BUILDER)
+
+    def scope_queryset_for_user(self, queryset):
+        return queryset.filter(user=self.request.user)
 
     def perform_create(self, serializer):
         self._save_with_actor(serializer, user=self.request.user)

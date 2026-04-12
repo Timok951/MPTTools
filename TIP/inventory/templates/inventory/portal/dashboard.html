@@ -4,16 +4,16 @@
 {% block content %}
 {% include "inventory/portal/_entity_tabs.html" %}
 <div class="card">
-    <h2>{% trans "Administrator portal" %}</h2>
-    <p class="muted">{% trans "Central CRUD access for all tables, including staff, users and roles." %}</p>
+    <h2>Портал администратора</h2>
+    <p class="muted">Центральный CRUD-доступ ко всем таблицам, включая сотрудников, пользователей и роли.</p>
 </div>
 
 <div class="card">
     <div class="card-header">
         <div>
-            <div class="kicker">{% trans "Admin procedures" %}</div>
-            <h2>{% trans "Business procedures" %}</h2>
-            <p class="muted">{% trans "Admin-only batch operations for maintenance, cleanup and stock alignment." %}</p>
+            <div class="kicker">Админские процедуры</div>
+            <h2>Бизнес-процедуры</h2>
+            <p class="muted">Пакетные операции только для администратора: обслуживание, очистка и выравнивание остатков.</p>
         </div>
     </div>
     <div class="grid cols-3">
@@ -29,7 +29,7 @@
                         {% endfor %}
                     {% endif %}
                     <div class="actions">
-                        <button class="btn" type="submit">{% trans "Run procedure" %}</button>
+                        <button class="btn" type="submit">Запустить процедуру</button>
                     </div>
                 </form>
             </div>

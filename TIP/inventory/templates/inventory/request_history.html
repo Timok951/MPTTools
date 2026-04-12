@@ -5,51 +5,53 @@
 <div class="card">
     <div class="card-header">
         <div>
-            <div class="kicker">{% trans "Requests" %}</div>
-            <h2>{% trans "Requests" %}</h2>
+            <div class="kicker">Заявки</div>
+            <h2>Заявки</h2>
         </div>
-        <div class="table-meta">{% trans "Rows per page" %}: {{ page_size }}</div>
+        <div class="table-meta">Строк на странице: {{ page_size }}</div>
     </div>
     <form method="get" class="filters">
         <div>
-            <label for="id_status">{% trans "Status" %}</label>
+            <label for="id_status">Статус</label>
             <select id="id_status" name="status">
-                <option value="">{% trans "All" %}</option>
+                <option value="">Все</option>
                 {% for value, label in status_choices %}
                 <option value="{{ value }}" {% if filters.status == value %}selected{% endif %}>{{ label }}</option>
                 {% endfor %}
             </select>
         </div>
         <div>
-            <label for="id_kind">{% trans "Request type" %}</label>
+            <label for="id_kind">Тип заявки</label>
             <select id="id_kind" name="kind">
-                <option value="">{% trans "All" %}</option>
+                <option value="">Все</option>
                 {% for value, label in kind_choices %}
                 <option value="{{ value }}" {% if filters.kind == value %}selected{% endif %}>{{ label }}</option>
                 {% endfor %}
             </select>
         </div>
         <div>
-            <label for="id_from">{% trans "From" %}</label>
+            <label for="id_from">С</label>
             <input id="id_from" type="date" name="from" value="{{ filters.from }}" />
         </div>
         <div>
-            <label for="id_to">{% trans "To" %}</label>
+            <label for="id_to">По</label>
             <input id="id_to" type="date" name="to" value="{{ filters.to }}" />
         </div>
         <div>
-            <button class="btn" type="submit">{% trans "Apply" %}</button>
+            <button class="btn" type="submit">Применить</button>
         </div>
     </form>
 </div>
 
 <div class="card">
     <div class="toolbar-spread">
-        <div class="table-meta">{% trans "Showing" %}: {{ requests|length }} / {{ total_rows }}</div>
+        <div class="table-meta">Показано: {{ requests|length }} / {{ total_rows }}</div>
         <div class="actions">
-            <a href="{% url 'request_create' %}">{% trans "New request" %}</a>
+            {% if can_create_request %}
+            <a href="{% url 'request_create' %}">Новая заявка</a>
+            {% endif %}
             {% if user|has_group:"Administrator" %}
-            <a class="secondary" href="{% url 'portal_list' entity='requests' %}">🧰 {% trans "Manage requests" %}</a>
+            <a class="secondary" href="{% url 'portal_list' entity='requests' %}">🧰 Управление заявками</a>
             {% endif %}
         </div>
     </div>
@@ -64,7 +66,7 @@
                 <th>{% trans "Status" %}</th>
                 <th>{% trans "Requested at" %}</th>
                 <th>{% trans "Needed by" %}</th>
-                {% if user|has_group:"Administrator" %}<th>Actions</th>{% endif %}
+                {% if user|has_group:"Administrator" %}<th>Действия</th>{% endif %}
             </tr>
         </thead>
         <tbody>
@@ -86,7 +88,7 @@
                 {% endif %}
             </tr>
             {% empty %}
-            <tr><td colspan="{% if user|has_group:'Administrator' %}9{% else %}8{% endif %}" class="muted">{% trans "No requests yet." %}</td></tr>
+            <tr><td colspan="{% if user|has_group:'Administrator' %}9{% else %}8{% endif %}" class="muted">Заявок пока нет.</td></tr>
             {% endfor %}
         </tbody>
     </table>

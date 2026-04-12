@@ -10,6 +10,7 @@ from django.contrib.auth import login, logout
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import Group, User
 from django.conf import settings
+from django.views.decorators.http import require_POST
 from django.utils import translation
 from django.core.management import call_command
 from django.core.paginator import Paginator
@@ -38,6 +39,7 @@ from .forms import (
     UserPreferenceForm,
     WorkTimerForm,
 )
+from .quality_report import generate_quality_report, load_quality_report
 
 ROLE_DESCRIPTIONS = {
     GROUP_ADMIN: "Полный доступ, аналитика и контроль.",
@@ -52,6 +54,71 @@ def _can_manage_timers(user) -> bool:
         user_in_group(user, GROUP_ADMIN)
         or user_in_group(user, GROUP_SYSADMIN)
         or user_in_group(user, GROUP_BUILDER)
+    )
+
+
+def _can_view_all_operational_data(user) -> bool:
+    return user_in_group(user, GROUP_ADMIN) or user_in_group(user, GROUP_WAREHOUSE)
+
+
+def _can_access_history(user) -> bool:
+    return user_in_group(user, GROUP_ADMIN)
+
+
+def _can_access_reports(user) -> bool:
+    return (
+        user_in_group(user, GROUP_ADMIN)
+        or user_in_group(user, GROUP_WAREHOUSE)
+        or user_in_group(user, GROUP_SYSADMIN)
+    )
+
+
+def _can_access_data_tools(user) -> bool:
+    return user_in_group(user, GROUP_ADMIN) or user_in_group(user, GROUP_SYSADMIN)
+
+
+def _can_import_backup(user) -> bool:
+    return user_in_group(user, GROUP_ADMIN)
+
+
+def _can_access_quality_report(user) -> bool:
+    return user_in_group(user, GROUP_ADMIN) or user_in_group(user, GROUP_SYSADMIN)
+
+
+def _can_create_request(user) -> bool:
+    return (
+        user_in_group(user, GROUP_ADMIN)
+        or user_in_group(user, GROUP_SYSADMIN)
+        or user_in_group(user, GROUP_BUILDER)
+    )
+
+
+def _can_create_checkout(user) -> bool:
+    return (
+        user_in_group(user, GROUP_ADMIN)
+        or user_in_group(user, GROUP_SYSADMIN)
+        or user_in_group(user, GROUP_BUILDER)
+    )
+
+
+def _can_create_usage(user) -> bool:
+    return (
+        user_in_group(user, GROUP_ADMIN)
+        or user_in_group(user, GROUP_WAREHOUSE)
+        or user_in_group(user, GROUP_SYSADMIN)
+        or user_in_group(user, GROUP_BUILDER)
+    )
+
+
+def _can_stop_timer(user, timer: WorkTimer) -> bool:
+    return user_in_group(user, GROUP_ADMIN) or timer.user_id == user.pk
+
+
+def _can_return_checkout(user, checkout: EquipmentCheckout) -> bool:
+    return (
+        user_in_group(user, GROUP_ADMIN)
+        or user_in_group(user, GROUP_WAREHOUSE)
+        or checkout.taken_by_id == user.pk
     )
 
 
@@ -268,6 +335,8 @@ def usage_history(request):
     show_deleted = bool(request.session.get("show_deleted_global", False))
     usage_manager = MaterialUsage.all_objects if show_deleted else MaterialUsage.objects
     usage = usage_manager.select_related("equipment", "used_by", "workplace").order_by("-used_at")
+    if not _can_view_all_operational_data(request.user):
+        usage = usage.filter(used_by=request.user)
     date_from = request.GET.get("from", "").strip()
     date_to = request.GET.get("to", "").strip()
     if not date_from and "from" not in request.GET and preferences and preferences.default_usage_period_days:
@@ -283,6 +352,7 @@ def usage_history(request):
         {
             "usage": page_obj.object_list,
             "filters": {"from": date_from, "to": date_to},
+            "can_create_usage": _can_create_usage(request.user),
             **_with_page_context(page_obj),
         },
     )
@@ -295,6 +365,8 @@ def request_history(request):
     show_deleted = bool(request.session.get("show_deleted_global", False))
     requests_manager = EquipmentRequest.all_objects if show_deleted else EquipmentRequest.objects
     requests = requests_manager.select_related("requester", "equipment", "workplace").order_by("-requested_at")
+    if not _can_view_all_operational_data(request.user):
+        requests = requests.filter(requester=request.user)
     status = request.GET.get("status", "").strip()
     kind = request.GET.get("kind", "").strip()
     if not status and "status" not in request.GET and preferences and preferences.default_request_status:
@@ -323,6 +395,7 @@ def request_history(request):
             "status_choices": EquipmentRequest._meta.get_field("status").choices,
             "kind_choices": EquipmentRequest._meta.get_field("request_kind").choices,
             "filters": {"status": status, "kind": kind, "from": date_from, "to": date_to},
+            "can_create_request": _can_create_request(request.user),
             **_with_page_context(page_obj),
         },
     )
@@ -335,6 +408,8 @@ def timer_panel(request):
     show_deleted = bool(request.session.get("show_deleted_global", False))
     timers_manager = WorkTimer.all_objects if show_deleted else WorkTimer.objects
     timers = timers_manager.select_related("user", "workplace", "equipment").order_by("-started_at")
+    if not _can_view_all_operational_data(request.user):
+        timers = timers.filter(user=request.user)
     timer_status = request.GET.get("status", "").strip()
     using_default_status_filter = False
     if not timer_status and "status" not in request.GET and preferences and preferences.default_timer_status:
@@ -345,7 +420,10 @@ def timer_panel(request):
     elif timer_status == "finished":
         timers = timers.filter(ended_at__isnull=False)
 
-    active_timers_total = timers_manager.filter(ended_at__isnull=True).count()
+    active_timers_qs = timers_manager.filter(ended_at__isnull=True)
+    if not _can_view_all_operational_data(request.user):
+        active_timers_qs = active_timers_qs.filter(user=request.user)
+    active_timers_total = active_timers_qs.count()
     page_obj = _paginate(request, timers, page_size)
     now = timezone.now()
     for timer in page_obj.object_list:
@@ -355,12 +433,14 @@ def timer_panel(request):
         else:
             timer.duration_seconds_live = max(int((now - timer.started_at).total_seconds()), 0)
             timer.is_active = True
+        timer.can_stop = _can_stop_timer(request.user, timer)
 
     context = {
         "timers": page_obj.object_list,
         "filters": {"status": timer_status},
         "active_timers_total": active_timers_total,
         "can_manage_timers": _can_manage_timers(request.user),
+        "can_create_timer": _can_manage_timers(request.user),
         "quick_timer_form": QuickTimerStartForm(),
         "using_default_status_filter": using_default_status_filter,
         **_with_page_context(page_obj),
@@ -409,6 +489,10 @@ def inventory_search(request):
         )
         .order_by("name")[:25]
     )
+    if not _can_view_all_operational_data(request.user):
+        requests_manager = requests_manager.filter(requester=request.user)
+        usage_manager = usage_manager.filter(used_by=request.user)
+        checkouts_manager = checkouts_manager.filter(taken_by=request.user)
     request_results = (
         requests_manager.select_related("requester", "equipment", "workplace")
         .filter(
@@ -510,6 +594,8 @@ def checkouts(request):
     show_deleted = bool(request.session.get("show_deleted_global", False))
     checkout_manager = EquipmentCheckout.all_objects if show_deleted else EquipmentCheckout.objects
     checkout_qs = checkout_manager.select_related("equipment", "taken_by", "workplace", "cabinet", "related_request")
+    if not _can_view_all_operational_data(request.user):
+        checkout_qs = checkout_qs.filter(taken_by=request.user)
     status = request.GET.get("status", "").strip()
     if not status and "status" not in request.GET and preferences and preferences.default_checkout_status:
         status = preferences.default_checkout_status
@@ -518,12 +604,15 @@ def checkouts(request):
     elif status == "returned":
         checkout_qs = checkout_qs.filter(returned_at__isnull=False)
     page_obj = _paginate(request, checkout_qs, page_size)
+    for checkout in page_obj.object_list:
+        checkout.can_return = (not checkout.returned_at) and (not checkout.deleted_at) and _can_return_checkout(request.user, checkout)
     return render(
         request,
         "inventory/checkouts.html",
         {
             "checkouts": page_obj.object_list,
             "filters": {"status": status},
+            "can_create_checkout": _can_create_checkout(request.user),
             **_with_page_context(page_obj),
         },
     )
@@ -531,6 +620,8 @@ def checkouts(request):
 
 @login_required
 def history_timeline(request):
+    if not _can_access_history(request.user):
+        return forbidden(request, "История изменений доступна только администратору.")
     logs = AuditLog.objects.select_related("actor", "content_type").order_by("created_at")
     action = request.GET.get("action", "").strip()
     model = request.GET.get("model", "").strip()
@@ -564,6 +655,8 @@ def history_timeline(request):
 
 @login_required
 def reports(request):
+    if not _can_access_reports(request.user):
+        return forbidden(request, "Отчёты доступны только администратору и складу.")
     date_from = request.GET.get("from", "").strip()
     date_to = request.GET.get("to", "").strip()
 
@@ -614,11 +707,13 @@ def reports(request):
 
 @login_required
 def reports_export(request, report_type: str):
+    if not _can_access_reports(request.user):
+        return forbidden(request, "Экспорт отчётов доступен только администратору и складу.")
     date_from = request.GET.get("from", "").strip()
     date_to = request.GET.get("to", "").strip()
 
-    response = HttpResponse(content_type="application/vnd.ms-excel")
-    response["Content-Disposition"] = f"attachment; filename={report_type}-report.xls"
+    response = HttpResponse(content_type="text/csv; charset=utf-8")
+    response["Content-Disposition"] = f'attachment; filename="{report_type}-report.csv"'
     writer = csv.writer(response)
 
     if report_type == "cabinets":
@@ -673,11 +768,7 @@ def reports_export(request, report_type: str):
 
 @login_required
 def request_create(request):
-    if not (
-        user_in_group(request.user, GROUP_ADMIN)
-        or user_in_group(request.user, GROUP_SYSADMIN)
-        or user_in_group(request.user, GROUP_BUILDER)
-    ):
+    if not _can_create_request(request.user):
         return forbidden(request, "Заявки доступны только уполномоченным ролям.")
 
     if request.method == "POST":
@@ -697,12 +788,7 @@ def request_create(request):
 
 @login_required
 def usage_create(request):
-    if not (
-        user_in_group(request.user, GROUP_ADMIN)
-        or user_in_group(request.user, GROUP_WAREHOUSE)
-        or user_in_group(request.user, GROUP_SYSADMIN)
-        or user_in_group(request.user, GROUP_BUILDER)
-    ):
+    if not _can_create_usage(request.user):
         return forbidden(request, "Списание доступно только уполномоченным ролям.")
 
     if request.method == "POST":
@@ -742,11 +828,7 @@ def adjustment_create(request):
 
 @login_required
 def timer_create(request):
-    if not (
-        user_in_group(request.user, GROUP_ADMIN)
-        or user_in_group(request.user, GROUP_SYSADMIN)
-        or user_in_group(request.user, GROUP_BUILDER)
-    ):
+    if not _can_manage_timers(request.user):
         return forbidden(request, "Таймер доступен только уполномоченным ролям.")
 
     if request.method == "POST":
@@ -766,11 +848,7 @@ def timer_create(request):
 
 @login_required
 def timer_quick_start(request):
-    if not (
-        user_in_group(request.user, GROUP_ADMIN)
-        or user_in_group(request.user, GROUP_SYSADMIN)
-        or user_in_group(request.user, GROUP_BUILDER)
-    ):
+    if not _can_manage_timers(request.user):
         return forbidden(request, "Таймер доступен только уполномоченным ролям.")
     if request.method != "POST":
         return redirect("timer_panel")
@@ -795,7 +873,7 @@ def timer_quick_start(request):
 @login_required
 def timer_stop(request, timer_id: int):
     timer = get_object_or_404(WorkTimer, pk=timer_id)
-    if not _can_manage_timers(request.user):
+    if not _can_stop_timer(request.user, timer):
         return forbidden(request, "Таймер доступен только уполномоченным ролям.")
     if timer.ended_at:
         return redirect("timer_panel")
@@ -808,11 +886,7 @@ def timer_stop(request, timer_id: int):
 
 @login_required
 def checkout_create(request):
-    if not (
-        user_in_group(request.user, GROUP_ADMIN)
-        or user_in_group(request.user, GROUP_SYSADMIN)
-        or user_in_group(request.user, GROUP_BUILDER)
-    ):
+    if not _can_create_checkout(request.user):
         return forbidden(request, "Выдача доступна только уполномоченным ролям.")
 
     if request.method == "POST":
@@ -837,8 +911,11 @@ def checkout_create(request):
 
 
 @login_required
+@require_POST
 def checkout_return(request, checkout_id: int):
     checkout = get_object_or_404(EquipmentCheckout, pk=checkout_id)
+    if not _can_return_checkout(request.user, checkout):
+        return forbidden(request, "Возврат выдачи доступен только владельцу, складу или администратору.")
     if checkout.returned_at:
         return redirect("checkouts")
     checkout.returned_at = timezone.now()
@@ -851,17 +928,19 @@ def checkout_return(request, checkout_id: int):
 @login_required
 def user_preferences_view(request):
     preferences = _get_user_preferences(request.user)
+    current_language = getattr(request, "LANGUAGE_CODE", None) or getattr(request, "LANGUAGE_CODE", "ru") or "ru"
     if request.method == "POST":
-        form = UserPreferenceForm(request.POST, instance=preferences)
+        form = UserPreferenceForm(request.POST, instance=preferences, language_code=current_language)
         if form.is_valid():
             saved = form.save()
             if saved.preferred_language:
                 translation.activate(saved.preferred_language)
+                request.LANGUAGE_CODE = saved.preferred_language
                 request.session["django_language"] = saved.preferred_language
-            messages.success(request, "Preferences updated.")
+            messages.success(request, "Настройки сохранены.")
             return redirect("user_preferences")
     else:
-        form = UserPreferenceForm(instance=preferences)
+        form = UserPreferenceForm(instance=preferences, language_code=current_language)
 
     return render(request, "inventory/user_preferences.html", {"form": form})
 
@@ -888,6 +967,20 @@ def api_docs(request):
             ]
         },
     )
+
+
+@login_required
+def quality_report_view(request):
+    if not _can_access_quality_report(request.user):
+        return forbidden(request, "Результаты проверок доступны только администратору и системному администратору.")
+
+    report = load_quality_report()
+    if request.method == "POST":
+        report = generate_quality_report()
+        messages.success(request, "Отчёт по качеству обновлён.")
+        return redirect("quality_report")
+
+    return render(request, "inventory/quality_report.html", {"report": report})
 
 
 @login_required
@@ -967,19 +1060,24 @@ def _data_tools_context():
         "db_port": db_cfg.get("PORT", "5432"),
         "db_user": db_cfg.get("USER", "postgres"),
         "backup_import_form": BackupImportForm(),
+        "can_import_backup": False,
     }
 
 
 @login_required
 def data_tools(request):
-    if not user_in_group(request.user, GROUP_ADMIN):
-        return forbidden(request, "Инструменты данных доступны только администратору.")
-    return render(request, "inventory/tools/data_io.html", _data_tools_context())
+    if not _can_access_data_tools(request.user):
+        return forbidden(request, "Инструменты данных доступны только администратору и системному администратору.")
+    return render(
+        request,
+        "inventory/tools/data_io.html",
+        {**_data_tools_context(), "can_import_backup": _can_import_backup(request.user)},
+    )
 
 
 @login_required
 def import_json_backup(request):
-    if not user_in_group(request.user, GROUP_ADMIN):
+    if not _can_import_backup(request.user):
         return forbidden(request, "Импорт доступен только администратору.")
     if request.method != "POST":
         return redirect("data_tools")
@@ -989,7 +1087,12 @@ def import_json_backup(request):
         for field_errors in form.errors.values():
             for error in field_errors:
                 messages.error(request, error)
-        return render(request, "inventory/tools/data_io.html", {**_data_tools_context(), "backup_import_form": form}, status=400)
+        return render(
+            request,
+            "inventory/tools/data_io.html",
+            {**_data_tools_context(), "backup_import_form": form, "can_import_backup": _can_import_backup(request.user)},
+            status=400,
+        )
 
     temp_path = None
     try:
@@ -1012,8 +1115,8 @@ def import_json_backup(request):
 
 @login_required
 def download_json_backup(request):
-    if not user_in_group(request.user, GROUP_ADMIN):
-        return forbidden(request, "Экспорт доступен только администратору.")
+    if not _can_access_data_tools(request.user):
+        return forbidden(request, "Экспорт доступен только администратору и системному администратору.")
     out = io.StringIO()
     call_command("dumpdata", indent=2, stdout=out)
     response = HttpResponse(out.getvalue(), content_type="application/json; charset=utf-8")
@@ -1023,8 +1126,8 @@ def download_json_backup(request):
 
 @login_required
 def download_sqlite_backup(request):
-    if not user_in_group(request.user, GROUP_ADMIN):
-        return forbidden(request, "Экспорт доступен только администратору.")
+    if not _can_access_data_tools(request.user):
+        return forbidden(request, "Экспорт доступен только администратору и системному администратору.")
     db_cfg = settings.DATABASES["default"]
     if not db_cfg["ENGINE"].endswith("sqlite3"):
         return HttpResponse("SQLite backup is available only for sqlite3 engine.", status=400)

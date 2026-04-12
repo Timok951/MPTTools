@@ -1,9 +1,15 @@
+import os
+import tempfile
+from datetime import timedelta
+from pathlib import Path
+from time import perf_counter
+from unittest import mock
+
 from django.contrib.auth.models import Group, User
-from django.test import TestCase
+from django.core.management import call_command
+from django.test import TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
-from datetime import timedelta
-from time import perf_counter
 from rest_framework.authtoken.models import Token
 from rest_framework.test import APIClient
 
@@ -11,6 +17,8 @@ from assets.models import Equipment, EquipmentCheckout, InventoryAdjustment
 from audit.models import AuditLog
 from audit.models import AdminPortalLog
 from core.models import EquipmentCategory, UserPreference, Workplace
+from inventory.backup_utils import PostgreSQLBackupConfig, create_postgresql_backup, get_postgresql_backup_config
+from inventory.portal_forms import PortalUserForm
 from operations.models import (
     REQUEST_APPROVED,
     REQUEST_KIND_BUILDER,
@@ -91,6 +99,16 @@ class TimerAndPreferenceViewTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'value="dark"')
         self.assertContains(response, "Язык интерфейса")
+
+    def test_saved_language_is_applied_on_next_request(self):
+        UserPreference.objects.create(user=self.user, preferred_language="en")
+        self.client.force_login(self.user)
+
+        response = self.client.get(reverse("user_preferences"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.wsgi_request.LANGUAGE_CODE, "en")
+        self.assertContains(response, "User preferences")
 
 
 class LightweightPerformanceTests(TestCase):
@@ -176,8 +194,8 @@ class AdminProcedureTests(TestCase):
         response = self.client.get(reverse("portal_home"))
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Business procedures")
-        self.assertContains(response, "Run procedure")
+        self.assertContains(response, "Бизнес-процедуры")
+        self.assertContains(response, "Запустить процедуру")
 
     def test_non_admin_cannot_run_procedure(self):
         self.client.force_login(self.builder)
@@ -231,6 +249,227 @@ class AdminProcedureTests(TestCase):
                 reason="Automatic restock to low-stock threshold by admin procedure.",
             ).exists()
         )
+
+
+class RoleEnforcementWebTests(TestCase):
+    def setUp(self):
+        self.password = "secret123"
+        self.admin = User.objects.create_user(username="site_admin", password=self.password)
+        self.warehouse = User.objects.create_user(username="site_warehouse", password=self.password)
+        self.sysadmin = User.objects.create_user(username="site_sysadmin", password=self.password)
+        self.builder = User.objects.create_user(username="site_builder", password=self.password)
+        self.builder_other = User.objects.create_user(username="site_builder_other", password=self.password)
+
+        admin_group, _ = Group.objects.get_or_create(name="Administrator")
+        warehouse_group, _ = Group.objects.get_or_create(name="Warehouse")
+        sysadmin_group, _ = Group.objects.get_or_create(name="Sysadmin")
+        builder_group, _ = Group.objects.get_or_create(name="Builder")
+        self.admin.groups.add(admin_group)
+        self.warehouse.groups.add(warehouse_group)
+        self.sysadmin.groups.add(sysadmin_group)
+        self.builder.groups.add(builder_group)
+        self.builder_other.groups.add(builder_group)
+
+        self.workplace = Workplace.objects.create(name="Web roles lab")
+        self.category = EquipmentCategory.objects.create(name="Hand tools")
+        self.equipment = Equipment.objects.create(
+            name="Drill",
+            inventory_number="WEB-001",
+            category=self.category,
+            workplace=self.workplace,
+            quantity_total=5,
+            quantity_available=5,
+        )
+        self.checkout = EquipmentCheckout.objects.create(
+            equipment=self.equipment,
+            quantity=1,
+            taken_by=self.builder_other,
+            workplace=self.workplace,
+            taken_at=timezone.now(),
+        )
+
+    def test_checkout_return_requires_post(self):
+        self.client.force_login(self.admin)
+
+        response = self.client.get(reverse("checkout_return", args=[self.checkout.pk]))
+
+        self.assertEqual(response.status_code, 405)
+
+    def test_builder_cannot_return_other_users_checkout(self):
+        self.client.force_login(self.builder)
+
+        response = self.client.post(reverse("checkout_return", args=[self.checkout.pk]), follow=True)
+
+        self.assertEqual(response.status_code, 403)
+        self.checkout.refresh_from_db()
+        self.assertIsNone(self.checkout.returned_at)
+
+    def test_warehouse_can_return_checkout(self):
+        self.client.force_login(self.warehouse)
+
+        response = self.client.post(reverse("checkout_return", args=[self.checkout.pk]), follow=True)
+
+        self.assertEqual(response.status_code, 200)
+        self.checkout.refresh_from_db()
+        self.assertIsNotNone(self.checkout.returned_at)
+
+    def test_history_page_is_admin_only(self):
+        self.client.force_login(self.builder)
+        denied = self.client.get(reverse("history"))
+        self.assertEqual(denied.status_code, 403)
+
+        self.client.force_login(self.admin)
+        allowed = self.client.get(reverse("history"))
+        self.assertEqual(allowed.status_code, 200)
+
+    def test_reports_pages_are_admin_or_warehouse_only(self):
+        self.client.force_login(self.builder)
+        denied_page = self.client.get(reverse("reports"))
+        denied_export = self.client.get(reverse("reports_export", args=["materials"]))
+        self.assertEqual(denied_page.status_code, 403)
+        self.assertEqual(denied_export.status_code, 403)
+
+        self.client.force_login(self.warehouse)
+        allowed_page = self.client.get(reverse("reports"))
+        allowed_export = self.client.get(reverse("reports_export", args=["materials"]))
+        self.assertEqual(allowed_page.status_code, 200)
+        self.assertEqual(allowed_export.status_code, 200)
+
+        self.client.force_login(self.sysadmin)
+        sysadmin_page = self.client.get(reverse("reports"))
+        sysadmin_export = self.client.get(reverse("reports_export", args=["materials"]))
+        self.assertEqual(sysadmin_page.status_code, 200)
+        self.assertEqual(sysadmin_export.status_code, 200)
+        self.assertEqual(sysadmin_export["Content-Type"], "text/csv; charset=utf-8")
+        self.assertIn('materials-report.csv', sysadmin_export["Content-Disposition"])
+
+    def test_sysadmin_can_access_backup_tools_but_not_import_backup(self):
+        self.client.force_login(self.sysadmin)
+
+        tools_response = self.client.get(reverse("data_tools"))
+        json_backup_response = self.client.get(reverse("download_json_backup"))
+
+        self.assertEqual(tools_response.status_code, 200)
+        self.assertEqual(json_backup_response.status_code, 200)
+        self.assertNotContains(tools_response, 'action="/tools/data/import-json/"')
+        self.assertNotContains(tools_response, "Импортировать резервную копию")
+
+        import_response = self.client.post(reverse("import_json_backup"), follow=True)
+        self.assertEqual(import_response.status_code, 403)
+
+    def test_quality_report_page_is_available_for_admin_and_sysadmin(self):
+        self.client.force_login(self.builder)
+        denied = self.client.get(reverse("quality_report"))
+        self.assertEqual(denied.status_code, 403)
+
+        self.client.force_login(self.sysadmin)
+        sysadmin_response = self.client.get(reverse("quality_report"))
+        self.assertEqual(sysadmin_response.status_code, 200)
+
+        self.client.force_login(self.admin)
+        admin_response = self.client.get(reverse("quality_report"))
+        self.assertEqual(admin_response.status_code, 200)
+
+    def test_portal_user_form_exposes_only_business_role_fields(self):
+        Group.objects.get_or_create(name="Sysadmin")
+        form = PortalUserForm()
+
+        self.assertNotIn("is_staff", form.fields)
+        self.assertNotIn("is_superuser", form.fields)
+        self.assertNotIn("user_permissions", form.fields)
+        self.assertEqual(
+            list(form.fields["groups"].queryset.values_list("name", flat=True)),
+            ["Administrator", "Builder", "Sysadmin", "Warehouse"],
+        )
+
+
+@override_settings(
+    DATABASES={
+        "default": {
+            "ENGINE": "django.db.backends.postgresql",
+            "NAME": "mpttools",
+            "USER": "postgres",
+            "PASSWORD": "secret",
+            "HOST": "localhost",
+            "PORT": "5432",
+        }
+    }
+)
+class BackupCommandTests(TestCase):
+    def _mock_pg_dump(self, command, **kwargs):
+        backup_path = Path(command[-1])
+        backup_path.write_bytes(b"dump")
+        completed = mock.Mock()
+        completed.stdout = ""
+        completed.stderr = ""
+        return completed
+
+    def test_backup_config_reads_env_overrides(self):
+        with tempfile.TemporaryDirectory() as temp_dir, mock.patch.dict(
+            os.environ,
+            {
+                "BACKUP_DIR": temp_dir,
+                "BACKUP_KEEP_COUNT": "9",
+                "PG_DUMP_PATH": r"C:\PostgreSQL\bin\pg_dump.exe",
+                "BACKUP_CRON_SCHEDULE": "0 2 * * *",
+            },
+            clear=False,
+        ):
+            config = get_postgresql_backup_config()
+
+        self.assertEqual(config.output_dir, Path(temp_dir))
+        self.assertEqual(config.keep_count, 9)
+        self.assertEqual(config.pg_dump_path, r"C:\PostgreSQL\bin\pg_dump.exe")
+
+    @mock.patch("inventory.backup_utils.subprocess.run")
+    def test_create_backup_prunes_old_dump_files(self, run_mock):
+        run_mock.side_effect = self._mock_pg_dump
+        with tempfile.TemporaryDirectory() as temp_dir:
+            output_dir = Path(temp_dir)
+            for idx in range(3):
+                old_file = output_dir / f"old_{idx}.dump"
+                old_file.write_bytes(b"old")
+                stamp = 1_700_000_000 + idx
+                os.utime(old_file, (stamp, stamp))
+
+            config = PostgreSQLBackupConfig(
+                db_name="mpttools",
+                db_user="postgres",
+                db_password="secret",
+                db_host="localhost",
+                db_port="5432",
+                output_dir=output_dir,
+                keep_count=2,
+                pg_dump_path="pg_dump",
+            )
+
+            result = create_postgresql_backup(config, label="nightly")
+
+            self.assertTrue(result.backup_path.exists())
+            self.assertEqual(len(result.removed_files), 2)
+            self.assertEqual(len(list(output_dir.glob("*.dump"))), 2)
+            self.assertEqual(result.command[0], "pg_dump")
+            self.assertIn("nightly", result.backup_path.name)
+
+    @mock.patch("inventory.backup_utils.subprocess.run")
+    def test_management_command_creates_backup_file(self, run_mock):
+        run_mock.side_effect = self._mock_pg_dump
+        with tempfile.TemporaryDirectory() as temp_dir:
+            call_command(
+                "create_server_backup",
+                "--output-dir",
+                temp_dir,
+                "--keep",
+                "3",
+                "--label",
+                "server",
+                "--pg-dump-path",
+                "pg_dump",
+            )
+
+            dump_files = list(Path(temp_dir).glob("*.dump"))
+            self.assertEqual(len(dump_files), 1)
+            self.assertIn("server", dump_files[0].name)
 
 
 class InventoryApiTests(TestCase):
@@ -508,6 +747,90 @@ class InventoryApiTests(TestCase):
             action="created",
         ).latest("created_at")
         self.assertEqual(audit_entry.actor, self.builder)
+
+    def test_builder_api_lists_are_scoped_to_own_operational_records(self):
+        MaterialUsage.objects.create(
+            equipment=self.equipment,
+            workplace=self.workplace,
+            quantity=1,
+            used_by=self.builder,
+            note="My usage",
+        )
+        MaterialUsage.objects.create(
+            equipment=self.equipment,
+            workplace=self.workplace,
+            quantity=1,
+            used_by=self.builder_other,
+            note="Other usage",
+        )
+        own_request = EquipmentRequest.objects.create(
+            requester=self.builder,
+            workplace=self.workplace,
+            equipment=self.equipment,
+            quantity=1,
+            request_kind=REQUEST_KIND_BUILDER,
+        )
+        EquipmentRequest.objects.create(
+            requester=self.builder_other,
+            workplace=self.workplace,
+            equipment=self.equipment,
+            quantity=1,
+            request_kind=REQUEST_KIND_BUILDER,
+        )
+        own_checkout = EquipmentCheckout.objects.create(
+            equipment=self.equipment,
+            quantity=1,
+            taken_by=self.builder,
+            workplace=self.workplace,
+            taken_at=timezone.now(),
+        )
+        own_timer = WorkTimer.objects.create(
+            user=self.builder,
+            workplace=self.workplace,
+            equipment=self.equipment,
+            note="My timer",
+        )
+        EquipmentCheckout.objects.create(
+            equipment=self.equipment,
+            quantity=1,
+            taken_by=self.builder_other,
+            workplace=self.workplace,
+            taken_at=timezone.now(),
+        )
+
+        client = self.api_client_for(self.builder)
+
+        requests_response = client.get("/api/v1/requests/")
+        usage_response = client.get("/api/v1/usage/")
+        timers_response = client.get("/api/v1/timers/")
+        checkouts_response = client.get("/api/v1/checkouts/")
+
+        self.assertEqual([item["id"] for item in requests_response.json()], [own_request.pk, self.pending_request.pk])
+        self.assertEqual([item["used_by"] for item in usage_response.json()], [self.builder.pk])
+        self.assertEqual([item["id"] for item in timers_response.json()], [own_timer.pk])
+        self.assertEqual([item["id"] for item in checkouts_response.json()], [own_checkout.pk])
+
+    def test_warehouse_api_lists_can_see_all_operational_records(self):
+        MaterialUsage.objects.create(
+            equipment=self.equipment,
+            workplace=self.workplace,
+            quantity=1,
+            used_by=self.builder,
+            note="Builder usage",
+        )
+        MaterialUsage.objects.create(
+            equipment=self.equipment,
+            workplace=self.workplace,
+            quantity=1,
+            used_by=self.builder_other,
+            note="Other usage",
+        )
+
+        client = self.api_client_for(self.warehouse)
+        usage_response = client.get("/api/v1/usage/")
+
+        self.assertEqual(usage_response.status_code, 200)
+        self.assertEqual(len(usage_response.json()), 2)
 
     def test_warehouse_can_create_and_update_adjustment_with_stock_sync(self):
         client = self.api_client_for(self.warehouse)

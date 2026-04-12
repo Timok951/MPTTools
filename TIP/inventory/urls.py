@@ -7,6 +7,7 @@ urlpatterns = [
     path("show-deleted/toggle/", views.toggle_show_deleted, name="toggle_show_deleted"),
     path("accounts/preferences/", views.user_preferences_view, name="user_preferences"),
     path("api/docs/", views.api_docs, name="api_docs"),
+    path("quality/", views.quality_report_view, name="quality_report"),
     path("tools/data/", views.data_tools, name="data_tools"),
     path("tools/data/import-json/", views.import_json_backup, name="import_json_backup"),
     path("tools/data/backup-json/", views.download_json_backup, name="download_json_backup"),

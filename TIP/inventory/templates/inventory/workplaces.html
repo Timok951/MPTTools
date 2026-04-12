@@ -3,12 +3,12 @@
 
 {% block content %}
 <div class="card">
-    <h2>Workplaces</h2>
+    <h2>Рабочие места</h2>
     {% if user|has_group:"Administrator" %}
     <div class="actions" style="margin-bottom: 8px;">
-        <a href="{% url 'portal_create' entity='workplaces' %}">➕ Add</a>
-        <a class="secondary" href="{% url 'portal_list' entity='workplaces' %}">🧰 Manage workplaces</a>
-        <a class="secondary" href="{% url 'portal_list' entity='workplace-members' %}">Manage staff assignments</a>
+        <a href="{% url 'portal_create' entity='workplaces' %}">➕ Добавить</a>
+        <a class="secondary" href="{% url 'portal_list' entity='workplaces' %}">🧰 Управление рабочими местами</a>
+        <a class="secondary" href="{% url 'portal_list' entity='workplace-members' %}">Назначения сотрудников</a>
     </div>
     {% endif %}
     {% for workplace in workplaces %}
@@ -29,9 +29,9 @@
             <table>
                 <thead>
                     <tr>
-                        <th>User</th>
-                        <th>Role</th>
-                        <th>Assigned at</th>
+                        <th>Пользователь</th>
+                        <th>Роль</th>
+                        <th>Назначен</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -42,13 +42,13 @@
                         <td>{{ member.assigned_at }}</td>
                     </tr>
                     {% empty %}
-                    <tr><td colspan="3" class="muted">No members assigned.</td></tr>
+                    <tr><td colspan="3" class="muted">Сотрудники не назначены.</td></tr>
                     {% endfor %}
                 </tbody>
             </table>
         </div>
     {% empty %}
-        <div class="muted">No workplaces defined.</div>
+        <div class="muted">Рабочие места ещё не созданы.</div>
     {% endfor %}
 </div>
 {% endblock %}

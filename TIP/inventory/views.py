@@ -873,6 +873,8 @@ def api_docs(request):
         "inventory/api_docs.html",
         {
             "endpoints": [
+                "/api/v1/auth/token/",
+                "/api/v1/auth/token/revoke/",
                 "/api/v1/equipment/",
                 "/api/v1/workplaces/",
                 "/api/v1/cabinets/",
@@ -880,6 +882,7 @@ def api_docs(request):
                 "/api/v1/suppliers/",
                 "/api/v1/requests/",
                 "/api/v1/usage/",
+                "/api/v1/adjustments/",
                 "/api/v1/checkouts/",
                 "/api/v1/timers/",
             ]
@@ -952,9 +955,17 @@ def toggle_show_deleted(request):
 
 
 def _data_tools_context():
-    sqlite_engine = settings.DATABASES["default"]["ENGINE"].endswith("sqlite3")
+    db_cfg = settings.DATABASES["default"]
+    engine = db_cfg["ENGINE"]
+    sqlite_engine = engine.endswith("sqlite3")
+    postgresql_engine = engine.endswith("postgresql")
     return {
         "sqlite_available": sqlite_engine,
+        "postgresql_available": postgresql_engine,
+        "db_name": db_cfg.get("NAME", ""),
+        "db_host": db_cfg.get("HOST", "localhost"),
+        "db_port": db_cfg.get("PORT", "5432"),
+        "db_user": db_cfg.get("USER", "postgres"),
         "backup_import_form": BackupImportForm(),
     }
 

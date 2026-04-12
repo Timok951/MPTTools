@@ -118,9 +118,11 @@ class WorkplaceMember(SoftDeleteModel):
 class UserPreference(models.Model):
     THEME_DEFAULT = "default"
     THEME_CONTRAST = "contrast"
+    THEME_DARK = "dark"
     THEME_CHOICES = [
         (THEME_DEFAULT, _("Soft light")),
         (THEME_CONTRAST, _("High contrast")),
+        (THEME_DARK, _("Dark night")),
     ]
 
     DATE_FORMAT_COMPACT = "compact"

@@ -52,6 +52,30 @@
             --ring: rgba(29, 39, 69, 0.24);
             --shadow: 0 18px 40px rgba(29, 39, 69, 0.2);
         }
+        body.theme-dark {
+            color-scheme: dark;
+            --bg: #0f1524;
+            --panel: #151d31;
+            --panel-soft: rgba(249, 217, 73, 0.12);
+            --surface: rgba(24, 34, 58, 0.88);
+            --surface-strong: rgba(30, 41, 68, 0.96);
+            --surface-solid: #1f2a44;
+            --ink: #eef2ff;
+            --muted: rgba(224, 231, 255, 0.72);
+            --accent: #ff6b6b;
+            --accent-2: #f9d949;
+            --accent-3: #8ea6ff;
+            --warn: #f9d949;
+            --border: rgba(142, 166, 255, 0.22);
+            --ring: rgba(249, 217, 73, 0.28);
+            --shadow: 0 22px 48px rgba(0, 0, 0, 0.34);
+        }
+        body.theme-dark {
+            background:
+                radial-gradient(circle at 14% 0%, rgba(249, 217, 73, 0.12) 0%, transparent 34%),
+                radial-gradient(circle at 88% 10%, rgba(142, 166, 255, 0.18) 0%, transparent 30%),
+                linear-gradient(180deg, #121a2c 0%, #0c1220 100%);
+        }
         .page {
             min-height: 100vh;
             display: flex;
@@ -106,6 +130,9 @@
             background: var(--surface);
             color: var(--accent-2);
             box-shadow: none;
+        }
+        body.theme-dark .header-tools a.admin-quick-muted {
+            color: var(--ink);
         }
         .header-tools form.lang-form {
             display: inline-flex;
@@ -165,6 +192,9 @@
             border-radius: 999px;
             font-size: 12px;
             font-weight: 600;
+        }
+        body.theme-dark .user-chip {
+            background: rgba(249, 217, 73, 0.12);
         }
         .switch-form {
             margin: 0;
@@ -267,6 +297,9 @@
         }
         .flash.info {
             border-color: rgba(60, 72, 107, 0.2);
+        }
+        body.theme-dark .flash.info {
+            border-color: var(--border);
         }
         .card {
             background: var(--panel);
@@ -468,6 +501,12 @@
             background: rgba(244, 80, 80, 0.14);
             color: var(--accent);
         }
+        body.theme-dark .badge,
+        body.theme-dark .kicker,
+        body.theme-dark .pagination-links span.current {
+            background: rgba(249, 217, 73, 0.16);
+            color: var(--accent-2);
+        }
         .actions {
             display: flex;
             flex-wrap: wrap;
@@ -539,6 +578,15 @@
             outline: none;
             border-color: var(--accent);
             box-shadow: 0 0 0 3px rgba(244, 80, 80, 0.14);
+        }
+        body.theme-dark input,
+        body.theme-dark select,
+        body.theme-dark textarea {
+            color: var(--ink);
+        }
+        body.theme-dark input::placeholder,
+        body.theme-dark textarea::placeholder {
+            color: rgba(224, 231, 255, 0.5);
         }
         .timeline {
             display: grid;

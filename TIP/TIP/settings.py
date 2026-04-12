@@ -56,6 +56,7 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'rest_framework',
+    'rest_framework.authtoken',
     'core',
     'assets',
     'operations',
@@ -130,6 +131,10 @@ else:
             "PASSWORD": os.getenv("DATABASE_PASSWORD", "").strip(),
             "HOST": os.getenv("DATABASE_HOST", "localhost").strip(),
             "PORT": os.getenv("DATABASE_PORT", "5432").strip(),
+            "CONN_MAX_AGE": int(os.getenv("DATABASE_CONN_MAX_AGE", "60").strip() or "60"),
+            "OPTIONS": {
+                "sslmode": os.getenv("DATABASE_SSLMODE", "prefer").strip(),
+            },
         }
     }
 
@@ -192,9 +197,11 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": [
         "rest_framework.authentication.SessionAuthentication",
+        "rest_framework.authentication.TokenAuthentication",
     ],
     "DEFAULT_PERMISSION_CLASSES": [
         "rest_framework.permissions.IsAuthenticated",
     ],
     "DEFAULT_SCHEMA_CLASS": "rest_framework.schemas.openapi.AutoSchema",
+    "EXCEPTION_HANDLER": "inventory.api.exceptions.humanized_exception_handler",
 }

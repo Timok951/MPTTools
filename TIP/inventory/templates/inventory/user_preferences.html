@@ -21,6 +21,7 @@
         {% endif %}
         <div class="form-grid">
             {% include "inventory/_form_field.html" with field=form.theme_variant %}
+            {% include "inventory/_form_field.html" with field=form.preferred_language %}
             {% include "inventory/_form_field.html" with field=form.page_size %}
             {% include "inventory/_form_field.html" with field=form.date_display_format %}
             {% include "inventory/_form_field.html" with field=form.default_timer_status %}

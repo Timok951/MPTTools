@@ -261,3 +261,11 @@ class PortalGroupForm(forms.ModelForm):
         fields = ["name", "permissions"]
         widgets = {"permissions": forms.SelectMultiple(attrs={"size": 12})}
         labels = {"name": "Название", "permissions": "Права"}
+
+
+class RejectStaleRequestsProcedureForm(forms.Form):
+    stale_days = forms.IntegerField(label="Дней без обработки", min_value=1, initial=14)
+
+
+class FinishAbandonedTimersProcedureForm(forms.Form):
+    stale_hours = forms.IntegerField(label="Часов без завершения", min_value=1, initial=12)

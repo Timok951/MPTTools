@@ -1,37 +1,60 @@
 from rest_framework import serializers
 
-from assets.models import Equipment, EquipmentCheckout
+from assets.models import Equipment, EquipmentCheckout, InventoryAdjustment
 from core.models import Cabinet, EquipmentCategory, Supplier, Workplace
 from operations.models import EquipmentRequest, MaterialUsage, WorkTimer
 
 
-class WorkplaceSerializer(serializers.ModelSerializer):
+class AuditActorModelSerializer(serializers.ModelSerializer):
+    def create(self, validated_data):
+        actor = validated_data.pop("_actor", None)
+        instance = self.Meta.model(**validated_data)
+        if actor is not None:
+            instance._actor = actor
+        instance.save()
+        return instance
+
+    def update(self, instance, validated_data):
+        actor = validated_data.pop("_actor", None)
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        if actor is not None:
+            instance._actor = actor
+        instance.save()
+        return instance
+
+
+class WorkplaceSerializer(AuditActorModelSerializer):
     class Meta:
         model = Workplace
         fields = ["id", "name", "location", "description", "deleted_at"]
+        read_only_fields = ["deleted_at"]
 
 
-class CabinetSerializer(serializers.ModelSerializer):
+class CabinetSerializer(AuditActorModelSerializer):
     workplace_name = serializers.CharField(source="workplace.name", read_only=True)
 
     class Meta:
         model = Cabinet
         fields = ["id", "code", "name", "floor", "description", "workplace", "workplace_name", "deleted_at"]
+        read_only_fields = ["deleted_at"]
 
 
-class EquipmentCategorySerializer(serializers.ModelSerializer):
+class EquipmentCategorySerializer(AuditActorModelSerializer):
     class Meta:
         model = EquipmentCategory
         fields = ["id", "name", "description", "deleted_at"]
+        read_only_fields = ["deleted_at"]
 
 
-class SupplierSerializer(serializers.ModelSerializer):
+class SupplierSerializer(AuditActorModelSerializer):
     class Meta:
         model = Supplier
         fields = ["id", "name", "contact_name", "phone", "email", "address", "notes", "deleted_at"]
+        read_only_fields = ["deleted_at"]
 
 
-class EquipmentSerializer(serializers.ModelSerializer):
+class EquipmentSerializer(AuditActorModelSerializer):
     category_name = serializers.CharField(source="category.name", read_only=True)
     supplier_name = serializers.CharField(source="supplier.name", read_only=True)
     workplace_name = serializers.CharField(source="workplace.name", read_only=True)
@@ -67,9 +90,10 @@ class EquipmentSerializer(serializers.ModelSerializer):
             "updated_at",
             "deleted_at",
         ]
+        read_only_fields = ["created_at", "updated_at", "deleted_at"]
 
 
-class EquipmentRequestSerializer(serializers.ModelSerializer):
+class EquipmentRequestSerializer(AuditActorModelSerializer):
     requester_username = serializers.CharField(source="requester.username", read_only=True)
     equipment_name = serializers.CharField(source="equipment.name", read_only=True)
     workplace_name = serializers.CharField(source="workplace.name", read_only=True)
@@ -94,9 +118,13 @@ class EquipmentRequestSerializer(serializers.ModelSerializer):
             "processed_at",
             "deleted_at",
         ]
+        read_only_fields = ["requester", "processed_by", "processed_at", "deleted_at"]
+        extra_kwargs = {
+            "request_kind": {"required": False},
+        }
 
 
-class MaterialUsageSerializer(serializers.ModelSerializer):
+class MaterialUsageSerializer(AuditActorModelSerializer):
     equipment_name = serializers.CharField(source="equipment.name", read_only=True)
     workplace_name = serializers.CharField(source="workplace.name", read_only=True)
     used_by_username = serializers.CharField(source="used_by.username", read_only=True)
@@ -117,9 +145,30 @@ class MaterialUsageSerializer(serializers.ModelSerializer):
             "note",
             "deleted_at",
         ]
+        read_only_fields = ["used_by", "deleted_at"]
 
 
-class EquipmentCheckoutSerializer(serializers.ModelSerializer):
+class InventoryAdjustmentSerializer(AuditActorModelSerializer):
+    equipment_name = serializers.CharField(source="equipment.name", read_only=True)
+    created_by_username = serializers.CharField(source="created_by.username", read_only=True)
+
+    class Meta:
+        model = InventoryAdjustment
+        fields = [
+            "id",
+            "equipment",
+            "equipment_name",
+            "delta",
+            "reason",
+            "created_at",
+            "created_by",
+            "created_by_username",
+            "deleted_at",
+        ]
+        read_only_fields = ["created_by", "deleted_at"]
+
+
+class EquipmentCheckoutSerializer(AuditActorModelSerializer):
     equipment_name = serializers.CharField(source="equipment.name", read_only=True)
     taken_by_username = serializers.CharField(source="taken_by.username", read_only=True)
     workplace_name = serializers.CharField(source="workplace.name", read_only=True)
@@ -145,9 +194,10 @@ class EquipmentCheckoutSerializer(serializers.ModelSerializer):
             "note",
             "deleted_at",
         ]
+        read_only_fields = ["taken_by", "deleted_at"]
 
 
-class WorkTimerSerializer(serializers.ModelSerializer):
+class WorkTimerSerializer(AuditActorModelSerializer):
     user_username = serializers.CharField(source="user.username", read_only=True)
     workplace_name = serializers.CharField(source="workplace.name", read_only=True)
     equipment_name = serializers.CharField(source="equipment.name", read_only=True)
@@ -167,3 +217,4 @@ class WorkTimerSerializer(serializers.ModelSerializer):
             "note",
             "deleted_at",
         ]
+        read_only_fields = ["user", "deleted_at"]

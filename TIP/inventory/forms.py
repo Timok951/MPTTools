@@ -79,6 +79,7 @@ class UserPreferenceForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields["theme_variant"].label = "Тема"
+        self.fields["theme_variant"].help_text = "Светлая, контрастная или тёмная тема интерфейса."
         self.fields["preferred_language"] = forms.ChoiceField(
             label="Язык интерфейса",
             choices=[("ru", "Русский"), ("en", "English")],

@@ -14,6 +14,8 @@
     </div>
     <div class="aside-panel">
         <p><code>/api/v1/</code></p>
+        <p>Поддерживаются две схемы авторизации: браузерная сессия и токен DRF. Для получения токена отправьте логин и пароль на <code>/api/v1/auth/token/</code>, для отзыва используйте <code>/api/v1/auth/token/revoke/</code>.</p>
+        <p>Роли применяются по типу ресурса: администратор имеет полный доступ, склад может изменять складские сущности и корректировки, а Sysadmin и Builder работают со своими заявками, таймерами и выдачами.</p>
         <div class="grid cols-2">
             {% for endpoint in endpoints %}
                 <div class="badge">{{ endpoint }}</div>

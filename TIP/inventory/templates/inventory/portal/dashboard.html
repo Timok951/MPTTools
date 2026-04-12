@@ -7,4 +7,33 @@
     <h2>{% trans "Administrator portal" %}</h2>
     <p class="muted">{% trans "Central CRUD access for all tables, including staff, users and roles." %}</p>
 </div>
+
+<div class="card">
+    <div class="card-header">
+        <div>
+            <div class="kicker">{% trans "Admin procedures" %}</div>
+            <h2>{% trans "Business procedures" %}</h2>
+            <p class="muted">{% trans "Admin-only batch operations for maintenance, cleanup and stock alignment." %}</p>
+        </div>
+    </div>
+    <div class="grid cols-3">
+        {% for procedure in procedure_cards %}
+            <div class="aside-panel">
+                <h3>{{ procedure.title }}</h3>
+                <p class="muted">{{ procedure.description }}</p>
+                <form method="post" action="{% url 'portal_procedure_run' slug=procedure.slug %}" class="form-shell">
+                    {% csrf_token %}
+                    {% if procedure.form %}
+                        {% for field in procedure.form %}
+                            {% include "inventory/_form_field.html" with field=field %}
+                        {% endfor %}
+                    {% endif %}
+                    <div class="actions">
+                        <button class="btn" type="submit">{% trans "Run procedure" %}</button>
+                    </div>
+                </form>
+            </div>
+        {% endfor %}
+    </div>
+</div>
 {% endblock %}

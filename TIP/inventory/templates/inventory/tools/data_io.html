@@ -17,6 +17,20 @@
     </div>
 </div>
 
+{% if postgresql_available %}
+<div class="card">
+    <h3>PostgreSQL backup / restore</h3>
+    <p class="muted">Для PostgreSQL используйте логический дамп и restore через стандартные утилиты. Это удобно показать на защите как регламент восстановления.</p>
+    <div class="aside-panel">
+        <p><strong>Backup</strong></p>
+        <pre><code>pg_dump -h {{ db_host|default:"localhost" }} -p {{ db_port|default:"5432" }} -U {{ db_user|default:"postgres" }} -d {{ db_name }} -Fc -f backup.dump</code></pre>
+        <p><strong>Restore</strong></p>
+        <pre><code>pg_restore -h {{ db_host|default:"localhost" }} -p {{ db_port|default:"5432" }} -U {{ db_user|default:"postgres" }} -d {{ db_name }} --clean --if-exists backup.dump</code></pre>
+        <p class="muted">После restore выполните проверку: вход в систему, список оборудования, API `/api/v1/schema/`, и одну админскую процедуру из portal.</p>
+    </div>
+</div>
+{% endif %}
+
 <div class="card">
     <h3>{% trans "Import JSON backup" %}</h3>
     <p class="muted">{% trans "Upload a file created with the JSON backup export. Existing records with the same IDs will be updated." %}</p>

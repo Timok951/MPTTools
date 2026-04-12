@@ -16,8 +16,14 @@ from operations.models import EquipmentRequest, MaterialUsage, WorkTimer
 from audit.models import AdminPortalLog
 from audit.portal_log import log_portal_action
 
+from .admin_procedures import (
+    finish_abandoned_timers,
+    reject_stale_requests,
+    restock_low_stock_consumables,
+)
 from .authz import is_portal_admin
 from .portal_forms import (
+    FinishAbandonedTimersProcedureForm,
     PortalCabinetForm,
     PortalEquipmentCategoryForm,
     PortalEquipmentCheckoutForm,
@@ -31,6 +37,7 @@ from .portal_forms import (
     PortalWorkplaceForm,
     PortalWorkplaceMemberForm,
     PortalWorkTimerForm,
+    RejectStaleRequestsProcedureForm,
 )
 from .views import forbidden
 
@@ -64,6 +71,29 @@ PORTAL_BY_SLUG = {e.slug: e for e in PORTAL_ENTITIES}
 
 def _portal_nav_context(current_slug: str | None = None):
     return {"entities": PORTAL_ENTITIES, "current_entity_slug": current_slug}
+
+
+def _procedure_cards():
+    return [
+        {
+            "slug": "reject_stale_requests",
+            "title": _("Reject stale requests"),
+            "description": _("Marks old pending requests as rejected and records who processed them."),
+            "form": RejectStaleRequestsProcedureForm(prefix="reject"),
+        },
+        {
+            "slug": "finish_abandoned_timers",
+            "title": _("Finish abandoned timers"),
+            "description": _("Closes long-running active timers that were left unfinished."),
+            "form": FinishAbandonedTimersProcedureForm(prefix="timers"),
+        },
+        {
+            "slug": "restock_low_stock_consumables",
+            "title": _("Restock low-stock consumables"),
+            "description": _("Creates stock adjustments for consumables below their threshold."),
+            "form": None,
+        },
+    ]
 
 
 def _manager(model):
@@ -105,7 +135,14 @@ def _friendly_integrity_message(exc: Exception) -> str:
 def portal_dashboard(request):
     if resp := _portal_guard(request):
         return resp
-    return render(request, "inventory/portal/dashboard.html", _portal_nav_context("__home"))
+    return render(
+        request,
+        "inventory/portal/dashboard.html",
+        {
+            **_portal_nav_context("__home"),
+            "procedure_cards": _procedure_cards(),
+        },
+    )
 
 
 @login_required
@@ -239,3 +276,43 @@ def portal_restore(request, entity: str, pk: int):
         log_portal_action(request, "restore", cfg.slug, obj=obj, meta={"pk": obj.pk})
         return redirect("portal_list", entity=cfg.slug)
     return render(request, "inventory/portal/object_confirm_restore.html", {**_portal_nav_context(cfg.slug), "cfg": cfg, "object": obj})
+
+
+@login_required
+def portal_procedure_run(request, slug: str):
+    if resp := _portal_guard(request):
+        return resp
+    if request.method != "POST":
+        return redirect("portal_home")
+
+    if slug == "reject_stale_requests":
+        form = RejectStaleRequestsProcedureForm(request.POST, prefix="reject")
+        if not form.is_valid():
+            messages.error(request, _("Enter a valid stale period for requests."))
+            return redirect("portal_home")
+        result = reject_stale_requests(actor=request.user, stale_days=form.cleaned_data["stale_days"])
+    elif slug == "finish_abandoned_timers":
+        form = FinishAbandonedTimersProcedureForm(request.POST, prefix="timers")
+        if not form.is_valid():
+            messages.error(request, _("Enter a valid stale period for timers."))
+            return redirect("portal_home")
+        result = finish_abandoned_timers(actor=request.user, stale_hours=form.cleaned_data["stale_hours"])
+    elif slug == "restock_low_stock_consumables":
+        result = restock_low_stock_consumables(actor=request.user)
+    else:
+        messages.error(request, _("Unknown procedure."))
+        return redirect("portal_home")
+
+    log_portal_action(
+        request,
+        "procedure",
+        slug,
+        obj=result.title,
+        meta={
+            "processed_count": result.processed_count,
+            "detail": result.detail,
+            "execution_mode": result.execution_mode,
+        },
+    )
+    messages.success(request, result.detail)
+    return redirect("portal_home")

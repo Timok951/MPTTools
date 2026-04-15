@@ -17,7 +17,7 @@ from django.core.paginator import Paginator
 from django.db.models import Count, F, Q, Sum
 from django.db.models.functions import TruncDate
 from django.db.utils import OperationalError, ProgrammingError
-from django.http import FileResponse, HttpResponse
+from django.http import FileResponse, Http404, HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
@@ -1009,66 +1009,7 @@ def quality_report_view(request):
 
 @login_required
 def direct_messages_view(request):
-    selected_user = None
-    selected_user_id = request.GET.get("user") or request.POST.get("recipient")
-    if selected_user_id:
-        selected_user = get_object_or_404(User.objects.filter(is_active=True), pk=selected_user_id)
-        if selected_user.pk == request.user.pk:
-            selected_user = None
-
-    if request.method == "POST":
-        form = DirectMessageForm(request.POST, sender=request.user)
-        if form.is_valid():
-            message_obj = form.save(commit=False)
-            message_obj.sender = request.user
-            message_obj.save()
-            messages.success(request, "Сообщение отправлено.")
-            return redirect(f"{reverse('direct_messages')}?user={message_obj.recipient_id}")
-    else:
-        form = DirectMessageForm(
-            sender=request.user,
-            initial={"recipient": selected_user.pk} if selected_user else None,
-        )
-
-    conversation_messages = []
-    if selected_user is not None:
-        DirectMessage.objects.filter(
-            sender=selected_user,
-            recipient=request.user,
-            read_at__isnull=True,
-        ).update(read_at=timezone.now())
-        conversation_messages = (
-            DirectMessage.objects.filter(
-                (Q(sender=request.user) & Q(recipient=selected_user))
-                | (Q(sender=selected_user) & Q(recipient=request.user))
-            )
-            .select_related("sender", "recipient")
-            .order_by("created_at", "id")
-        )
-
-    conversations = _message_conversation_summaries(request.user)
-    if selected_user is None and conversations:
-        selected_user = conversations[0]["user"]
-        form = DirectMessageForm(sender=request.user, initial={"recipient": selected_user.pk})
-        conversation_messages = (
-            DirectMessage.objects.filter(
-                (Q(sender=request.user) & Q(recipient=selected_user))
-                | (Q(sender=selected_user) & Q(recipient=request.user))
-            )
-            .select_related("sender", "recipient")
-            .order_by("created_at", "id")
-        )
-
-    return render(
-        request,
-        "inventory/direct_messages.html",
-        {
-            "conversations": conversations,
-            "selected_user": selected_user,
-            "conversation_messages": conversation_messages,
-            "form": form,
-        },
-    )
+    raise Http404()
 
 
 @login_required

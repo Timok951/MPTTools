@@ -6,6 +6,7 @@ urlpatterns = [
     path("portal/", include("inventory.portal_urls")),
     path("show-deleted/toggle/", views.toggle_show_deleted, name="toggle_show_deleted"),
     path("accounts/preferences/", views.user_preferences_view, name="user_preferences"),
+    path("messages/", views.direct_messages_view, name="direct_messages"),
     path("api/docs/", views.api_docs, name="api_docs"),
     path("quality/", views.quality_report_view, name="quality_report"),
     path("tools/data/", views.data_tools, name="data_tools"),

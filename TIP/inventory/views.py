@@ -24,11 +24,12 @@ from django.utils import timezone
 
 from assets.models import Equipment, EquipmentCheckout
 from audit.models import AdminPortalLog, AuditLog
-from core.models import Cabinet, EquipmentCategory, Supplier, UserPreference, Workplace, WorkplaceMember
+from core.models import Cabinet, DirectMessage, EquipmentCategory, Supplier, UserPreference, Workplace, WorkplaceMember
 from operations.models import EquipmentRequest, MaterialUsage, WorkTimer, REQUEST_PENDING
 from .authz import GROUP_ADMIN, GROUP_BUILDER, GROUP_SYSADMIN, GROUP_WAREHOUSE, user_in_group
 from .forms import (
     BackupImportForm,
+    DirectMessageForm,
     EquipmentCheckoutForm,
     EquipmentRequestForm,
     InventoryAdjustmentForm,
@@ -120,6 +121,29 @@ def _can_return_checkout(user, checkout: EquipmentCheckout) -> bool:
         or user_in_group(user, GROUP_WAREHOUSE)
         or checkout.taken_by_id == user.pk
     )
+
+
+def _message_conversation_summaries(user):
+    message_qs = (
+        DirectMessage.objects.filter(Q(sender=user) | Q(recipient=user))
+        .select_related("sender", "recipient")
+        .order_by("-created_at", "-id")
+    )
+    summaries = {}
+    for item in message_qs:
+        counterpart = item.recipient if item.sender_id == user.pk else item.sender
+        summary = summaries.setdefault(
+            counterpart.pk,
+            {
+                "user": counterpart,
+                "last_message": item.body,
+                "last_message_at": item.created_at,
+                "unread_count": 0,
+            },
+        )
+        if item.recipient_id == user.pk and item.read_at is None:
+            summary["unread_count"] += 1
+    return list(summaries.values())
 
 
 def forbidden(request, message: str):
@@ -981,6 +1005,70 @@ def quality_report_view(request):
         return redirect("quality_report")
 
     return render(request, "inventory/quality_report.html", {"report": report})
+
+
+@login_required
+def direct_messages_view(request):
+    selected_user = None
+    selected_user_id = request.GET.get("user") or request.POST.get("recipient")
+    if selected_user_id:
+        selected_user = get_object_or_404(User.objects.filter(is_active=True), pk=selected_user_id)
+        if selected_user.pk == request.user.pk:
+            selected_user = None
+
+    if request.method == "POST":
+        form = DirectMessageForm(request.POST, sender=request.user)
+        if form.is_valid():
+            message_obj = form.save(commit=False)
+            message_obj.sender = request.user
+            message_obj.save()
+            messages.success(request, "Сообщение отправлено.")
+            return redirect(f"{reverse('direct_messages')}?user={message_obj.recipient_id}")
+    else:
+        form = DirectMessageForm(
+            sender=request.user,
+            initial={"recipient": selected_user.pk} if selected_user else None,
+        )
+
+    conversation_messages = []
+    if selected_user is not None:
+        DirectMessage.objects.filter(
+            sender=selected_user,
+            recipient=request.user,
+            read_at__isnull=True,
+        ).update(read_at=timezone.now())
+        conversation_messages = (
+            DirectMessage.objects.filter(
+                (Q(sender=request.user) & Q(recipient=selected_user))
+                | (Q(sender=selected_user) & Q(recipient=request.user))
+            )
+            .select_related("sender", "recipient")
+            .order_by("created_at", "id")
+        )
+
+    conversations = _message_conversation_summaries(request.user)
+    if selected_user is None and conversations:
+        selected_user = conversations[0]["user"]
+        form = DirectMessageForm(sender=request.user, initial={"recipient": selected_user.pk})
+        conversation_messages = (
+            DirectMessage.objects.filter(
+                (Q(sender=request.user) & Q(recipient=selected_user))
+                | (Q(sender=selected_user) & Q(recipient=request.user))
+            )
+            .select_related("sender", "recipient")
+            .order_by("created_at", "id")
+        )
+
+    return render(
+        request,
+        "inventory/direct_messages.html",
+        {
+            "conversations": conversations,
+            "selected_user": selected_user,
+            "conversation_messages": conversation_messages,
+            "form": form,
+        },
+    )
 
 
 @login_required

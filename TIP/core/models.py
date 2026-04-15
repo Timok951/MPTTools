@@ -194,3 +194,31 @@ class UserPreference(models.Model):
             self.DATE_FORMAT_ISO: "Y-m-d",
             self.DATE_FORMAT_VERBOSE: "j E Y",
         }.get(self.date_display_format, "d.m.Y")
+
+
+class DirectMessage(models.Model):
+    sender = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="sent_direct_messages",
+    )
+    recipient = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="received_direct_messages",
+    )
+    body = models.TextField()
+    created_at = models.DateTimeField(default=timezone.now, db_index=True)
+    read_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["created_at", "id"]
+        constraints = [
+            models.CheckConstraint(
+                condition=~models.Q(sender=models.F("recipient")),
+                name="core_directmessage_sender_not_recipient",
+            )
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.sender} -> {self.recipient} ({self.created_at:%Y-%m-%d %H:%M})"

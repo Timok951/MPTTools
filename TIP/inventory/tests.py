@@ -16,7 +16,7 @@ from rest_framework.test import APIClient
 from assets.models import Equipment, EquipmentCheckout, InventoryAdjustment
 from audit.models import AuditLog
 from audit.models import AdminPortalLog
-from core.models import EquipmentCategory, UserPreference, Workplace
+from core.models import DirectMessage, EquipmentCategory, UserPreference, Workplace
 from inventory.backup_utils import PostgreSQLBackupConfig, create_postgresql_backup, get_postgresql_backup_config
 from inventory.portal_forms import PortalUserForm
 from operations.models import (
@@ -109,6 +109,54 @@ class TimerAndPreferenceViewTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.wsgi_request.LANGUAGE_CODE, "en")
         self.assertContains(response, "User preferences")
+
+
+class DirectMessageTests(TestCase):
+    def setUp(self):
+        self.password = "secret123"
+        self.sender = User.objects.create_user(username="sender_user", password=self.password)
+        self.recipient = User.objects.create_user(username="recipient_user", password=self.password)
+        builder_group, _ = Group.objects.get_or_create(name="Builder")
+        self.sender.groups.add(builder_group)
+        self.recipient.groups.add(builder_group)
+
+    def test_authenticated_user_can_open_messages_page(self):
+        self.client.force_login(self.sender)
+
+        response = self.client.get(reverse("direct_messages"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Сообщения пользователям")
+
+    def test_user_can_send_direct_message(self):
+        self.client.force_login(self.sender)
+
+        response = self.client.post(
+            reverse("direct_messages"),
+            {"recipient": self.recipient.pk, "body": "Привет, проверь оборудование."},
+            follow=True,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        message = DirectMessage.objects.get()
+        self.assertEqual(message.sender, self.sender)
+        self.assertEqual(message.recipient, self.recipient)
+        self.assertEqual(message.body, "Привет, проверь оборудование.")
+        self.assertContains(response, self.recipient.username)
+
+    def test_opening_dialog_marks_received_messages_as_read(self):
+        message = DirectMessage.objects.create(
+            sender=self.sender,
+            recipient=self.recipient,
+            body="Есть новое сообщение",
+        )
+        self.client.force_login(self.recipient)
+
+        response = self.client.get(f"{reverse('direct_messages')}?user={self.sender.pk}")
+
+        self.assertEqual(response.status_code, 200)
+        message.refresh_from_db()
+        self.assertIsNotNone(message.read_at)
 
 
 class LightweightPerformanceTests(TestCase):

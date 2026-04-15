@@ -1,0 +1,71 @@
+{% extends "inventory/base.html" %}
+{% load inventory_extras %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header">
+        <div>
+            <div class="kicker">{% ui_text "Чат" "Chat" %}</div>
+            <h2>{% ui_text "Сообщения пользователям" "Direct messages" %}</h2>
+            <p class="muted">{% ui_text "Выберите пользователя и отправьте сообщение внутри системы." "Choose a user and send an internal message." %}</p>
+        </div>
+    </div>
+</div>
+
+<div class="split-layout">
+    <div class="card">
+        <h3>{% ui_text "Диалоги" "Conversations" %}</h3>
+        <div class="timeline">
+            {% for item in conversations %}
+            <a href="{% url 'direct_messages' %}?user={{ item.user.pk }}" class="secondary" style="display:block; text-decoration:none;">
+                <strong>{{ item.user.username }}</strong>
+                <div class="muted" style="margin-top: 4px;">{{ item.last_message|truncatechars:90 }}</div>
+                <div class="toolbar-spread" style="margin-top: 8px;">
+                    <span class="muted">{{ item.last_message_at|date:preferred_datetime_format }}</span>
+                    {% if item.unread_count %}
+                    <span class="badge warn">{{ item.unread_count }}</span>
+                    {% endif %}
+                </div>
+            </a>
+            {% empty %}
+            <div class="muted">{% ui_text "Диалогов пока нет." "No conversations yet." %}</div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <div class="card">
+        <h3>
+            {% if selected_user %}
+                {% ui_text "Диалог с" "Conversation with" %} {{ selected_user.username }}
+            {% else %}
+                {% ui_text "Новое сообщение" "New message" %}
+            {% endif %}
+        </h3>
+
+        <form method="post" class="form-shell" style="margin-bottom: 18px;">
+            {% csrf_token %}
+            <div class="form-grid single">
+                {% include "inventory/_form_field.html" with field=form.recipient %}
+                {% include "inventory/_form_field.html" with field=form.body full_width=True %}
+            </div>
+            <div class="actions">
+                <button class="btn" type="submit">{% ui_text "Отправить сообщение" "Send message" %}</button>
+            </div>
+        </form>
+
+        <div class="timeline">
+            {% for item in conversation_messages %}
+            <div class="timeline-item">
+                <div class="timeline-time">{{ item.created_at|date:preferred_datetime_format }}</div>
+                <div class="timeline-body">
+                    <strong>{{ item.sender.username }}</strong>
+                    <div style="margin-top: 8px; white-space: pre-wrap;">{{ item.body }}</div>
+                </div>
+            </div>
+            {% empty %}
+            <div class="muted">{% ui_text "Сообщений в этом диалоге пока нет." "There are no messages in this conversation yet." %}</div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+{% endblock %}

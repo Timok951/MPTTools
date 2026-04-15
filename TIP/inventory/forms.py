@@ -5,7 +5,9 @@ from django.utils.translation import gettext_lazy as _
 from django.utils import timezone
 
 from assets.models import Equipment, EquipmentCheckout, InventoryAdjustment
-from core.models import UserPreference, Workplace
+from django.contrib.auth.models import User
+
+from core.models import DirectMessage, UserPreference, Workplace
 from operations.models import EquipmentRequest, MaterialUsage, WorkTimer
 
 
@@ -41,6 +43,29 @@ class BackupImportForm(forms.Form):
         if not backup_file.name.lower().endswith(".json"):
             raise ValidationError(_("Upload a JSON backup file."))
         return backup_file
+
+
+class DirectMessageForm(forms.ModelForm):
+    class Meta:
+        model = DirectMessage
+        fields = ["recipient", "body"]
+        widgets = {
+            "body": forms.Textarea(attrs={"rows": 4, "placeholder": "Напишите сообщение пользователю."}),
+        }
+
+    def __init__(self, *args, sender=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.sender = sender
+        self.fields["recipient"].queryset = User.objects.filter(is_active=True).exclude(pk=getattr(sender, "pk", None)).order_by("username")
+        self.fields["recipient"].empty_label = "Выберите пользователя"
+        self.fields["recipient"].label = "Пользователь"
+        self.fields["body"].label = "Сообщение"
+
+    def clean_recipient(self):
+        recipient = self.cleaned_data["recipient"]
+        if self.sender and recipient.pk == self.sender.pk:
+            raise ValidationError("Нельзя отправить сообщение самому себе.")
+        return recipient
 
 
 class QuickTimerStartForm(forms.Form):

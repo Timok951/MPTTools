@@ -1,8 +1,10 @@
 import csv
 from datetime import timedelta
+import hashlib
 import io
 import os
 from pathlib import Path
+import random
 import tempfile
 
 from django.contrib import messages
@@ -10,6 +12,7 @@ from django.contrib.auth import login, logout
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import Group, User
 from django.conf import settings
+from django.core.mail import send_mail
 from django.views.decorators.http import require_POST
 from django.utils import translation
 from django.core.management import call_command
@@ -17,14 +20,23 @@ from django.core.paginator import Paginator
 from django.db.models import Count, F, Q, Sum
 from django.db.models.functions import TruncDate
 from django.db.utils import OperationalError, ProgrammingError
-from django.http import FileResponse, Http404, HttpResponse
+from django.http import FileResponse, HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
 
 from assets.models import Equipment, EquipmentCheckout
 from audit.models import AdminPortalLog, AuditLog
-from core.models import Cabinet, DirectMessage, EquipmentCategory, Supplier, UserPreference, Workplace, WorkplaceMember
+from core.models import (
+    Cabinet,
+    DirectMessage,
+    EquipmentCategory,
+    PasswordResetCode,
+    Supplier,
+    UserPreference,
+    Workplace,
+    WorkplaceMember,
+)
 from operations.models import EquipmentRequest, MaterialUsage, WorkTimer, REQUEST_PENDING
 from .authz import GROUP_ADMIN, GROUP_BUILDER, GROUP_SYSADMIN, GROUP_WAREHOUSE, user_in_group
 from .forms import (
@@ -33,6 +45,8 @@ from .forms import (
     EquipmentCheckoutForm,
     EquipmentRequestForm,
     InventoryAdjustmentForm,
+    PasswordResetConfirmForm,
+    PasswordResetRequestForm,
     MaterialUsageForm,
     QuickTimerStartForm,
     RussianAuthenticationForm,
@@ -144,6 +158,18 @@ def _message_conversation_summaries(user):
         if item.recipient_id == user.pk and item.read_at is None:
             summary["unread_count"] += 1
     return list(summaries.values())
+
+
+PASSWORD_RESET_CODE_TTL_MINUTES = 15
+
+
+def _password_reset_code_hash(email: str, code: str) -> str:
+    normalized_email = (email or "").strip().lower()
+    return hashlib.sha256(f"{normalized_email}:{code}".encode("utf-8")).hexdigest()
+
+
+def _generate_password_reset_code() -> str:
+    return f"{random.SystemRandom().randint(0, 999999):06d}"
 
 
 def forbidden(request, message: str):
@@ -1009,7 +1035,66 @@ def quality_report_view(request):
 
 @login_required
 def direct_messages_view(request):
-    raise Http404()
+    selected_user = None
+    selected_user_id = request.GET.get("user") or request.POST.get("recipient")
+    if selected_user_id:
+        selected_user = get_object_or_404(User.objects.filter(is_active=True), pk=selected_user_id)
+        if selected_user.pk == request.user.pk:
+            selected_user = None
+
+    if request.method == "POST":
+        form = DirectMessageForm(request.POST, sender=request.user)
+        if form.is_valid():
+            message_obj = form.save(commit=False)
+            message_obj.sender = request.user
+            message_obj.save()
+            messages.success(request, "Сообщение отправлено.")
+            return redirect(f"{reverse('direct_messages')}?user={message_obj.recipient_id}")
+    else:
+        form = DirectMessageForm(
+            sender=request.user,
+            initial={"recipient": selected_user.pk} if selected_user else None,
+        )
+
+    conversation_messages = []
+    if selected_user is not None:
+        DirectMessage.objects.filter(
+            sender=selected_user,
+            recipient=request.user,
+            read_at__isnull=True,
+        ).update(read_at=timezone.now())
+        conversation_messages = (
+            DirectMessage.objects.filter(
+                (Q(sender=request.user) & Q(recipient=selected_user))
+                | (Q(sender=selected_user) & Q(recipient=request.user))
+            )
+            .select_related("sender", "recipient")
+            .order_by("created_at", "id")
+        )
+
+    conversations = _message_conversation_summaries(request.user)
+    if selected_user is None and conversations:
+        selected_user = conversations[0]["user"]
+        form = DirectMessageForm(sender=request.user, initial={"recipient": selected_user.pk})
+        conversation_messages = (
+            DirectMessage.objects.filter(
+                (Q(sender=request.user) & Q(recipient=selected_user))
+                | (Q(sender=selected_user) & Q(recipient=request.user))
+            )
+            .select_related("sender", "recipient")
+            .order_by("created_at", "id")
+        )
+
+    return render(
+        request,
+        "inventory/direct_messages.html",
+        {
+            "conversations": conversations,
+            "selected_user": selected_user,
+            "conversation_messages": conversation_messages,
+            "form": form,
+        },
+    )
 
 
 @login_required
@@ -1065,6 +1150,87 @@ def register_view(request):
     else:
         form = RussianUserCreationForm()
     return render(request, "inventory/register.html", {"form": form})
+
+
+def password_reset_request_view(request):
+    if request.user.is_authenticated:
+        return redirect("analytics")
+
+    if request.method == "POST":
+        form = PasswordResetRequestForm(request.POST)
+        if form.is_valid():
+            email = form.cleaned_data["email"].strip().lower()
+            user = User.objects.filter(is_active=True, email__iexact=email).first()
+            if user:
+                PasswordResetCode.objects.filter(user=user, email__iexact=email, used_at__isnull=True).update(
+                    used_at=timezone.now()
+                )
+                code = _generate_password_reset_code()
+                expires_at = timezone.now() + timedelta(minutes=PASSWORD_RESET_CODE_TTL_MINUTES)
+                PasswordResetCode.objects.create(
+                    user=user,
+                    email=email,
+                    code_hash=_password_reset_code_hash(email, code),
+                    expires_at=expires_at,
+                )
+                send_mail(
+                    "Код восстановления пароля",
+                    (
+                        f"Здравствуйте, {user.get_username()}!\n\n"
+                        f"Код для восстановления пароля: {code}\n"
+                        f"Код действует {PASSWORD_RESET_CODE_TTL_MINUTES} минут.\n\n"
+                        "Если вы не запрашивали восстановление, просто проигнорируйте это письмо."
+                    ),
+                    settings.DEFAULT_FROM_EMAIL,
+                    [email],
+                    fail_silently=False,
+                )
+
+            messages.success(
+                request,
+                "Если адрес найден, мы отправили на него код для восстановления пароля.",
+            )
+            return redirect("password_reset_confirm")
+    else:
+        form = PasswordResetRequestForm()
+
+    return render(request, "inventory/password_reset_request.html", {"form": form})
+
+
+def password_reset_confirm_view(request):
+    if request.user.is_authenticated:
+        return redirect("analytics")
+
+    if request.method == "POST":
+        form = PasswordResetConfirmForm(request.POST)
+        if form.is_valid():
+            email = form.cleaned_data["email"].strip().lower()
+            code = form.cleaned_data["code"]
+            reset_entry = (
+                PasswordResetCode.objects.select_related("user")
+                .filter(email__iexact=email, used_at__isnull=True, expires_at__gte=timezone.now())
+                .order_by("-created_at", "-id")
+                .first()
+            )
+            if not reset_entry or reset_entry.code_hash != _password_reset_code_hash(email, code):
+                form.add_error("code", "Неверный или просроченный код.")
+            else:
+                user = reset_entry.user
+                user.set_password(form.cleaned_data["new_password1"])
+                user.save(update_fields=["password"])
+                reset_entry.used_at = timezone.now()
+                reset_entry.save(update_fields=["used_at"])
+                PasswordResetCode.objects.filter(
+                    user=user,
+                    email__iexact=email,
+                    used_at__isnull=True,
+                ).exclude(pk=reset_entry.pk).update(used_at=timezone.now())
+                messages.success(request, "Пароль обновлён. Теперь можно войти.")
+                return redirect("login")
+    else:
+        form = PasswordResetConfirmForm()
+
+    return render(request, "inventory/password_reset_confirm.html", {"form": form})
 
 
 @login_required

@@ -222,3 +222,26 @@ class DirectMessage(models.Model):
 
     def __str__(self) -> str:
         return f"{self.sender} -> {self.recipient} ({self.created_at:%Y-%m-%d %H:%M})"
+
+
+class PasswordResetCode(models.Model):
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="password_reset_codes",
+    )
+    email = models.EmailField()
+    code_hash = models.CharField(max_length=256)
+    created_at = models.DateTimeField(default=timezone.now)
+    expires_at = models.DateTimeField()
+    used_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["-created_at", "-id"]
+
+    @property
+    def is_active(self) -> bool:
+        return self.used_at is None and self.expires_at >= timezone.now()
+
+    def __str__(self) -> str:
+        return f"Password reset code for {self.user} ({self.email})"

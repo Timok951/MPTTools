@@ -1,7 +1,7 @@
 from django.contrib import admin
 
 from .admin_utils import SoftDeleteAdmin
-from .models import Cabinet, DirectMessage, EquipmentCategory, Supplier, UserPreference, Workplace, WorkplaceMember
+from .models import Cabinet, DirectMessage, EquipmentCategory, PasswordResetCode, Supplier, UserPreference, Workplace, WorkplaceMember
 
 
 @admin.register(Supplier)
@@ -47,3 +47,10 @@ class DirectMessageAdmin(admin.ModelAdmin):
     list_display = ("sender", "recipient", "created_at", "read_at")
     list_filter = ("created_at", "read_at")
     search_fields = ("sender__username", "recipient__username", "body")
+
+
+@admin.register(PasswordResetCode)
+class PasswordResetCodeAdmin(admin.ModelAdmin):
+    list_display = ("user", "email", "created_at", "expires_at", "used_at")
+    list_filter = ("created_at", "expires_at", "used_at")
+    search_fields = ("user__username", "user__email", "email")

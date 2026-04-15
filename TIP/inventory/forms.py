@@ -1,5 +1,6 @@
 from django import forms
 from django.contrib.auth.forms import AuthenticationForm, UserCreationForm
+from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
 from django.utils.translation import gettext_lazy as _
 from django.utils import timezone
@@ -43,6 +44,49 @@ class BackupImportForm(forms.Form):
         if not backup_file.name.lower().endswith(".json"):
             raise ValidationError(_("Upload a JSON backup file."))
         return backup_file
+
+
+class PasswordResetRequestForm(forms.Form):
+    email = forms.EmailField(
+        label="Email",
+        widget=forms.EmailInput(attrs={"autocomplete": "email", "placeholder": "user@example.com"}),
+    )
+
+
+class PasswordResetConfirmForm(forms.Form):
+    email = forms.EmailField(
+        label="Email",
+        widget=forms.EmailInput(attrs={"autocomplete": "email", "placeholder": "user@example.com"}),
+    )
+    code = forms.CharField(
+        label="Код из письма",
+        max_length=6,
+        min_length=6,
+        widget=forms.TextInput(attrs={"autocomplete": "one-time-code", "inputmode": "numeric", "placeholder": "123456"}),
+    )
+    new_password1 = forms.CharField(
+        label="Новый пароль",
+        strip=False,
+        widget=forms.PasswordInput(attrs={"autocomplete": "new-password"}),
+    )
+    new_password2 = forms.CharField(
+        label="Подтверждение нового пароля",
+        strip=False,
+        widget=forms.PasswordInput(attrs={"autocomplete": "new-password"}),
+    )
+
+    def clean_code(self):
+        return (self.cleaned_data.get("code") or "").strip()
+
+    def clean(self):
+        cleaned = super().clean()
+        password1 = cleaned.get("new_password1")
+        password2 = cleaned.get("new_password2")
+        if password1 and password2 and password1 != password2:
+            self.add_error("new_password2", "Пароли не совпадают.")
+        if password1:
+            validate_password(password1)
+        return cleaned
 
 
 class DirectMessageForm(forms.ModelForm):

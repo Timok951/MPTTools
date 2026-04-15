@@ -16,7 +16,7 @@ from rest_framework.test import APIClient
 from assets.models import Equipment, EquipmentCheckout, InventoryAdjustment
 from audit.models import AuditLog
 from audit.models import AdminPortalLog
-from core.models import DirectMessage, EquipmentCategory, UserPreference, Workplace
+from core.models import DirectMessage, EquipmentCategory, PasswordResetCode, UserPreference, Workplace
 from inventory.backup_utils import PostgreSQLBackupConfig, create_postgresql_backup, get_postgresql_backup_config
 from inventory.portal_forms import PortalUserForm
 from operations.models import (
@@ -157,6 +157,68 @@ class DirectMessageTests(TestCase):
         self.assertEqual(response.status_code, 200)
         message.refresh_from_db()
         self.assertIsNotNone(message.read_at)
+
+
+@override_settings(EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend")
+class PasswordResetFlowTests(TestCase):
+    def setUp(self):
+        self.password = "secret123"
+        self.user = User.objects.create_user(
+            username="mail_user",
+            email="mail_user@example.com",
+            password=self.password,
+        )
+
+    def test_request_form_sends_code_and_creates_reset_entry(self):
+        response = self.client.post(
+            reverse("password_reset_request"),
+            {"email": "mail_user@example.com"},
+            follow=True,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(PasswordResetCode.objects.count(), 1)
+        self.assertContains(response, "Подтверждение кода")
+
+    def test_confirm_form_updates_password_from_valid_code(self):
+        with mock.patch("inventory.views._generate_password_reset_code", return_value="123456"):
+            self.client.post(reverse("password_reset_request"), {"email": "mail_user@example.com"})
+
+        response = self.client.post(
+            reverse("password_reset_confirm"),
+            {
+                "email": "mail_user@example.com",
+                "code": "123456",
+                "new_password1": "new-secret-123",
+                "new_password2": "new-secret-123",
+            },
+            follow=True,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Пароль обновлён")
+        self.user.refresh_from_db()
+        self.assertTrue(self.user.check_password("new-secret-123"))
+        self.assertIsNotNone(PasswordResetCode.objects.get().used_at)
+
+    def test_confirm_form_rejects_invalid_code(self):
+        with mock.patch("inventory.views._generate_password_reset_code", return_value="123456"):
+            self.client.post(reverse("password_reset_request"), {"email": "mail_user@example.com"})
+
+        response = self.client.post(
+            reverse("password_reset_confirm"),
+            {
+                "email": "mail_user@example.com",
+                "code": "654321",
+                "new_password1": "new-secret-123",
+                "new_password2": "new-secret-123",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Неверный или просроченный код")
+        self.user.refresh_from_db()
+        self.assertTrue(self.user.check_password(self.password))
 
 
 class LightweightPerformanceTests(TestCase):

@@ -1,11 +1,16 @@
-version: "3.8"
+# Параллельный запуск со вторым похожим стеком:
+#   COMPOSE_PROJECT_NAME=my_mpt docker compose -p my_mpt up -d
+# или задайте свободные порты:
+#   MPTTOOLS_WEB_PORT=8010 MPTTOOLS_POSTGRES_PORT=5434 docker compose up -d
+#
+# Не задавайте container_name — имена контейнеров тогда уникальны для каждого проекта.
 
 services:
   djangoapp:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: mpttools_web
+    restart: unless-stopped
     volumes:
       - .:/app
     working_dir: /app/TIP
@@ -16,14 +21,14 @@ services:
       DATABASE_NAME: mpttools
       DATABASE_USERNAME: postgres
       DATABASE_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
-      ALLOWED_HOSTS: ${ALLOWED_HOSTS:-localhost,127.0.0.1,web,djangoapp}
+      ALLOWED_HOSTS: "${ALLOWED_HOSTS:-localhost,127.0.0.1,web,djangoapp,*}"
       CSRF_TRUSTED_ORIGINS: ${CSRF_TRUSTED_ORIGINS:-http://localhost:8000,http://127.0.0.1:8000}
       DEBUG: ${DEBUG:-true}
       DJANGO_SUPERUSER_USERNAME: ${DJANGO_SUPERUSER_USERNAME:-admin}
       DJANGO_SUPERUSER_EMAIL: ${DJANGO_SUPERUSER_EMAIL:-admin@example.com}
       DJANGO_SUPERUSER_PASSWORD: ${DJANGO_SUPERUSER_PASSWORD:-admin123}
       EMAIL_BACKEND: ${EMAIL_BACKEND:-django.core.mail.backends.smtp.EmailBackend}
-      EMAIL_HOST: ${EMAIL_HOST:-mailhog}
+      EMAIL_HOST: ${EMAIL_HOST:-mailpit}
       EMAIL_PORT: ${EMAIL_PORT:-1025}
       EMAIL_HOST_USER: ${EMAIL_HOST_USER:-}
       EMAIL_HOST_PASSWORD: ${EMAIL_HOST_PASSWORD:-}
@@ -31,25 +36,25 @@ services:
       EMAIL_USE_SSL: ${EMAIL_USE_SSL:-false}
       DEFAULT_FROM_EMAIL: ${DEFAULT_FROM_EMAIL:-noreply@mpttools.local}
     ports:
-      - "8000:8000"
+      - "${MPTTOOLS_WEB_PORT:-8000}:8000"
     depends_on:
       postgres_db:
         condition: service_healthy
-      mailhog:
+      mailpit:
         condition: service_started
     networks:
       - django_monitoring
-    entrypoint: ["/app/entrypoint.sh"]
+    entrypoint: ["bash", "/app/entrypoint.sh"]
 
   postgres_db:
     image: postgres:17
-    container_name: mpttools_postgres
+    restart: unless-stopped
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
       POSTGRES_DB: mpttools
     ports:
-      - "5433:5432"
+      - "${MPTTOOLS_POSTGRES_PORT:-5433}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -60,20 +65,20 @@ services:
     networks:
       - django_monitoring
 
-  mailhog:
-    image: mailhog/mailhog:v1.0.1
-    container_name: mpttools_mailhog
+  mailpit:
+    image: axllent/mailpit:latest
+    restart: unless-stopped
     ports:
-      - "1025:1025"
-      - "8025:8025"
+      - "${MPTTOOLS_SMTP_PORT:-1025}:1025"
+      - "${MPTTOOLS_MAILPIT_UI_PORT:-8025}:8025"
     networks:
       - django_monitoring
 
   prometheus:
     image: prom/prometheus:latest
-    container_name: mpttools_prometheus
+    restart: unless-stopped
     ports:
-      - "9176:9090"
+      - "${MPTTOOLS_PROMETHEUS_PORT:-9176}:9090"
     volumes:
       - prometheus_tsdb:/prometheus
       - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
@@ -91,7 +96,7 @@ services:
 
   postgres_exporter:
     image: quay.io/prometheuscommunity/postgres-exporter:latest
-    container_name: mpttools_postgres_exporter
+    restart: unless-stopped
     environment:
       DATA_SOURCE_NAME: postgresql://postgres:${POSTGRES_PASSWORD:-postgres}@postgres_db:5432/mpttools?sslmode=disable
     depends_on:
@@ -102,9 +107,9 @@ services:
 
   grafana:
     image: grafana/grafana:latest
-    container_name: mpttools_grafana
+    restart: unless-stopped
     ports:
-      - "3816:3000"
+      - "${MPTTOOLS_GRAFANA_PORT:-3816}:3000"
     environment:
       GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
       GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
@@ -121,10 +126,7 @@ services:
       - django_monitoring
 
   backup:
-    build:
-      context: .
-      dockerfile: docker/backup/Dockerfile
-    container_name: mpttools_backup
+    image: postgres:17
     restart: unless-stopped
     environment:
       DATABASE_HOST: postgres_db
@@ -134,10 +136,13 @@ services:
       DATABASE_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
       BACKUP_DIR: /backups
       BACKUP_KEEP_COUNT: ${BACKUP_KEEP_COUNT:-14}
-      BACKUP_CRON_SCHEDULE: ${BACKUP_CRON_SCHEDULE:-0 2 * * *}
-      BACKUP_LABEL: docker
+      BACKUP_LABEL: ${BACKUP_LABEL:-docker}
+      BACKUP_INTERVAL_SECONDS: ${BACKUP_INTERVAL_SECONDS:-86400}
     volumes:
       - ./backups/postgresql:/backups
+      - ./docker/backup/backup-cron.sh:/scripts/backup-cron.sh:ro
+      - ./docker/backup/backup-loop.sh:/scripts/backup-loop.sh:ro
+    command: ["bash", "/scripts/backup-loop.sh"]
     depends_on:
       postgres_db:
         condition: service_healthy

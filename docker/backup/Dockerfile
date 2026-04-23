@@ -1,3 +1,5 @@
+# Не используется основным docker-compose.yml (бэкап идёт через postgres:17 + backup-loop.sh).
+# Оставлен для ручной сборки: docker build -f docker/backup/Dockerfile .
 FROM postgres:17
 
 RUN apt-get update \

@@ -68,4 +68,5 @@ else:
 PY
 fi
 
-exec python manage.py runserver 0.0.0.0:8000
+DJANGO_LISTEN_PORT="${DJANGO_LISTEN_PORT:-8000}"
+exec python manage.py runserver "0.0.0.0:${DJANGO_LISTEN_PORT}"

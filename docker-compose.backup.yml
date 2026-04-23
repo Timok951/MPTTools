@@ -22,6 +22,5 @@ services:
       apt-get update &&
       apt-get install -y --no-install-recommends cron bash &&
       rm -rf /var/lib/apt/lists/* &&
-      chmod +x /usr/local/bin/backup-cron.sh /usr/local/bin/docker-backup-entrypoint.sh &&
-      /usr/local/bin/docker-backup-entrypoint.sh
+      bash /usr/local/bin/docker-backup-entrypoint.sh
       "

@@ -3,7 +3,7 @@ set -euo pipefail
 
 BACKUP_CRON_SCHEDULE="${BACKUP_CRON_SCHEDULE:-0 2 * * *}"
 
-printf '%s /usr/local/bin/backup-cron.sh >> /var/log/backup-cron.log 2>&1\n' "$BACKUP_CRON_SCHEDULE" > /etc/cron.d/mpttools-backup
+printf '%s bash /usr/local/bin/backup-cron.sh >> /var/log/backup-cron.log 2>&1\n' "$BACKUP_CRON_SCHEDULE" > /etc/cron.d/mpttools-backup
 chmod 0644 /etc/cron.d/mpttools-backup
 crontab /etc/cron.d/mpttools-backup
 

@@ -89,7 +89,7 @@ Docker automatic backup:
 2. Start the dedicated backup container:
 
 ```bash
-docker compose -f docker-compose.backup.yml up -d --build
+docker compose -f docker-compose.backup.yml up -d
 ```
 
 3. Backups will be written to:
@@ -111,7 +111,6 @@ docker compose -f docker-compose.backup.yml down
 Included Docker files:
 
 - `docker-compose.backup.yml`
-- `docker/backup/Dockerfile`
 - `docker/backup/backup-cron.sh`
 - `docker/backup/docker-entrypoint.sh`
 

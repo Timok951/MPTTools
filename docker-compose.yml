@@ -93,9 +93,7 @@ services:
       - django_monitoring
 
   backup:
-    build:
-      context: .
-      dockerfile: docker/backup/Dockerfile
+    image: postgres:17
     container_name: mpttools_backup
     restart: unless-stopped
     environment:
@@ -110,6 +108,16 @@ services:
       BACKUP_LABEL: docker
     volumes:
       - ./backups/postgresql:/backups
+      - ./docker/backup/backup-cron.sh:/usr/local/bin/backup-cron.sh:ro
+      - ./docker/backup/docker-entrypoint.sh:/usr/local/bin/docker-backup-entrypoint.sh:ro
+    command: >
+      bash -lc "
+      apt-get update &&
+      apt-get install -y --no-install-recommends cron bash &&
+      rm -rf /var/lib/apt/lists/* &&
+      chmod +x /usr/local/bin/backup-cron.sh /usr/local/bin/docker-backup-entrypoint.sh &&
+      /usr/local/bin/docker-backup-entrypoint.sh
+      "
     depends_on:
       postgres_db:
         condition: service_healthy

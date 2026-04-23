@@ -1,10 +1,13 @@
-# Имя проекта по умолчанию: mpt_tools (тома/сеть: mpt_tools_*), чтобы не пересекаться с другим сервером.
-# Другой стек:   docker compose -p my_other_stack up -d
-# Порты на хосте (второй стек — другие MPTTOOLS_*): см. mailpit ниже (1025 на хосте часто занят).
+# Два стека на одной машине: разные каталоги + свой .env (см. env.docker.example — блок «Стек 2»).
+# Во втором .env задайте: COMPOSE_PROJECT_NAME=mpt_tools_b и свободные MPTTOOLS_* порты.
 #
-# Старая БД mpttools: задайте DATABASE_NAME=mpttools POSTGRES_DB=mpttools в .env
+# Postgres по умолчанию только внутри Docker (без конфликта порта 5433). С хоста:
+#   docker compose exec postgres_db psql -U postgres -d mpt_tools
+# Нужен доступ с хоста к порту БД:
+#   docker compose -f docker-compose.yml -f docker-compose.postgres-host.yml up -d
 
-name: mpt_tools
+# Имя Docker-проекта (тома/сеть): задайте в .env COMPOSE_PROJECT_NAME для второго клона.
+name: ${COMPOSE_PROJECT_NAME:-mpt_tools}
 
 services:
   djangoapp:
@@ -23,7 +26,7 @@ services:
       DATABASE_USERNAME: postgres
       DATABASE_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
       ALLOWED_HOSTS: "${ALLOWED_HOSTS:-localhost,127.0.0.1,web,djangoapp,*}"
-      CSRF_TRUSTED_ORIGINS: ${CSRF_TRUSTED_ORIGINS:-http://localhost:8000,http://127.0.0.1:8000}
+      CSRF_TRUSTED_ORIGINS: ${CSRF_TRUSTED_ORIGINS:-http://localhost:18080,http://127.0.0.1:18080}
       DEBUG: ${DEBUG:-true}
       DJANGO_SUPERUSER_USERNAME: ${DJANGO_SUPERUSER_USERNAME:-admin}
       DJANGO_SUPERUSER_EMAIL: ${DJANGO_SUPERUSER_EMAIL:-admin@example.com}
@@ -37,7 +40,7 @@ services:
       EMAIL_USE_SSL: ${EMAIL_USE_SSL:-false}
       DEFAULT_FROM_EMAIL: ${DEFAULT_FROM_EMAIL:-noreply@mpt-tools.local}
     ports:
-      - "${MPTTOOLS_WEB_PORT:-8000}:8000"
+      - "${MPTTOOLS_WEB_PORT:-18080}:8000"
     depends_on:
       postgres_db:
         condition: service_healthy
@@ -54,8 +57,6 @@ services:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
       POSTGRES_DB: ${POSTGRES_DB:-mpt_tools}
-    ports:
-      - "${MPTTOOLS_POSTGRES_PORT:-5433}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -69,11 +70,10 @@ services:
   mailpit:
     image: axllent/mailpit:latest
     restart: unless-stopped
-    # На хосте по умолчанию 1125/8125 — не конфликтуют с другим Mailpit/SMTP на 1025/8025.
-    # Django внутри сети всё равно ходит на mailpit:1025 (см. EMAIL_PORT у djangoapp).
+    # Высокие порты на хосте — реже пересекаются со вторым Mailpit/приложением на 1025/8025.
     ports:
-      - "${MPTTOOLS_SMTP_PORT:-1125}:1025"
-      - "${MPTTOOLS_MAILPIT_UI_PORT:-8125}:8025"
+      - "${MPTTOOLS_SMTP_PORT:-10225}:1025"
+      - "${MPTTOOLS_MAILPIT_UI_PORT:-18025}:8025"
     networks:
       - django_monitoring
 
@@ -81,7 +81,7 @@ services:
     image: prom/prometheus:latest
     restart: unless-stopped
     ports:
-      - "${MPTTOOLS_PROMETHEUS_PORT:-9176}:9090"
+      - "${MPTTOOLS_PROMETHEUS_PORT:-19176}:9090"
     volumes:
       - prometheus_tsdb:/prometheus
       - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
@@ -112,12 +112,12 @@ services:
     image: grafana/grafana:latest
     restart: unless-stopped
     ports:
-      - "${MPTTOOLS_GRAFANA_PORT:-3816}:3000"
+      - "${MPTTOOLS_GRAFANA_PORT:-13816}:3000"
     environment:
       GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
       GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
       GF_USERS_ALLOW_SIGN_UP: "false"
-      GF_SERVER_ROOT_URL: ${GRAFANA_ROOT_URL:-http://localhost:3816}
+      GF_SERVER_ROOT_URL: ${GRAFANA_ROOT_URL:-http://localhost:13816}
     volumes:
       - grafana_data:/var/lib/grafana
       - ./grafana/provisioning:/etc/grafana/provisioning:ro

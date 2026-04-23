@@ -1,0 +1,9 @@
+# Опционально: проброс Postgres на хост (например localhost:5433).
+# Запуск: docker compose -f docker-compose.yml -f docker-compose.postgres-host.yml up -d
+#
+# В .env задайте свободный порт, если 5433 занят: MPTTOOLS_POSTGRES_PORT=5434
+
+services:
+  postgres_db:
+    ports:
+      - "${MPTTOOLS_POSTGRES_PORT:-5433}:5432"

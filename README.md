@@ -83,6 +83,13 @@ Environment variables in `TIP/.env`:
 - `PG_DUMP_PATH` - path to `pg_dump`, default `pg_dump`
 - `BACKUP_CRON_SCHEDULE` - cron schedule for Docker backup container, default `0 2 * * *`
 
+### Docker stack (MPT Tools)
+
+- Сайт по умолчанию: **http://localhost:18080** (порт вынесен из диапазона 8000, чтобы не конфликтовать со вторым приложением).
+- Два независимых стека: второй клон репозитория + свой `.env` — см. **`env.docker.example`** (блок «Стек 2»): другие `MPTTOOLS_*` и `COMPOSE_PROJECT_NAME`.
+- Postgres **не** пробрасывается на хост по умолчанию (нет борьбы за 5433). С хоста: `docker compose exec postgres_db psql -U postgres -d mpt_tools`. Проброс порта:  
+  `docker compose -f docker-compose.yml -f docker-compose.postgres-host.yml up -d`
+
 Docker automatic backup:
 
 1. Make sure your PostgreSQL credentials are present in `TIP/.env`.

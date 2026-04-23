@@ -100,7 +100,7 @@ WSGI_APPLICATION = 'TIP.wsgi.application'
 
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
-db_engine = os.getenv("DATABASE_ENGINE", "sqlite3").strip().lower()
+db_engine = os.getenv("DATABASE_ENGINE", "postgresql").strip().lower()
 
 ENGINE_MAP = {
     "postgresql": "django.db.backends.postgresql",
@@ -127,7 +127,7 @@ else:
     DATABASES = {
         "default": {
             "ENGINE": engine_path,
-            "NAME": os.getenv("DATABASE_NAME", "djangodb").strip(),
+            "NAME": os.getenv("DATABASE_NAME", "mpttools").strip(),
             "USER": os.getenv("DATABASE_USERNAME", "postgres").strip(),
             "PASSWORD": os.getenv("DATABASE_PASSWORD", "").strip(),
             "HOST": os.getenv("DATABASE_HOST", "localhost").strip(),

@@ -126,7 +126,7 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "pg_stat_database_numbackends{datname=\"mpttools\"}",
+          "expr": "pg_stat_database_numbackends{datname=\"mpt_tools\"}",
           "legendFormat": "backends",
           "refId": "A"
         }
@@ -166,12 +166,12 @@
   "refresh": "10s",
   "schemaVersion": 39,
   "style": "dark",
-  "tags": ["mpttools", "django", "postgres"],
+  "tags": ["mpt_tools", "django", "postgres"],
   "templating": { "list": [] },
   "time": { "from": "now-6h", "to": "now" },
   "timepicker": {},
   "timezone": "",
   "title": "MPT Tools — обзор",
-  "uid": "mpttools-overview",
+  "uid": "mpt-tools-overview",
   "version": 1
 }

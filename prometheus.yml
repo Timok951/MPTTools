@@ -12,10 +12,10 @@ scrape_configs:
     static_configs:
       - targets: ["djangoapp:8000"]
         labels:
-          service: mpttools_web
+          service: mpt_tools_web
 
   - job_name: postgres
     static_configs:
       - targets: ["postgres_exporter:9187"]
         labels:
-          service: mpttools_postgres
+          service: mpt_tools_postgres

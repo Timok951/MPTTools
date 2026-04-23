@@ -1,9 +1,10 @@
-# Параллельный запуск со вторым похожим стеком:
-#   COMPOSE_PROJECT_NAME=my_mpt docker compose -p my_mpt up -d
-# или задайте свободные порты:
-#   MPTTOOLS_WEB_PORT=8010 MPTTOOLS_POSTGRES_PORT=5434 docker compose up -d
+# Имя проекта по умолчанию: mpt_tools (тома/сеть: mpt_tools_*), чтобы не пересекаться с другим сервером.
+# Другой стек:   docker compose -p my_other_stack up -d
+# Или порты:     MPTTOOLS_WEB_PORT=8010 MPTTOOLS_POSTGRES_PORT=5434 docker compose up -d
 #
-# Не задавайте container_name — имена контейнеров тогда уникальны для каждого проекта.
+# Старая БД mpttools: задайте DATABASE_NAME=mpttools POSTGRES_DB=mpttools в .env
+
+name: mpt_tools
 
 services:
   djangoapp:
@@ -18,7 +19,7 @@ services:
       DATABASE_ENGINE: postgresql
       DATABASE_HOST: postgres_db
       DATABASE_PORT: "5432"
-      DATABASE_NAME: mpttools
+      DATABASE_NAME: ${DATABASE_NAME:-mpt_tools}
       DATABASE_USERNAME: postgres
       DATABASE_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
       ALLOWED_HOSTS: "${ALLOWED_HOSTS:-localhost,127.0.0.1,web,djangoapp,*}"
@@ -34,7 +35,7 @@ services:
       EMAIL_HOST_PASSWORD: ${EMAIL_HOST_PASSWORD:-}
       EMAIL_USE_TLS: ${EMAIL_USE_TLS:-false}
       EMAIL_USE_SSL: ${EMAIL_USE_SSL:-false}
-      DEFAULT_FROM_EMAIL: ${DEFAULT_FROM_EMAIL:-noreply@mpttools.local}
+      DEFAULT_FROM_EMAIL: ${DEFAULT_FROM_EMAIL:-noreply@mpt-tools.local}
     ports:
       - "${MPTTOOLS_WEB_PORT:-8000}:8000"
     depends_on:
@@ -52,13 +53,13 @@ services:
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
-      POSTGRES_DB: mpttools
+      POSTGRES_DB: ${POSTGRES_DB:-mpt_tools}
     ports:
       - "${MPTTOOLS_POSTGRES_PORT:-5433}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d mpttools"]
+      test: ["CMD-SHELL", "pg_isready -U postgres -d ${POSTGRES_DB:-mpt_tools}"]
       interval: 3s
       timeout: 5s
       retries: 20
@@ -98,7 +99,7 @@ services:
     image: quay.io/prometheuscommunity/postgres-exporter:latest
     restart: unless-stopped
     environment:
-      DATA_SOURCE_NAME: postgresql://postgres:${POSTGRES_PASSWORD:-postgres}@postgres_db:5432/mpttools?sslmode=disable
+      DATA_SOURCE_NAME: postgresql://postgres:${POSTGRES_PASSWORD:-postgres}@postgres_db:5432/${POSTGRES_DB:-mpt_tools}?sslmode=disable
     depends_on:
       postgres_db:
         condition: service_healthy
@@ -131,7 +132,7 @@ services:
     environment:
       DATABASE_HOST: postgres_db
       DATABASE_PORT: "5432"
-      DATABASE_NAME: mpttools
+      DATABASE_NAME: ${DATABASE_NAME:-mpt_tools}
       DATABASE_USERNAME: postgres
       DATABASE_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
       BACKUP_DIR: /backups

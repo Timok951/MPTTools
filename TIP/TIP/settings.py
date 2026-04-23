@@ -137,7 +137,7 @@ else:
     DATABASES = {
         "default": {
             "ENGINE": engine_path,
-            "NAME": os.getenv("DATABASE_NAME", "djangodb").strip(),
+            "NAME": os.getenv("DATABASE_NAME", "mpt_tools").strip(),
             "USER": os.getenv("DATABASE_USERNAME", "postgres").strip(),
             "PASSWORD": os.getenv("DATABASE_PASSWORD", "").strip(),
             "HOST": os.getenv("DATABASE_HOST", "localhost").strip(),
@@ -208,7 +208,7 @@ EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER", "").strip()
 EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD", "").strip()
 EMAIL_USE_TLS = os.getenv("EMAIL_USE_TLS", "false").strip().lower() in {"1", "true", "yes", "on"}
 EMAIL_USE_SSL = os.getenv("EMAIL_USE_SSL", "false").strip().lower() in {"1", "true", "yes", "on"}
-DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", "noreply@mpttools.local").strip()
+DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", "noreply@mpt-tools.local").strip()
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field

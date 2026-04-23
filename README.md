@@ -1,4 +1,4 @@
-# MPTTools
+# MPT Tools
 
 ## PostgreSQL setup
 
@@ -51,14 +51,14 @@ Recommended учебный регламент:
 Example commands:
 
 ```bash
-pg_dump -h localhost -p 5432 -U postgres -d mpttools -Fc -f backup.dump
-pg_restore -h localhost -p 5432 -U postgres -d mpttools --clean --if-exists backup.dump
+pg_dump -h localhost -p 5432 -U postgres -d mpt_tools -Fc -f backup.dump
+pg_restore -h localhost -p 5432 -U postgres -d mpt_tools --clean --if-exists backup.dump
 ```
 
 Manual SQL apply:
 
 ```bash
-psql -h localhost -p 5432 -U postgres -d mpttools -f db/postgresql/001_inventory_objects.sql
+psql -h localhost -p 5432 -U postgres -d mpt_tools -f db/postgresql/001_inventory_objects.sql
 ```
 
 ## Automatic server backup
@@ -99,7 +99,7 @@ docker compose -f docker-compose.backup.yml up -d --build
 4. To inspect logs:
 
 ```bash
-docker logs -f mpttools-backup
+docker compose logs -f backup
 ```
 
 5. To stop the auto-backup container:

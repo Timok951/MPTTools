@@ -595,7 +595,7 @@ class RoleEnforcementWebTests(TestCase):
     DATABASES={
         "default": {
             "ENGINE": "django.db.backends.postgresql",
-            "NAME": "mpttools",
+            "NAME": "mpt_tools",
             "USER": "postgres",
             "PASSWORD": "secret",
             "HOST": "localhost",
@@ -641,7 +641,7 @@ class BackupCommandTests(TestCase):
                 os.utime(old_file, (stamp, stamp))
 
             config = PostgreSQLBackupConfig(
-                db_name="mpttools",
+                db_name="mpt_tools",
                 db_user="postgres",
                 db_password="secret",
                 db_host="localhost",

@@ -20,8 +20,8 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Generated-By: Babel 2.18.0\n"
 
-msgid "MPT Inventory"
-msgstr "Учёт МПТ"
+msgid "MPT Tools"
+msgstr "МПТ Инструменты"
 
 msgid "Inventory and materials for the technical college"
 msgstr "Инвентаризация и материалы техникума"

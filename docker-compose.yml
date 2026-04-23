@@ -4,6 +4,7 @@ services:
       context: .
       dockerfile: Dockerfile
     container_name: mpttools_web
+    restart: unless-stopped
     volumes:
       - .:/app
     working_dir: /app/TIP

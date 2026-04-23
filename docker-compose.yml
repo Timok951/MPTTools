@@ -59,7 +59,7 @@ services:
       - django_monitoring
 
   mailhog:
-    image: mailhog/mailhog:v1.0.1
+    image: axllent/mailpit:latest
     container_name: mpttools_mailhog
     ports:
       - "1025:1025"

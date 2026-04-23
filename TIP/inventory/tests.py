@@ -148,6 +148,21 @@ class EquipmentCardViewTests(TestCase):
         self.assertContains(response, "Нет фото")
 
 
+class PrometheusMetricsTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(username="metrics_user", password="secret123")
+        builder_group, _ = Group.objects.get_or_create(name="Builder")
+        self.user.groups.add(builder_group)
+
+    def test_metrics_endpoint_returns_prometheus_text(self):
+        response = self.client.get("/metrics")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("text/plain", response["Content-Type"])
+        body = response.content.decode("utf-8")
+        self.assertIn("django_http", body)
+
+
 class EquipmentQRCodeTests(TestCase):
     def setUp(self):
         self.user = User.objects.create_user(username="qr_user", password="secret123")

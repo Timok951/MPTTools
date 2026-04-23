@@ -1,7 +1,21 @@
 global:
-  scrape_interval: 30s
+  scrape_interval: 15s
+  evaluation_interval: 15s
 
 scrape_configs:
   - job_name: prometheus
     static_configs:
       - targets: ["localhost:9090"]
+
+  - job_name: django
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["djangoapp:8000"]
+        labels:
+          service: mpttools_web
+
+  - job_name: postgres
+    static_configs:
+      - targets: ["postgres_exporter:9187"]
+        labels:
+          service: mpttools_postgres

@@ -1,0 +1,12 @@
+apiVersion: 1
+
+providers:
+  - name: MPTTools dashboards
+    orgId: 1
+    folder: MPT Tools
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 30
+    allowUiUpdates: true
+    options:
+      path: /etc/grafana/dashboards

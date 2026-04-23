@@ -1,6 +1,6 @@
 # Имя проекта по умолчанию: mpt_tools (тома/сеть: mpt_tools_*), чтобы не пересекаться с другим сервером.
 # Другой стек:   docker compose -p my_other_stack up -d
-# Или порты:     MPTTOOLS_WEB_PORT=8010 MPTTOOLS_POSTGRES_PORT=5434 docker compose up -d
+# Порты на хосте (второй стек — другие MPTTOOLS_*): см. mailpit ниже (1025 на хосте часто занят).
 #
 # Старая БД mpttools: задайте DATABASE_NAME=mpttools POSTGRES_DB=mpttools в .env
 
@@ -69,9 +69,11 @@ services:
   mailpit:
     image: axllent/mailpit:latest
     restart: unless-stopped
+    # На хосте по умолчанию 1125/8125 — не конфликтуют с другим Mailpit/SMTP на 1025/8025.
+    # Django внутри сети всё равно ходит на mailpit:1025 (см. EMAIL_PORT у djangoapp).
     ports:
-      - "${MPTTOOLS_SMTP_PORT:-1025}:1025"
-      - "${MPTTOOLS_MAILPIT_UI_PORT:-8025}:8025"
+      - "${MPTTOOLS_SMTP_PORT:-1125}:1025"
+      - "${MPTTOOLS_MAILPIT_UI_PORT:-8125}:8025"
     networks:
       - django_monitoring
 

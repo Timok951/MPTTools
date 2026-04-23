@@ -11,16 +11,10 @@ services:
       DATABASE_PASSWORD: ${DATABASE_PASSWORD:-postgres}
       BACKUP_DIR: /backups
       BACKUP_KEEP_COUNT: ${BACKUP_KEEP_COUNT:-14}
-      BACKUP_CRON_SCHEDULE: ${BACKUP_CRON_SCHEDULE:-0 2 * * *}
+      BACKUP_INTERVAL_SECONDS: ${BACKUP_INTERVAL_SECONDS:-86400}
       BACKUP_LABEL: ${BACKUP_LABEL:-docker}
     volumes:
       - ./backups/postgresql:/backups
       - ./docker/backup/backup-cron.sh:/usr/local/bin/backup-cron.sh:ro
-      - ./docker/backup/docker-entrypoint.sh:/usr/local/bin/docker-backup-entrypoint.sh:ro
-    command: >
-      bash -lc "
-      apt-get update &&
-      apt-get install -y --no-install-recommends cron bash &&
-      rm -rf /var/lib/apt/lists/* &&
-      bash /usr/local/bin/docker-backup-entrypoint.sh
-      "
+      - ./docker/backup/backup-loop.sh:/usr/local/bin/backup-loop.sh:ro
+    entrypoint: ["bash", "/usr/local/bin/backup-loop.sh"]

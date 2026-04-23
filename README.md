@@ -81,7 +81,7 @@ Environment variables in `TIP/.env`:
 - `BACKUP_DIR` - backup directory, default `TIP/backups/postgresql`
 - `BACKUP_KEEP_COUNT` - number of recent `.dump` files to keep, default `14`
 - `PG_DUMP_PATH` - path to `pg_dump`, default `pg_dump`
-- `BACKUP_CRON_SCHEDULE` - cron schedule for Docker backup container, default `0 2 * * *`
+- `BACKUP_INTERVAL_SECONDS` - interval between dumps in the Docker backup service, default `86400` (24h)
 
 Docker automatic backup:
 
@@ -112,7 +112,7 @@ Included Docker files:
 
 - `docker-compose.backup.yml`
 - `docker/backup/backup-cron.sh`
-- `docker/backup/docker-entrypoint.sh`
+- `docker/backup/backup-loop.sh`
 
 ## Validation
 

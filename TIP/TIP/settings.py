@@ -41,9 +41,13 @@ load_env_file(BASE_DIR / ".env")
 SECRET_KEY = 'django-insecure-(iae*%=jxqkz_3e^ii(b3ee6tvg_9!((w_bcburtnbc2b&g-^&'
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = os.getenv("DEBUG", "true").strip().lower() in ("1", "true", "yes", "on")
 
-ALLOWED_HOSTS = []
+_hosts = os.getenv("ALLOWED_HOSTS", "localhost,127.0.0.1").strip()
+ALLOWED_HOSTS = [h.strip() for h in _hosts.split(",") if h.strip()]
+
+_csrf = os.getenv("CSRF_TRUSTED_ORIGINS", "").strip()
+CSRF_TRUSTED_ORIGINS = [o.strip() for o in _csrf.split(",") if o.strip()]
 
 
 # Application definition

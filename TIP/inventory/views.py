@@ -7,6 +7,8 @@ from pathlib import Path
 import random
 import tempfile
 
+import qrcode
+
 from django.contrib import messages
 from django.contrib.auth import login, logout
 from django.contrib.auth.decorators import login_required
@@ -1352,3 +1354,16 @@ def export_portal_logs_csv(request):
             ]
         )
     return response
+
+
+@login_required
+def equipment_qr(request, equipment_id: int):
+    item = get_object_or_404(Equipment, pk=equipment_id)
+    search_url = request.build_absolute_uri(
+        f"{reverse('equipment_list')}?q={item.inventory_number}"
+    )
+    img = qrcode.make(search_url, box_size=8, border=2)
+    buf = io.BytesIO()
+    img.save(buf, format="PNG")
+    buf.seek(0)
+    return HttpResponse(buf.getvalue(), content_type="image/png")

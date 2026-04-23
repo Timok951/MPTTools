@@ -95,67 +95,101 @@
             {% endif %}
         </div>
     </div>
-    <table>
-        <thead>
-            <tr>
-                <th>{% trans "Name" %}</th>
-                <th>{% trans "Inventory #" %}</th>
-                <th>{% trans "Category" %}</th>
-                <th>{% trans "Workplaces" %}</th>
-                <th>{% trans "Cabinet" %}</th>
-                <th>{% trans "Total" %}</th>
-                <th>{% trans "Available" %}</th>
-                <th>{% trans "Consumable" %}</th>
-                <th>{% trans "Status" %}</th>
-                <th>{% trans "Low stock" %}</th>
-                <th>{% trans "Inventory" %}</th>
-                {% if user|has_group:"Administrator" %}
-                <th>{% trans "Actions" %}</th>
+    <div class="equipment-card-grid">
+        {% for item in equipment %}
+        <article class="card equipment-card">
+            <div class="equipment-card-media">
+                {% if item.photo %}
+                <img src="{{ item.photo.url }}" alt="{{ item.name }}" loading="lazy" />
+                {% else %}
+                <div class="equipment-card-empty">{% ui_text "Нет фото" "No photo" %}</div>
                 {% endif %}
-            </tr>
-        </thead>
-        <tbody>
-            {% for item in equipment %}
-            <tr>
-                <td>{{ item.name }}</td>
-                <td>{{ item.inventory_number }}</td>
-                <td>{{ item.category }}</td>
-                <td>{{ item.workplace }}</td>
-                <td>{{ item.cabinet }}</td>
-                <td>{{ item.quantity_total }}</td>
-                <td>{{ item.quantity_available }}</td>
-                <td>{% if item.is_consumable %}{% trans "Yes" %}{% else %}{% trans "No" %}{% endif %}</td>
-                <td>{{ item.get_status_display }}</td>
-                <td>
+                <span class="badge equipment-card-badge">{{ item.inventory_number }}</span>
+            </div>
+            <div class="equipment-card-body">
+                <div>
+                    <h3 class="equipment-card-title">{{ item.name }}</h3>
+                    <div class="equipment-card-subtitle">
+                        {{ item.category|default:"-" }}
+                        {% if item.model %} • {{ item.model }}{% endif %}
+                    </div>
+                </div>
+
+                <div class="equipment-card-meta">
+                    <div class="equipment-card-row">
+                        <span>{% ui_text "Статус" "Status" %}</span>
+                        <strong>{{ item.get_status_display }}</strong>
+                    </div>
+                    <div class="equipment-card-row">
+                        <span>{% ui_text "Доступно" "Available" %}</span>
+                        <strong>{{ item.quantity_available }} / {{ item.quantity_total }}</strong>
+                    </div>
+                    <div class="equipment-card-row">
+                        <span>{% ui_text "Рабочее место" "Workplace" %}</span>
+                        <strong>{{ item.workplace|default:"-" }}</strong>
+                    </div>
+                    <div class="equipment-card-row">
+                        <span>{% ui_text "Кабинет" "Cabinet" %}</span>
+                        <strong>{{ item.cabinet|default:"-" }}</strong>
+                    </div>
+                    <div class="equipment-card-row">
+                        <span>{% ui_text "Расходник" "Consumable" %}</span>
+                        <strong>{% if item.is_consumable %}{% ui_text "Да" "Yes" %}{% else %}{% ui_text "Нет" "No" %}{% endif %}</strong>
+                    </div>
+                </div>
+
+                <div class="equipment-card-flags">
                     {% if item.is_low_stock %}
-                        <span class="badge warn">{% trans "Low stock" %}</span>
+                    <span class="badge warn">{% ui_text "Малый остаток" "Low stock" %}</span>
                     {% else %}
-                        <span class="badge">OK</span>
+                    <span class="badge">OK</span>
                     {% endif %}
-                </td>
-                <td>
+
                     {% if item.is_inventory_due %}
-                        <span class="badge warn">{% trans "Due now" %}</span>
+                    <span class="badge warn">{% ui_text "Инвентаризация нужна" "Due now" %}</span>
                     {% else %}
-                        <span class="badge">OK</span>
+                    <span class="badge">{% ui_text "Инвентаризация актуальна" "Inventory ok" %}</span>
                     {% endif %}
-                </td>
-                {% if user|has_group:"Administrator" %}
-                <td class="actions">
-                    <a href="{% url 'portal_edit' entity='equipment' pk=item.pk %}">✏️</a>
+                </div>
+
+                <div class="actions">
+                    <a class="secondary qr-toggle-btn" href="{% url 'equipment_qr' equipment_id=item.pk %}" target="_blank" data-qr-id="{{ item.pk }}">QR</a>
+                    {% if user|has_group:"Administrator" %}
+                    <a href="{% url 'portal_edit' entity='equipment' pk=item.pk %}">✏️ {% ui_text "Изменить" "Edit" %}</a>
                     {% if item.deleted_at %}
-                        <a class="secondary" href="{% url 'portal_restore' entity='equipment' pk=item.pk %}">↩</a>
+                        <a class="secondary" href="{% url 'portal_restore' entity='equipment' pk=item.pk %}">↩ {% ui_text "Восстановить" "Restore" %}</a>
                     {% else %}
-                        <a class="secondary" href="{% url 'portal_delete' entity='equipment' pk=item.pk %}">🗑</a>
+                        <a class="secondary" href="{% url 'portal_delete' entity='equipment' pk=item.pk %}">🗑 {% ui_text "Удалить" "Delete" %}</a>
                     {% endif %}
-                </td>
-                {% endif %}
-            </tr>
-            {% empty %}
-            <tr><td colspan="{% if user|has_group:'Administrator' %}12{% else %}11{% endif %}" class="muted">{% trans "No equipment found." %}</td></tr>
-            {% endfor %}
-        </tbody>
-    </table>
+                    {% endif %}
+                </div>
+                <div class="qr-preview" id="qr-preview-{{ item.pk }}" style="display:none; text-align:center; margin-top:8px;">
+                    <img src="{% url 'equipment_qr' equipment_id=item.pk %}" alt="QR {{ item.inventory_number }}" style="max-width:160px;" loading="lazy" />
+                    <div style="margin-top:4px;">
+                        <a class="secondary" href="{% url 'equipment_qr' equipment_id=item.pk %}" download="qr-{{ item.inventory_number }}.png" style="font-size:12px;">{% ui_text "Скачать" "Download" %}</a>
+                    </div>
+                </div>
+            </div>
+        </article>
+        {% empty %}
+        <div class="muted">{% trans "No equipment found." %}</div>
+        {% endfor %}
+    </div>
     {% include "inventory/_pagination.html" %}
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.querySelectorAll('.qr-toggle-btn').forEach(btn => {
+    btn.addEventListener('click', e => {
+        e.preventDefault();
+        const id = btn.dataset.qrId;
+        const preview = document.getElementById('qr-preview-' + id);
+        if (preview) {
+            preview.style.display = preview.style.display === 'none' ? 'block' : 'none';
+        }
+    });
+});
+</script>
 {% endblock %}

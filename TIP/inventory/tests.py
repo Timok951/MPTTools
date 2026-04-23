@@ -111,6 +111,89 @@ class TimerAndPreferenceViewTests(TestCase):
         self.assertContains(response, "User preferences")
 
 
+class EquipmentCardViewTests(TestCase):
+    def setUp(self):
+        self.password = "secret123"
+        self.user = User.objects.create_user(username="equipment_user", password=self.password)
+        builder_group, _ = Group.objects.get_or_create(name="Builder")
+        self.user.groups.add(builder_group)
+        self.workplace = Workplace.objects.create(name="Card workshop")
+        self.category = EquipmentCategory.objects.create(name="Tools")
+
+    def test_equipment_list_renders_card_layout_with_photo_support(self):
+        Equipment.objects.create(
+            name="Drill",
+            inventory_number="INV-001",
+            category=self.category,
+            workplace=self.workplace,
+            quantity_total=3,
+            quantity_available=2,
+            photo="equipment/drill.jpg",
+        )
+        Equipment.objects.create(
+            name="Hammer",
+            inventory_number="INV-002",
+            category=self.category,
+            workplace=self.workplace,
+            quantity_total=1,
+            quantity_available=1,
+        )
+
+        self.client.force_login(self.user)
+        response = self.client.get(reverse("equipment_list"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'class="equipment-card-grid"', html=False)
+        self.assertContains(response, "/media/equipment/drill.jpg")
+        self.assertContains(response, "Нет фото")
+
+
+class EquipmentQRCodeTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(username="qr_user", password="secret123")
+        builder_group, _ = Group.objects.get_or_create(name="Builder")
+        self.user.groups.add(builder_group)
+        self.workplace = Workplace.objects.create(name="QR Lab")
+        self.category = EquipmentCategory.objects.create(name="QR Tools")
+        self.equipment = Equipment.objects.create(
+            name="Multimeter",
+            inventory_number="QR-001",
+            category=self.category,
+            workplace=self.workplace,
+            quantity_total=1,
+            quantity_available=1,
+        )
+
+    def test_qr_endpoint_returns_png_image(self):
+        self.client.force_login(self.user)
+        response = self.client.get(reverse("equipment_qr", args=[self.equipment.pk]))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response["Content-Type"], "image/png")
+        self.assertTrue(len(response.content) > 100)
+
+    def test_qr_endpoint_requires_authentication(self):
+        response = self.client.get(reverse("equipment_qr", args=[self.equipment.pk]))
+
+        self.assertEqual(response.status_code, 302)
+        self.assertIn("/accounts/login/", response.url)
+
+    def test_qr_endpoint_returns_404_for_missing_equipment(self):
+        self.client.force_login(self.user)
+        response = self.client.get(reverse("equipment_qr", args=[999999]))
+
+        self.assertEqual(response.status_code, 404)
+
+    def test_equipment_list_contains_qr_link(self):
+        self.client.force_login(self.user)
+        response = self.client.get(reverse("equipment_list"))
+
+        self.assertEqual(response.status_code, 200)
+        expected_url = reverse("equipment_qr", args=[self.equipment.pk])
+        self.assertContains(response, expected_url)
+        self.assertContains(response, "qr-toggle-btn")
+
+
 class DirectMessageTests(TestCase):
     def setUp(self):
         self.password = "secret123"

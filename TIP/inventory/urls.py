@@ -16,6 +16,7 @@ urlpatterns = [
     path("tools/data/export-portal-logs/", views.export_portal_logs_csv, name="export_portal_logs_csv"),
     path("", views.analytics, name="analytics"),
     path("equipment/", views.equipment_list, name="equipment_list"),
+    path("equipment/<int:equipment_id>/qr/", views.equipment_qr, name="equipment_qr"),
     path("usage/", views.usage_history, name="usage_history"),
     path("usage/new/", views.usage_create, name="usage_create"),
     path("requests/", views.request_history, name="request_history"),

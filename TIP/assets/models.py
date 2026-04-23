@@ -27,6 +27,7 @@ class Equipment(SoftDeleteModel):
     inventory_number = models.CharField(max_length=100, unique=True)
     category = models.ForeignKey(EquipmentCategory, on_delete=models.SET_NULL, null=True, blank=True)
     supplier = models.ForeignKey(Supplier, on_delete=models.SET_NULL, null=True, blank=True)
+    photo = models.ImageField(upload_to="equipment/", null=True, blank=True, verbose_name="Фото")
     serial_number = models.CharField(max_length=100, blank=True)
     model = models.CharField(max_length=200, blank=True)
     workplace = models.ForeignKey(Workplace, on_delete=models.SET_NULL, null=True, blank=True)

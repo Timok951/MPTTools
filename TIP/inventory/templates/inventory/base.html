@@ -596,6 +596,86 @@
             padding-left: 18px;
             color: var(--muted);
         }
+        .equipment-card-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 18px;
+            margin-top: 16px;
+        }
+        .equipment-card {
+            overflow: hidden;
+            padding: 0;
+        }
+        .equipment-card-media {
+            position: relative;
+            aspect-ratio: 4 / 3;
+            background: linear-gradient(135deg, var(--surface-strong), var(--panel-soft));
+            border-bottom: 1px solid var(--border);
+        }
+        .equipment-card-media img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: block;
+        }
+        .equipment-card-empty {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 18px;
+            color: var(--muted);
+            text-align: center;
+            font-weight: 600;
+        }
+        .equipment-card-badge {
+            position: absolute;
+            right: 10px;
+            bottom: 10px;
+        }
+        .equipment-card-body {
+            padding: 14px;
+            display: grid;
+            gap: 10px;
+        }
+        .equipment-card-title {
+            margin: 0;
+            font-size: 16px;
+        }
+        .equipment-card-subtitle {
+            font-size: 13px;
+            color: var(--muted);
+        }
+        .equipment-card-meta {
+            display: grid;
+            gap: 8px;
+            font-size: 13px;
+        }
+        .equipment-card-row {
+            display: flex;
+            justify-content: space-between;
+            gap: 10px;
+        }
+        .equipment-card-row span:first-child {
+            color: var(--muted);
+        }
+        .equipment-card-flags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+        .qr-toggle-btn {
+            min-width: 42px;
+            text-align: center;
+            font-size: 12px;
+            font-weight: 700;
+            letter-spacing: 0.04em;
+        }
+        .qr-preview img {
+            border-radius: 10px;
+            border: 1px solid var(--border);
+        }
         .auth-card {
             max-width: 420px;
             margin: 40px auto;
@@ -670,6 +750,7 @@
             .grid.cols-4,
             .grid.cols-3,
             .grid.cols-2,
+            .equipment-card-grid,
             .form-grid,
             .filters {
                 grid-template-columns: 1fr;

@@ -37,7 +37,7 @@ services:
         condition: service_started
     networks:
       - django_monitoring
-    entrypoint: ["/app/entrypoint.sh"]
+    entrypoint: ["bash", "/app/entrypoint.sh"]
 
   postgres_db:
     image: postgres:17

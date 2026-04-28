@@ -1,10 +1,13 @@
 from django.contrib.auth.models import Group, Permission
 from django.core.management.base import BaseCommand
 
-GROUP_SENIOR_TECHNICIAN = "Старший техник"
-GROUP_TECHNICIAN = "Техник"
-GROUP_SYSADMIN = "Системный администратор"
-GROUP_FIRST_LINE_SUPPORT = "Поддержка первой линии"
+from inventory.authz import (
+    GROUP_FIRST_LINE_SUPPORT,
+    GROUP_SENIOR_TECHNICIAN,
+    GROUP_SYSADMIN,
+    GROUP_TECHNICIAN,
+    ROLE_SPECS,
+)
 
 
 class Command(BaseCommand):
@@ -13,32 +16,9 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         groups = {
             GROUP_SYSADMIN: None,
-            GROUP_SENIOR_TECHNICIAN: [
-                "view_equipment",
-                "change_equipment",
-                "view_equipmentrequest",
-                "change_equipmentrequest",
-                "add_inventoryadjustment",
-                "view_inventoryadjustment",
-                "add_materialusage",
-                "view_materialusage",
-                "view_workplace",
-                "view_cabinet",
-            ],
-            GROUP_TECHNICIAN: [
-                "view_equipment",
-                "view_equipmentrequest",
-                "add_equipmentrequest",
-                "add_equipmentcheckout",
-                "view_equipmentcheckout",
-                "view_workplace",
-                "view_cabinet",
-            ],
-            GROUP_FIRST_LINE_SUPPORT: [
-                "view_equipmentrequest",
-                "change_equipmentrequest",
-                "view_equipment",
-            ],
+            GROUP_SENIOR_TECHNICIAN: list(ROLE_SPECS[GROUP_SENIOR_TECHNICIAN].permissions),
+            GROUP_TECHNICIAN: list(ROLE_SPECS[GROUP_TECHNICIAN].permissions),
+            GROUP_FIRST_LINE_SUPPORT: list(ROLE_SPECS[GROUP_FIRST_LINE_SUPPORT].permissions),
         }
 
         app_labels = ["core", "assets", "operations", "audit"]

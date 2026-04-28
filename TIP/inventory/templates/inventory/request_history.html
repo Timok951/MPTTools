@@ -10,7 +10,22 @@
         </div>
         <div class="table-meta">Строк на странице: {{ page_size }}</div>
     </div>
+    <div class="request-shortcuts">
+        <a class="shortcut-chip {% if not filters.view %}is-active{% endif %}" href="{% url 'request_history' %}?status={{ filters.status }}&kind={{ filters.kind }}&from={{ filters.from }}&to={{ filters.to }}">Все заявки</a>
+        <a class="shortcut-chip {% if filters.view == 'mine' %}is-active{% endif %}" href="{% url 'request_history' %}?view=mine&status={{ filters.status }}&kind={{ filters.kind }}&from={{ filters.from }}&to={{ filters.to }}">Мои заявки</a>
+        <a class="shortcut-chip {% if filters.view == 'processing' %}is-active{% endif %}" href="{% url 'request_history' %}?view=processing&status={{ filters.status }}&kind={{ filters.kind }}&from={{ filters.from }}&to={{ filters.to }}">Нуждаются в обработке</a>
+    </div>
+    {% if can_quick_status %}
+    <div class="request-bulk-actions">
+        <div class="table-meta">Частые статусы:</div>
+        <a class="status-hero status-pending {% if filters.status == 'pending' %}is-active{% endif %}" href="{% url 'request_history' %}?view={{ filters.view }}&status=pending&kind={{ filters.kind }}&from={{ filters.from }}&to={{ filters.to }}">На рассмотрении</a>
+        <a class="status-hero status-approved {% if filters.status == 'approved' %}is-active{% endif %}" href="{% url 'request_history' %}?view={{ filters.view }}&status=approved&kind={{ filters.kind }}&from={{ filters.from }}&to={{ filters.to }}">Одобрены</a>
+        <a class="status-hero status-issued {% if filters.status == 'issued' %}is-active{% endif %}" href="{% url 'request_history' %}?view={{ filters.view }}&status=issued&kind={{ filters.kind }}&from={{ filters.from }}&to={{ filters.to }}">Выданы</a>
+        <a class="status-hero status-reset {% if not filters.status %}is-active{% endif %}" href="{% url 'request_history' %}?view={{ filters.view }}&kind={{ filters.kind }}&from={{ filters.from }}&to={{ filters.to }}">Сбросить статус</a>
+    </div>
+    {% endif %}
     <form method="get" class="filters">
+        <input type="hidden" name="view" value="{{ filters.view }}" />
         <div>
             <label for="id_status">Статус</label>
             <select id="id_status" name="status">
@@ -80,17 +95,18 @@
                 <td>{{ item.quantity }}</td>
                 <td>
                     {% if can_quick_status %}
-                    <form method="post" action="{% url 'request_update_status' request_id=item.pk %}" class="actions" style="gap:6px;">
+                    <form method="post" action="{% url 'request_update_status' request_id=item.pk %}" class="request-status-form">
                         {% csrf_token %}
-                        <select name="status" style="min-width:140px;">
+                        <select name="status" class="request-status-select">
                             {% for value, label in status_choices %}
                             <option value="{{ value }}" {% if item.status == value %}selected{% endif %}>{{ label }}</option>
                             {% endfor %}
                         </select>
-                        <button class="btn secondary" type="submit">OK</button>
+                        <button class="btn secondary" type="submit">Сохранить</button>
                     </form>
+                    <div class="{{ item.badge_class }}" style="margin-top:6px;">{{ item.get_status_display }}</div>
                     {% else %}
-                    <span class="badge">{{ item.get_status_display }}</span>
+                    <span class="{{ item.badge_class }}">{{ item.get_status_display }}</span>
                     {% endif %}
                 </td>
                 <td>{{ item.processed_by|default:"-" }}</td>
@@ -99,16 +115,13 @@
                 <td class="actions">
                     <a class="secondary" href="{% url 'request_detail' request_id=item.pk %}">Открыть</a>
                     {% if can_quick_status %}
-                    <form method="post" action="{% url 'request_update_status' request_id=item.pk %}" style="display:inline;">
+                    {% for action in item.quick_actions %}
+                    <form method="post" action="{% url 'request_update_status' request_id=item.pk %}" class="request-quick-action">
                         {% csrf_token %}
-                        <input type="hidden" name="status" value="approved" />
-                        <button class="btn secondary" type="submit" style="padding:4px 8px;">Одобрить</button>
+                        <input type="hidden" name="status" value="{{ action.value }}" />
+                        <button class="btn secondary request-quick-btn" type="submit">{{ action.label }}</button>
                     </form>
-                    <form method="post" action="{% url 'request_update_status' request_id=item.pk %}" style="display:inline;">
-                        {% csrf_token %}
-                        <input type="hidden" name="status" value="rejected" />
-                        <button class="btn secondary" type="submit" style="padding:4px 8px;">Отклонить</button>
-                    </form>
+                    {% endfor %}
                     {% endif %}
                     {% if user|has_group:"Administrator" %}
                     <a href="{% url 'portal_edit' entity='requests' pk=item.pk %}">✏️</a>

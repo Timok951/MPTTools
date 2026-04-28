@@ -1,6 +1,6 @@
 {
-  "generated_at": "2026-04-28T08:37:01.099298+00:00",
-  "started_at": "2026-04-28T08:36:55.290769+00:00",
+  "generated_at": "2026-04-28T11:33:27.469781+00:00",
+  "started_at": "2026-04-28T11:33:20.503959+00:00",
   "python_executable": "G:\\Programming\\Django\\MPTTools\\.venv\\Scripts\\python.exe",
   "report_path": "G:\\Programming\\Django\\MPTTools\\TIP\\var\\quality-report.json",
   "summary": {
@@ -17,7 +17,7 @@
       "command": "G:\\Programming\\Django\\MPTTools\\.venv\\Scripts\\python.exe G:\\Programming\\Django\\MPTTools\\TIP\\manage.py check",
       "status": "passed",
       "returncode": 0,
-      "duration_seconds": 0.789,
+      "duration_seconds": 1.093,
       "tests_ran": 0,
       "output_tail": [
         "System check identified no issues (0 silenced)."
@@ -29,7 +29,7 @@
       "command": "G:\\Programming\\Django\\MPTTools\\.venv\\Scripts\\python.exe G:\\Programming\\Django\\MPTTools\\TIP\\manage.py test inventory.tests.TimerAndPreferenceViewTests --noinput",
       "status": "failed",
       "returncode": 1,
-      "duration_seconds": 1.044,
+      "duration_seconds": 1.047,
       "tests_ran": 1,
       "output_tail": [
         "Found 1 test(s).",
@@ -57,7 +57,7 @@
       "command": "G:\\Programming\\Django\\MPTTools\\.venv\\Scripts\\python.exe G:\\Programming\\Django\\MPTTools\\TIP\\manage.py test inventory.tests.LightweightPerformanceTests --noinput",
       "status": "failed",
       "returncode": 1,
-      "duration_seconds": 0.797,
+      "duration_seconds": 0.973,
       "tests_ran": 1,
       "output_tail": [
         "Found 1 test(s).",
@@ -85,7 +85,7 @@
       "command": "G:\\Programming\\Django\\MPTTools\\.venv\\Scripts\\python.exe G:\\Programming\\Django\\MPTTools\\TIP\\manage.py test inventory.tests.AdminProcedureTests --noinput",
       "status": "failed",
       "returncode": 1,
-      "duration_seconds": 0.765,
+      "duration_seconds": 0.938,
       "tests_ran": 1,
       "output_tail": [
         "Found 1 test(s).",
@@ -113,7 +113,7 @@
       "command": "G:\\Programming\\Django\\MPTTools\\.venv\\Scripts\\python.exe G:\\Programming\\Django\\MPTTools\\TIP\\manage.py test inventory.tests.RoleEnforcementWebTests --noinput",
       "status": "failed",
       "returncode": 1,
-      "duration_seconds": 0.798,
+      "duration_seconds": 0.915,
       "tests_ran": 1,
       "output_tail": [
         "Found 1 test(s).",
@@ -141,7 +141,7 @@
       "command": "G:\\Programming\\Django\\MPTTools\\.venv\\Scripts\\python.exe G:\\Programming\\Django\\MPTTools\\TIP\\manage.py test inventory.tests.InventoryApiTests --noinput",
       "status": "failed",
       "returncode": 1,
-      "duration_seconds": 0.841,
+      "duration_seconds": 0.971,
       "tests_ran": 1,
       "output_tail": [
         "Found 1 test(s).",
@@ -169,7 +169,7 @@
       "command": "G:\\Programming\\Django\\MPTTools\\.venv\\Scripts\\python.exe G:\\Programming\\Django\\MPTTools\\TIP\\manage.py test inventory.tests.BackupCommandTests --noinput",
       "status": "failed",
       "returncode": 1,
-      "duration_seconds": 0.774,
+      "duration_seconds": 1.028,
       "tests_ran": 1,
       "output_tail": [
         "Found 1 test(s).",

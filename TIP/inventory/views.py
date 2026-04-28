@@ -6,6 +6,7 @@ import os
 from pathlib import Path
 import random
 import tempfile
+from urllib.parse import urlencode
 
 import qrcode
 
@@ -42,6 +43,10 @@ from operations.models import (
     EquipmentRequest,
     EquipmentRequestMessage,
     EquipmentRequestPhoto,
+    REQUEST_APPROVED,
+    REQUEST_CLOSED,
+    REQUEST_ISSUED,
+    REQUEST_REJECTED,
     MaterialUsage,
     REQUEST_PENDING,
 )
@@ -49,10 +54,13 @@ from .authz import (
     GROUP_ADMIN,
     GROUP_BUILDER,
     GROUP_FIRST_LINE_SUPPORT,
+    ROLE_CAPABILITY_LABELS,
     ROLE_ALIASES,
+    ROLE_SPECS,
     GROUP_SENIOR_TECHNICIAN,
     GROUP_SYSADMIN,
     GROUP_WAREHOUSE,
+    user_has_capability,
     user_in_group,
 )
 from .forms import (
@@ -72,11 +80,42 @@ from .forms import (
 )
 from .quality_report import generate_quality_report, load_quality_report
 
-ROLE_DESCRIPTIONS = {
-    GROUP_SENIOR_TECHNICIAN: "Работа со складом и обработка оборудования.",
-    GROUP_BUILDER: "Создание заявок на оборудование.",
-    GROUP_SYSADMIN: "Пользователи, сайт и кабинеты.",
-    GROUP_FIRST_LINE_SUPPORT: "Обработка и смена статусов заявок.",
+ROLE_DESCRIPTIONS = {role_name: spec.description for role_name, spec in ROLE_SPECS.items()}
+
+REQUEST_STATUS_HELPERS = {
+    REQUEST_PENDING: {
+        "badge_class": "badge badge-pending",
+        "quick_actions": [
+            {"value": REQUEST_APPROVED, "label": "Одобрить"},
+            {"value": REQUEST_REJECTED, "label": "Отклонить"},
+        ],
+    },
+    REQUEST_APPROVED: {
+        "badge_class": "badge badge-approved",
+        "quick_actions": [
+            {"value": REQUEST_ISSUED, "label": "Отметить как выданную"},
+            {"value": REQUEST_REJECTED, "label": "Отклонить"},
+            {"value": REQUEST_CLOSED, "label": "Закрыть"},
+        ],
+    },
+    REQUEST_ISSUED: {
+        "badge_class": "badge badge-issued",
+        "quick_actions": [
+            {"value": REQUEST_CLOSED, "label": "Закрыть"},
+        ],
+    },
+    REQUEST_REJECTED: {
+        "badge_class": "badge badge-rejected",
+        "quick_actions": [
+            {"value": REQUEST_PENDING, "label": "Вернуть на рассмотрение"},
+        ],
+    },
+    REQUEST_CLOSED: {
+        "badge_class": "badge badge-closed",
+        "quick_actions": [
+            {"value": REQUEST_PENDING, "label": "Переоткрыть"},
+        ],
+    },
 }
 
 
@@ -85,77 +124,77 @@ def _can_manage_timers(user) -> bool:
 
 
 def _can_view_all_operational_data(user) -> bool:
-    return (
-        user_in_group(user, GROUP_ADMIN)
-        or user_in_group(user, GROUP_WAREHOUSE)
-        or user_in_group(user, GROUP_FIRST_LINE_SUPPORT)
-    )
+    return user_has_capability(user, "warehouse_operations") or user_has_capability(user, "request_processing")
 
 
 def _can_access_history(user) -> bool:
-    return user_in_group(user, GROUP_ADMIN)
+    return user_has_capability(user, "users_and_site_admin")
 
 
 def _can_access_reports(user) -> bool:
-    return (
-        user_in_group(user, GROUP_ADMIN)
-        or user_in_group(user, GROUP_WAREHOUSE)
-        or user_in_group(user, GROUP_SYSADMIN)
-    )
+    return user_has_capability(user, "report_access")
 
 
 def _can_access_data_tools(user) -> bool:
-    return user_in_group(user, GROUP_ADMIN) or user_in_group(user, GROUP_SYSADMIN)
+    return user_has_capability(user, "data_tools_access")
 
 
 def _can_import_backup(user) -> bool:
-    return user_in_group(user, GROUP_ADMIN)
+    return user_has_capability(user, "users_and_site_admin")
 
 
 def _can_access_quality_report(user) -> bool:
-    return user_in_group(user, GROUP_ADMIN) or user_in_group(user, GROUP_SYSADMIN)
+    return user_has_capability(user, "quality_access")
 
 
 def _can_create_request(user) -> bool:
-    return (
-        user_in_group(user, GROUP_ADMIN)
-        or user_in_group(user, GROUP_SYSADMIN)
-        or user_in_group(user, GROUP_BUILDER)
-        or user_in_group(user, GROUP_FIRST_LINE_SUPPORT)
-    )
+    return user_has_capability(user, "request_creation")
 
 
 def _can_process_request_status(user) -> bool:
-    return (
-        user_in_group(user, GROUP_ADMIN)
-        or user_in_group(user, GROUP_WAREHOUSE)
-        or user_in_group(user, GROUP_FIRST_LINE_SUPPORT)
-    )
+    return user_has_capability(user, "request_processing")
 
 
 def _can_create_checkout(user) -> bool:
-    return (
-        user_in_group(user, GROUP_ADMIN)
-        or user_in_group(user, GROUP_SYSADMIN)
-        or user_in_group(user, GROUP_BUILDER)
-    )
+    return user_has_capability(user, "checkout_operations")
 
 
 def _can_create_usage(user) -> bool:
-    return (
-        user_in_group(user, GROUP_ADMIN)
-        or user_in_group(user, GROUP_WAREHOUSE)
-        or user_in_group(user, GROUP_SYSADMIN)
-        or user_in_group(user, GROUP_BUILDER)
-    )
+    return user_has_capability(user, "usage_writeoff") or user_has_capability(user, "warehouse_operations")
 
 
 def _can_return_checkout(user, checkout: EquipmentCheckout) -> bool:
     return (
-        user_in_group(user, GROUP_ADMIN)
-        or user_in_group(user, GROUP_WAREHOUSE)
+        user_has_capability(user, "warehouse_operations")
         or checkout.taken_by_id == user.pk
     )
+
+
+def _decorate_request(item: EquipmentRequest):
+    helper = REQUEST_STATUS_HELPERS.get(item.status, {})
+    item.badge_class = helper.get("badge_class", "badge")
+    item.quick_actions = helper.get("quick_actions", [])
+    return item
+
+
+def _build_request_message_thread(messages_qs):
+    items = list(messages_qs)
+    children_map = {}
+    for msg in items:
+        children_map.setdefault(msg.parent_id, []).append(msg)
+    for key in children_map:
+        children_map[key].sort(key=lambda x: (x.created_at, x.pk))
+
+    ordered = []
+
+    def walk(parent_id, depth):
+        for msg in children_map.get(parent_id, []):
+            msg.thread_depth = min(depth, 5)
+            ordered.append(msg)
+            walk(msg.pk, depth + 1)
+
+    walk(None, 0)
+    return ordered
 
 
 def _message_conversation_summaries(user):
@@ -422,7 +461,8 @@ def request_history(request):
     page_size = preferences.page_size if preferences else 25
     show_deleted = bool(request.session.get("show_deleted_global", False))
     requests_manager = EquipmentRequest.all_objects if show_deleted else EquipmentRequest.objects
-    requests = requests_manager.select_related("requester", "equipment", "workplace").order_by("-requested_at")
+    requests = requests_manager.select_related("requester", "equipment", "workplace", "processed_by").order_by("-requested_at")
+    view_mode = request.GET.get("view", "").strip()
     if not _can_view_all_operational_data(request.user):
         requests = requests.filter(requester=request.user)
     status = request.GET.get("status", "").strip()
@@ -434,6 +474,13 @@ def request_history(request):
     date_from = request.GET.get("from", "").strip()
     date_to = request.GET.get("to", "").strip()
 
+    if view_mode == "mine":
+        requests = requests.filter(requester=request.user)
+    elif view_mode == "processing":
+        requests = requests.filter(status__in=[REQUEST_PENDING, REQUEST_APPROVED, REQUEST_ISSUED])
+        if _can_process_request_status(request.user):
+            requests = requests.exclude(processed_by=request.user, status__in=[REQUEST_APPROVED, REQUEST_ISSUED])
+
     if status:
         requests = requests.filter(status=status)
     if kind:
@@ -444,16 +491,17 @@ def request_history(request):
         requests = requests.filter(requested_at__date__lte=date_to)
 
     page_obj = _paginate(request, requests, page_size)
+    request_items = [_decorate_request(item) for item in page_obj.object_list]
     can_quick_status = _can_process_request_status(request.user)
 
     return render(
         request,
         "inventory/request_history.html",
         {
-            "requests": page_obj.object_list,
+            "requests": request_items,
             "status_choices": EquipmentRequest._meta.get_field("status").choices,
             "kind_choices": EquipmentRequest._meta.get_field("request_kind").choices,
-            "filters": {"status": status, "kind": kind, "from": date_from, "to": date_to},
+            "filters": {"status": status, "kind": kind, "from": date_from, "to": date_to, "view": view_mode},
             "can_create_request": _can_create_request(request.user),
             "can_quick_status": can_quick_status,
             **_with_page_context(page_obj),
@@ -798,6 +846,7 @@ def request_detail(request, request_id: int):
     can_access = _can_view_all_operational_data(request.user) or item.requester_id == request.user.pk
     if not can_access:
         return forbidden(request, "Просмотр этой заявки недоступен.")
+    _decorate_request(item)
 
     message_form = EquipmentRequestMessageForm()
     photo_form = EquipmentRequestPhotoForm()
@@ -809,6 +858,11 @@ def request_detail(request, request_id: int):
                 message_obj = message_form.save(commit=False)
                 message_obj.request = item
                 message_obj.author = request.user
+                parent_id = (request.POST.get("parent_id") or "").strip()
+                if parent_id.isdigit():
+                    parent_message = item.messages.filter(pk=int(parent_id)).first()
+                    if parent_message:
+                        message_obj.parent = parent_message
                 message_obj.save()
                 messages.success(request, "Сообщение добавлено.")
                 return redirect("request_detail", request_id=item.pk)
@@ -822,15 +876,21 @@ def request_detail(request, request_id: int):
                 messages.success(request, "Фото добавлено.")
                 return redirect("request_detail", request_id=item.pk)
 
+    request_usage_url = reverse("usage_create")
+    request_usage_url = f"{request_usage_url}?request_id={item.pk}"
+    threaded_messages = _build_request_message_thread(
+        item.messages.select_related("author", "parent").all()
+    )
     return render(
         request,
         "inventory/request_detail.html",
         {
             "item": item,
-            "messages_list": item.messages.select_related("author").all(),
+            "messages_list": threaded_messages,
             "photos": item.photos.select_related("uploaded_by").all(),
             "message_form": message_form,
             "photo_form": photo_form,
+            "request_usage_url": request_usage_url,
             "can_quick_status": _can_process_request_status(request.user),
             "status_choices": EquipmentRequest._meta.get_field("status").choices,
         },
@@ -848,13 +908,30 @@ def request_update_status(request, request_id: int):
     if new_status not in allowed_statuses:
         messages.error(request, "Некорректный статус.")
         return redirect(request.META.get("HTTP_REFERER") or reverse("request_history"))
+    status_note = (request.POST.get("status_note") or "").strip()
     if new_status != item.status:
+        previous_status = item.get_status_display()
         item.status = new_status
         item.processed_by = request.user
         item.processed_at = timezone.now()
         item._actor = request.user
         item.save(update_fields=["status", "processed_by", "processed_at"])
+        note_lines = [f"Статус изменён: {previous_status} -> {item.get_status_display()}."]
+        if status_note:
+            note_lines.append(status_note)
+        EquipmentRequestMessage.objects.create(
+            request=item,
+            author=request.user,
+            body="\n".join(note_lines),
+        )
         messages.success(request, "Статус обновлён.")
+    elif status_note:
+        EquipmentRequestMessage.objects.create(
+            request=item,
+            author=request.user,
+            body=status_note,
+        )
+        messages.success(request, "Комментарий добавлен.")
     return redirect(request.META.get("HTTP_REFERER") or reverse("request_history"))
 
 
@@ -863,6 +940,8 @@ def usage_create(request):
     if not _can_create_usage(request.user):
         return forbidden(request, "Списание доступно только уполномоченным ролям.")
 
+    request_id = (request.GET.get("request_id") or "").strip()
+    initial_request_id = int(request_id) if request_id.isdigit() else None
     if request.method == "POST":
         form = MaterialUsageForm(request.POST)
         if form.is_valid():
@@ -873,7 +952,7 @@ def usage_create(request):
             messages.success(request, "Usage record saved.")
             return redirect("usage_history")
     else:
-        form = MaterialUsageForm()
+        form = MaterialUsageForm(initial_request_id=initial_request_id)
 
     return render(
         request,
@@ -881,6 +960,9 @@ def usage_create(request):
         {
             "form": form,
             "request_quantity_map": getattr(form, "request_quantity_map", {}),
+            "request_equipment_map": getattr(form, "request_equipment_map", {}),
+            "request_workplace_map": getattr(form, "request_workplace_map", {}),
+            "prefilled_request_id": initial_request_id,
         },
     )
 
@@ -1090,14 +1172,30 @@ def role_assignment(request):
 
     if request.method == "POST":
         user_id = request.POST.get("user_id")
-        role_name = request.POST.get("role")
+        role_name = (request.POST.get("role") or "").strip()
         target_user = get_object_or_404(User, pk=user_id)
+        redirect_query = {}
+        query = (request.POST.get("q") or "").strip()
+        role_filter = (request.POST.get("role_filter") or "").strip()
+        if query:
+            redirect_query["q"] = query
+        if role_filter:
+            redirect_query["role"] = role_filter
         if role_name in groups:
             target_user.groups.clear()
             target_user.groups.add(groups[role_name])
-        return redirect("role_assignment")
+            messages.success(request, f"Роль пользователя {target_user.username} обновлена.")
+        elif role_name == "":
+            target_user.groups.clear()
+            messages.success(request, f"У пользователя {target_user.username} роль снята.")
+        redirect_url = reverse("role_assignment")
+        if redirect_query:
+            redirect_url = f"{redirect_url}?{urlencode(redirect_query)}"
+        return redirect(redirect_url)
 
     users = User.objects.prefetch_related("groups").all().order_by("username")
+    query = request.GET.get("q", "").strip()
+    selected_role = request.GET.get("role", "").strip()
     user_role_map = {}
     for item in users:
         if item.is_superuser:
@@ -1112,10 +1210,42 @@ def role_assignment(request):
                 resolved = canonical_name
                 break
         user_role_map[item.pk] = resolved
+    if query:
+        query_lower = query.lower()
+        users = [
+            item for item in users
+            if query_lower in item.username.lower()
+            or query_lower in item.email.lower()
+            or query_lower in f"{item.first_name} {item.last_name}".strip().lower()
+        ]
+    if selected_role == "__without_role__":
+        users = [item for item in users if not user_role_map.get(item.pk)]
+    elif selected_role:
+        users = [item for item in users if user_role_map.get(item.pk) == selected_role]
+    role_counts = {role_name: 0 for role_name in ROLE_DESCRIPTIONS}
+    role_capability_map = {
+        role_name: [ROLE_CAPABILITY_LABELS[item] for item in spec.capabilities]
+        for role_name, spec in ROLE_SPECS.items()
+    }
+    without_role_count = 0
+    for user_obj in User.objects.prefetch_related("groups").all():
+        role_name = user_role_map.get(user_obj.pk, "")
+        if role_name:
+            role_counts[role_name] = role_counts.get(role_name, 0) + 1
+        else:
+            without_role_count += 1
     return render(
         request,
         "inventory/role_assignment.html",
-        {"users": users, "roles": ROLE_DESCRIPTIONS, "user_role_map": user_role_map},
+        {
+            "users": users,
+            "roles": ROLE_DESCRIPTIONS,
+            "user_role_map": user_role_map,
+            "filters": {"q": query, "role": selected_role},
+            "role_counts": role_counts,
+            "role_capability_map": role_capability_map,
+            "without_role_count": without_role_count,
+        },
     )
 
 

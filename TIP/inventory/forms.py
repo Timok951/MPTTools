@@ -274,6 +274,7 @@ class MaterialUsageForm(forms.ModelForm):
         }
 
     def __init__(self, *args, **kwargs):
+        initial_request_id = kwargs.pop("initial_request_id", None)
         super().__init__(*args, **kwargs)
         self.fields["equipment"].empty_label = "Выберите оборудование"
         self.fields["workplace"].empty_label = "Выберите рабочее место"
@@ -286,8 +287,21 @@ class MaterialUsageForm(forms.ModelForm):
         self.request_quantity_map = {
             str(item.pk): item.quantity for item in self.fields["related_request"].queryset.only("id", "quantity")
         }
+        self.request_equipment_map = {
+            str(item.pk): (item.equipment_id or "")
+            for item in self.fields["related_request"].queryset.only("id", "equipment_id")
+        }
+        self.request_workplace_map = {
+            str(item.pk): (item.workplace_id or "")
+            for item in self.fields["related_request"].queryset.only("id", "workplace_id")
+        }
+        if initial_request_id:
+            self.initial["related_request"] = initial_request_id
         self.fields["quantity"].help_text = "Если выбрана заявка, количество автоматически берётся из неё."
-        self.fields["related_request"].help_text = "Для нерасходного оборудования обязательно укажите связанную заявку."
+        self.fields["related_request"].help_text = (
+            "Для нерасходного оборудования обязательно укажите связанную заявку. "
+            "Оборудование, рабочее место и количество подставятся автоматически."
+        )
 
     def clean_quantity(self):
         quantity = self.cleaned_data.get("quantity") or 0

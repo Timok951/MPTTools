@@ -584,11 +584,175 @@
             background: rgba(245, 159, 0, 0.14);
             color: #c97a00;
         }
+        .badge-pending {
+            background: rgba(245, 159, 0, 0.16);
+            color: #b56c00;
+        }
+        .badge-approved {
+            background: rgba(46, 184, 92, 0.16);
+            color: #1f8a44;
+        }
+        .badge-issued {
+            background: rgba(76, 103, 255, 0.16);
+            color: #3854e5;
+        }
+        .badge-rejected {
+            background: rgba(217, 63, 63, 0.16);
+            color: #ba2f2f;
+        }
+        .badge-closed {
+            background: rgba(112, 122, 146, 0.18);
+            color: #526079;
+        }
         body.theme-dark .badge,
         body.theme-dark .kicker,
         body.theme-dark .pagination-links span.current {
             background: rgba(125, 150, 255, 0.2);
             color: #eef3ff;
+        }
+        body.theme-dark .badge-pending {
+            background: rgba(255, 200, 87, 0.18);
+            color: #ffd989;
+        }
+        body.theme-dark .badge-approved {
+            background: rgba(58, 201, 120, 0.18);
+            color: #7cf0ab;
+        }
+        body.theme-dark .badge-issued {
+            background: rgba(125, 150, 255, 0.22);
+            color: #dfe8ff;
+        }
+        body.theme-dark .badge-rejected {
+            background: rgba(244, 80, 80, 0.2);
+            color: #ffb0b0;
+        }
+        body.theme-dark .badge-closed {
+            background: rgba(140, 154, 186, 0.2);
+            color: #d1daf0;
+        }
+        .request-status-form {
+            display: grid;
+            gap: 6px;
+        }
+        .request-status-select {
+            min-width: 150px;
+        }
+        .request-quick-action {
+            display: inline-flex;
+        }
+        .request-quick-btn {
+            padding: 5px 9px;
+            font-size: 12px;
+        }
+        .quick-role-grid {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+        .quick-role-grid form {
+            margin: 0;
+        }
+        .quick-role-btn {
+            padding: 6px 10px;
+            font-size: 12px;
+            border-radius: 10px;
+        }
+        .quick-role-btn.is-active {
+            border-color: var(--accent);
+            background: rgba(76, 103, 255, 0.14);
+            color: var(--accent-2);
+        }
+        body.theme-dark .quick-role-btn.is-active {
+            background: rgba(125, 150, 255, 0.22);
+            color: #eef3ff;
+        }
+        .request-shortcuts,
+        .request-bulk-actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin: 0 0 12px;
+            align-items: center;
+        }
+        .shortcut-chip {
+            display: inline-flex;
+            align-items: center;
+            min-height: 38px;
+            padding: 8px 14px;
+            border-radius: 999px;
+            text-decoration: none;
+            border: 1px solid var(--border);
+            background: var(--surface);
+            color: var(--accent-2);
+            font-size: 13px;
+            font-weight: 700;
+        }
+        .shortcut-chip.is-active {
+            border-color: var(--accent);
+            background: rgba(76, 103, 255, 0.14);
+            color: var(--accent);
+        }
+        body.theme-dark .shortcut-chip {
+            background: rgba(31, 46, 82, 0.95);
+            color: #eef3ff;
+        }
+        body.theme-dark .shortcut-chip.is-active {
+            background: rgba(125, 150, 255, 0.22);
+            color: #ffffff;
+        }
+        .status-hero {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 42px;
+            padding: 10px 16px;
+            border-radius: 14px;
+            text-decoration: none;
+            font-size: 13px;
+            font-weight: 700;
+            border: 1px solid transparent;
+            box-shadow: 0 8px 18px rgba(31, 42, 68, 0.08);
+        }
+        .status-hero.is-active {
+            transform: translateY(-1px);
+            box-shadow: 0 10px 22px rgba(31, 42, 68, 0.14);
+        }
+        .status-pending {
+            background: rgba(245, 159, 0, 0.14);
+            color: #b56c00;
+            border-color: rgba(245, 159, 0, 0.18);
+        }
+        .status-approved {
+            background: rgba(46, 184, 92, 0.14);
+            color: #1f8a44;
+            border-color: rgba(46, 184, 92, 0.18);
+        }
+        .status-issued {
+            background: rgba(76, 103, 255, 0.14);
+            color: #3854e5;
+            border-color: rgba(76, 103, 255, 0.2);
+        }
+        .status-reset {
+            background: var(--surface);
+            color: var(--accent-2);
+            border-color: var(--border);
+        }
+        body.theme-dark .status-pending {
+            background: rgba(255, 200, 87, 0.18);
+            color: #ffd989;
+        }
+        body.theme-dark .status-approved {
+            background: rgba(58, 201, 120, 0.18);
+            color: #7cf0ab;
+        }
+        body.theme-dark .status-issued {
+            background: rgba(125, 150, 255, 0.22);
+            color: #eef3ff;
+        }
+        body.theme-dark .status-reset {
+            background: rgba(31, 46, 82, 0.95);
+            color: #eef3ff;
+            border-color: var(--border);
         }
         .actions {
             display: flex;

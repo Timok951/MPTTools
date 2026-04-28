@@ -1,3 +1,6 @@
+from dataclasses import dataclass
+
+
 GROUP_SENIOR_TECHNICIAN = "Старший техник"
 GROUP_TECHNICIAN = "Техник"
 GROUP_SYSADMIN = "Системный администратор"
@@ -9,6 +12,103 @@ ROLE_ALIASES = {
     GROUP_TECHNICIAN: {"Builder"},
     GROUP_SYSADMIN: {"Administrator", "Sysadmin"},
     GROUP_FIRST_LINE_SUPPORT: set(),
+}
+
+
+@dataclass(frozen=True)
+class RoleSpec:
+    slug: str
+    title: str
+    description: str
+    permissions: tuple[str, ...]
+    capabilities: tuple[str, ...]
+
+
+ROLE_CAPABILITY_LABELS = {
+    "warehouse_operations": "Склад: оборудование, остатки, корректировки",
+    "request_creation": "Создание заявок на оборудование",
+    "request_processing": "Обработка и смена статусов заявок",
+    "checkout_operations": "Выдача и просмотр выдач",
+    "usage_writeoff": "Списание оборудования",
+    "report_access": "Просмотр отчётов и аналитики",
+    "users_and_site_admin": "Управление пользователями, сайтом, кабинетами",
+    "quality_access": "Просмотр и обновление отчёта качества",
+    "data_tools_access": "Инструменты данных и резервные копии",
+}
+
+ROLE_SPECS: dict[str, RoleSpec] = {
+    GROUP_SYSADMIN: RoleSpec(
+        slug="sysadmin",
+        title=GROUP_SYSADMIN,
+        description="Полный административный доступ к пользователям, сайту и кабинетам.",
+        permissions=(),
+        capabilities=(
+            "warehouse_operations",
+            "request_creation",
+            "request_processing",
+            "checkout_operations",
+            "usage_writeoff",
+            "report_access",
+            "users_and_site_admin",
+            "quality_access",
+            "data_tools_access",
+        ),
+    ),
+    GROUP_SENIOR_TECHNICIAN: RoleSpec(
+        slug="senior_technician",
+        title=GROUP_SENIOR_TECHNICIAN,
+        description="Работа со складом, движением оборудования и операционной отчётностью.",
+        permissions=(
+            "view_equipment",
+            "change_equipment",
+            "view_equipmentrequest",
+            "change_equipmentrequest",
+            "add_inventoryadjustment",
+            "view_inventoryadjustment",
+            "add_materialusage",
+            "view_materialusage",
+            "view_workplace",
+            "view_cabinet",
+        ),
+        capabilities=(
+            "warehouse_operations",
+            "request_processing",
+            "usage_writeoff",
+            "report_access",
+        ),
+    ),
+    GROUP_TECHNICIAN: RoleSpec(
+        slug="technician",
+        title=GROUP_TECHNICIAN,
+        description="Создание заявок и базовые операции с выдачей оборудования.",
+        permissions=(
+            "view_equipment",
+            "view_equipmentrequest",
+            "add_equipmentrequest",
+            "add_equipmentcheckout",
+            "view_equipmentcheckout",
+            "view_workplace",
+            "view_cabinet",
+        ),
+        capabilities=(
+            "request_creation",
+            "checkout_operations",
+        ),
+    ),
+    GROUP_FIRST_LINE_SUPPORT: RoleSpec(
+        slug="first_line_support",
+        title=GROUP_FIRST_LINE_SUPPORT,
+        description="Быстрая обработка и сопровождение заявок пользователей.",
+        permissions=(
+            "view_equipmentrequest",
+            "change_equipmentrequest",
+            "view_equipment",
+        ),
+        capabilities=(
+            "request_creation",
+            "request_processing",
+        ),
+    ),
 }
 
 # Legacy constant names kept to avoid touching every import.
@@ -25,6 +125,22 @@ def user_in_group(user, group_name: str) -> bool:
     allowed_names = {group_name}
     allowed_names.update(ROLE_ALIASES.get(group_name, set()))
     return user.groups.filter(name__in=allowed_names).exists()
+
+
+def user_capabilities(user) -> set[str]:
+    if not user:
+        return set()
+    if getattr(user, "is_superuser", False):
+        return set(ROLE_CAPABILITY_LABELS.keys())
+    caps = set()
+    for role_name, spec in ROLE_SPECS.items():
+        if user_in_group(user, role_name):
+            caps.update(spec.capabilities)
+    return caps
+
+
+def user_has_capability(user, capability: str) -> bool:
+    return capability in user_capabilities(user)
 
 
 def is_portal_admin(user) -> bool:

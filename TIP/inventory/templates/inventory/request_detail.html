@@ -7,10 +7,12 @@
         <div>
             <div class="kicker">Заявка #{{ item.pk }}</div>
             <h2>{{ item.equipment|default:"Без оборудования" }}</h2>
-            <p class="muted">Создал: {{ item.requester }} | Кол-во: {{ item.quantity }} | Статус: {{ item.get_status_display }}</p>
+            <p class="muted">Создал: {{ item.requester }} | Кол-во: {{ item.quantity }} | Статус: <span class="{{ item.badge_class }}">{{ item.get_status_display }}</span></p>
+            <p class="muted">Обработчик: {{ item.processed_by|default:"-" }} | Сообщений: {{ messages_list|length }} | Фото: {{ photos|length }}</p>
         </div>
         <div class="actions">
             <a class="secondary" href="{% url 'request_history' %}">К списку заявок</a>
+            <a href="{{ request_usage_url }}">Списать по этой заявке</a>
         </div>
     </div>
     {% if can_quick_status %}
@@ -24,24 +26,20 @@
                 {% endfor %}
             </select>
         </div>
+        <div style="min-width:260px;">
+            <label for="id_status_note">Комментарий к смене статуса</label>
+            <input id="id_status_note" type="text" name="status_note" placeholder="Например: оборудование подготовлено к выдаче" />
+        </div>
         <div><button class="btn" type="submit">Обновить</button></div>
     </form>
     <div class="actions" style="margin-top:8px;">
+        {% for action in item.quick_actions %}
         <form method="post" action="{% url 'request_update_status' request_id=item.pk %}">
             {% csrf_token %}
-            <input type="hidden" name="status" value="approved" />
-            <button class="btn secondary" type="submit">Быстро: Одобрить</button>
+            <input type="hidden" name="status" value="{{ action.value }}" />
+            <button class="btn secondary" type="submit">{{ action.label }}</button>
         </form>
-        <form method="post" action="{% url 'request_update_status' request_id=item.pk %}">
-            {% csrf_token %}
-            <input type="hidden" name="status" value="rejected" />
-            <button class="btn secondary" type="submit">Быстро: Отклонить</button>
-        </form>
-        <form method="post" action="{% url 'request_update_status' request_id=item.pk %}">
-            {% csrf_token %}
-            <input type="hidden" name="status" value="closed" />
-            <button class="btn secondary" type="submit">Быстро: Закрыть</button>
-        </form>
+        {% endfor %}
     </div>
     {% endif %}
 </div>
@@ -52,16 +50,35 @@
         <form method="post" class="form-shell">
             {% csrf_token %}
             <input type="hidden" name="action" value="add_message" />
+            <input type="hidden" name="parent_id" id="id_parent_id" value="" />
+            <div id="reply-target" class="badge" style="display:none; margin-bottom:8px;"></div>
             {% include "inventory/_form_field.html" with field=message_form.body full_width=True %}
-            <div class="actions"><button class="btn" type="submit">Добавить сообщение</button></div>
+            <div class="actions">
+                <button class="btn" type="submit">Добавить сообщение</button>
+                <button class="btn secondary" type="button" id="clear-reply-btn" style="display:none;">Сбросить ответ</button>
+            </div>
         </form>
         <div class="timeline">
             {% for msg in messages_list %}
-            <div class="timeline-item">
+            <div class="timeline-item" style="margin-left: calc({{ msg.thread_depth|default:0 }} * 18px);">
                 <div class="timeline-time">{{ msg.created_at|date:preferred_datetime_format }}</div>
                 <div class="timeline-body">
                     <strong>{{ msg.author }}</strong>
+                    {% if msg.parent_id %}
+                    <span class="muted">ответ на #{{ msg.parent_id }}</span>
+                    {% endif %}
                     <div>{{ msg.body }}</div>
+                    <div class="actions" style="margin-top:6px;">
+                        <button
+                            type="button"
+                            class="btn secondary reply-btn"
+                            data-message-id="{{ msg.pk }}"
+                            data-author="{{ msg.author }}"
+                            style="padding:4px 8px;"
+                        >
+                            Ответить
+                        </button>
+                    </div>
                 </div>
             </div>
             {% empty %}
@@ -98,4 +115,42 @@
         </div>
     </div>
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(() => {
+    const parentInput = document.getElementById("id_parent_id");
+    const replyTarget = document.getElementById("reply-target");
+    const clearButton = document.getElementById("clear-reply-btn");
+    const buttons = document.querySelectorAll(".reply-btn");
+    if (!parentInput || !replyTarget || !clearButton || !buttons.length) {
+        return;
+    }
+
+    const setReplyTarget = (id, author) => {
+        parentInput.value = String(id || "");
+        if (id) {
+            replyTarget.style.display = "inline-flex";
+            replyTarget.textContent = `Ответ на сообщение #${id} (${author})`;
+            clearButton.style.display = "inline-flex";
+        } else {
+            replyTarget.style.display = "none";
+            replyTarget.textContent = "";
+            clearButton.style.display = "none";
+        }
+    };
+
+    buttons.forEach((btn) => {
+        btn.addEventListener("click", () => {
+            setReplyTarget(btn.dataset.messageId, btn.dataset.author || "пользователь");
+            const bodyField = document.getElementById("id_body");
+            if (bodyField) {
+                bodyField.focus();
+            }
+        });
+    });
+    clearButton.addEventListener("click", () => setReplyTarget("", ""));
+})();
+</script>
 {% endblock %}

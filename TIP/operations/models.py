@@ -64,6 +64,13 @@ class EquipmentRequest(SoftDeleteModel):
 class EquipmentRequestMessage(models.Model):
     request = models.ForeignKey(EquipmentRequest, on_delete=models.CASCADE, related_name="messages")
     author = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="request_messages")
+    parent = models.ForeignKey(
+        "self",
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name="replies",
+    )
     body = models.TextField()
     created_at = models.DateTimeField(default=timezone.now, db_index=True)
 

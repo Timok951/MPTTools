@@ -9,13 +9,50 @@
         {% for role, description in roles.items %}
         <div class="stat">
             <strong>{{ role }}</strong>
+            <div class="badge">{{ role_counts|dict_get:role }} чел.</div>
             <div class="muted">{{ description }}</div>
+            <div style="margin-top:8px;">
+                {% for capability in role_capability_map|dict_get:role %}
+                <div class="muted">- {{ capability }}</div>
+                {% endfor %}
+            </div>
         </div>
         {% endfor %}
+        <div class="stat">
+            <strong>Без роли</strong>
+            <div class="badge warn">{{ without_role_count }} чел.</div>
+            <div class="muted">Пользователи, которым ещё не назначен доступ.</div>
+        </div>
     </div>
 </div>
 
 <div class="card">
+    <form method="get" class="filters">
+        <div>
+            <label for="id_role_search">Поиск пользователя</label>
+            <input id="id_role_search" type="text" name="q" value="{{ filters.q }}" placeholder="Логин, имя или почта" />
+        </div>
+        <div>
+            <label for="id_role_filter">Роль</label>
+            <select id="id_role_filter" name="role">
+                <option value="">Все</option>
+                <option value="__without_role__" {% if filters.role == "__without_role__" %}selected{% endif %}>Без роли</option>
+                {% for role, description in roles.items %}
+                <option value="{{ role }}" {% if filters.role == role %}selected{% endif %}>{{ role }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div>
+            <button class="btn" type="submit">Показать</button>
+        </div>
+        <div>
+            <a class="secondary" href="{% url 'role_assignment' %}">Сбросить</a>
+        </div>
+    </form>
+    <div class="toolbar-spread" style="margin: 12px 0 4px;">
+        <div class="table-meta">Пользователей: {{ users|length }}</div>
+        <div class="muted">Суперпользователь отображается как системный администратор.</div>
+    </div>
     <table>
         <thead>
             <tr>
@@ -27,13 +64,22 @@
         <tbody>
             {% for user in users %}
             <tr>
-                <td>{{ user.username }}</td>
+                <td>
+                    <div><strong>{{ user.username }}</strong></div>
+                    {% if user.first_name or user.last_name %}
+                    <div class="muted">{{ user.first_name }} {{ user.last_name }}</div>
+                    {% endif %}
+                    {% if user.email %}
+                    <div class="muted">{{ user.email }}</div>
+                    {% endif %}
+                </td>
                 <td>
                     {% if user.is_superuser %}
-                        Системный администратор (superuser)
+                        <span class="badge badge-approved">Системный администратор</span>
+                        <div class="muted">superuser</div>
                     {% else %}
                         {% for group in user.groups.all %}
-                            {{ group.name }}
+                            <span class="badge">{{ group.name }}</span>
                         {% empty %}
                             <span class="muted">Без роли</span>
                         {% endfor %}
@@ -43,13 +89,42 @@
                     <form method="post" class="actions">
                         {% csrf_token %}
                         <input type="hidden" name="user_id" value="{{ user.id }}" />
+                        <input type="hidden" name="q" value="{{ filters.q }}" />
+                        <input type="hidden" name="role_filter" value="{{ filters.role }}" />
                         <select name="role">
+                            <option value="">Без роли</option>
                             {% for role, description in roles.items %}
                             <option value="{{ role }}" {% if user_role_map|dict_get:user.id == role %}selected{% endif %}>{{ role }}</option>
                             {% endfor %}
                         </select>
-                        <button class="btn" type="submit">Назначить</button>
+                        <button class="btn" type="submit">Сохранить</button>
                     </form>
+                    <div class="quick-role-grid" style="margin-top:10px;">
+                        {% for role, description in roles.items %}
+                        <form method="post">
+                            {% csrf_token %}
+                            <input type="hidden" name="user_id" value="{{ user.id }}" />
+                            <input type="hidden" name="role" value="{{ role }}" />
+                            <input type="hidden" name="q" value="{{ filters.q }}" />
+                            <input type="hidden" name="role_filter" value="{{ filters.role }}" />
+                            <button
+                                class="btn {% if user_role_map|dict_get:user.id == role %}secondary is-active{% else %}secondary{% endif %} quick-role-btn"
+                                type="submit"
+                                title="{{ description }}"
+                            >
+                                {{ role }}
+                            </button>
+                        </form>
+                        {% endfor %}
+                        <form method="post">
+                            {% csrf_token %}
+                            <input type="hidden" name="user_id" value="{{ user.id }}" />
+                            <input type="hidden" name="role" value="" />
+                            <input type="hidden" name="q" value="{{ filters.q }}" />
+                            <input type="hidden" name="role_filter" value="{{ filters.role }}" />
+                            <button class="btn secondary quick-role-btn" type="submit">Снять роль</button>
+                        </form>
+                    </div>
                 </td>
             </tr>
             {% endfor %}

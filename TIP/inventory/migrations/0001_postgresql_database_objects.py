@@ -14,13 +14,11 @@ VIEW_SQL = [
         e.quantity_available,
         e.low_stock_threshold,
         c.name AS category_name,
-        s.name AS supplier_name,
         w.name AS workplace_name,
         cb.code AS cabinet_code,
         (e.quantity_available <= e.low_stock_threshold) AS is_low_stock
     FROM assets_equipment e
     LEFT JOIN core_equipmentcategory c ON c.id = e.category_id
-    LEFT JOIN core_supplier s ON s.id = e.supplier_id
     LEFT JOIN core_workplace w ON w.id = e.workplace_id
     LEFT JOIN core_cabinet cb ON cb.id = e.cabinet_id
     WHERE e.deleted_at IS NULL;

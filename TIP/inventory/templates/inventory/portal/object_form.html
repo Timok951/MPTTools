@@ -11,13 +11,161 @@
             {% trans "Create" %}: {{ cfg.title }}
         {% endif %}
     </h2>
-    <form method="post" class="grid" enctype="multipart/form-data">
+    <form method="post" class="form-shell" enctype="multipart/form-data">
         {% csrf_token %}
-        {{ form.as_p }}
+        <div class="form-grid">
+            {% for field in form %}
+                <div class="form-field {% if field.errors %}has-error{% endif %}">
+                    {% if field.field.widget.input_type == "checkbox" %}
+                    <label for="{{ field.id_for_label }}" class="checkbox-control">
+                        {{ field }}
+                        <span>{{ field.label }}</span>
+                    </label>
+                    {% else %}
+                    <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                    <div class="inline-field-with-action">
+                        {{ field }}
+                        {% if field.name == "category" %}
+                        <a class="quick-add-btn" href="{% url 'portal_create' entity='categories' %}" target="_blank" rel="noopener" title="Добавить категорию">+</a>
+                        {% elif field.name == "workplace" %}
+                        <a class="quick-add-btn" href="{% url 'portal_create' entity='workplaces' %}" target="_blank" rel="noopener" title="Добавить рабочее место">+</a>
+                        {% elif field.name == "cabinet" %}
+                        <a class="quick-add-btn" href="{% url 'portal_create' entity='cabinets' %}" target="_blank" rel="noopener" title="Добавить кабинет">+</a>
+                        {% elif field.name == "equipment" %}
+                        <a class="quick-add-btn" href="{% url 'portal_create' entity='equipment' %}" target="_blank" rel="noopener" title="Добавить оборудование">+</a>
+                        {% endif %}
+                    </div>
+                    {% endif %}
+                    {% if field.help_text %}
+                        <div class="field-help">{{ field.help_text }}</div>
+                    {% endif %}
+                    {% for error in field.errors %}
+                        <div class="field-error">{{ error }}</div>
+                    {% endfor %}
+                </div>
+            {% endfor %}
+        </div>
+        {% if cfg.slug == "workplaces" %}
+        <div class="aside-panel">
+            <h3>Локация на карте</h3>
+            {% if yandex_maps_api_key %}
+            <p class="muted">Введите адрес, нажмите "Найти адрес" и при необходимости уточните позицию кликом по карте. Адрес автоматически запишется в поле "Локация".</p>
+            <div class="actions" style="margin-bottom: 10px;">
+                <input id="id_map_search_input" type="text" placeholder="Введите адрес для поиска" />
+                <button class="btn secondary" type="button" id="map_search_btn">Найти адрес</button>
+            </div>
+            <div id="workplace_map_canvas" style="height: 320px; border-radius: 12px; border: 1px solid var(--border);"></div>
+            {% else %}
+            <div class="muted">Yandex Maps API key не задан. Укажите `YANDEX_MAPS_API_KEY` в окружении для включения карты.</div>
+            {% endif %}
+        </div>
+        {% endif %}
         <div class="actions">
             <button class="btn" type="submit">{% trans "Save" %}</button>
             <a class="secondary" href="{% url 'portal_list' entity=cfg.slug %}">{% trans "Cancel" %}</a>
         </div>
     </form>
 </div>
+{% endblock %}
+
+{% block scripts %}
+{% if cfg.slug == "workplaces" and yandex_maps_api_key %}
+<script>
+(() => {
+    const latField = document.getElementById("id_latitude");
+    const lngField = document.getElementById("id_longitude");
+    const locationField = document.getElementById("id_location");
+    const searchField = document.getElementById("id_map_search_input");
+    const searchButton = document.getElementById("map_search_btn");
+    const mapCanvas = document.getElementById("workplace_map_canvas");
+    if (!latField || !lngField || !locationField || !mapCanvas) {
+        return;
+    }
+
+    window.__initWorkplaceMap = () => {
+        if (!window.ymaps) {
+            return;
+        }
+        const defaultLat = parseFloat(latField.value || "55.751244");
+        const defaultLng = parseFloat(lngField.value || "37.618423");
+        const hasCoords = Number.isFinite(defaultLat) && Number.isFinite(defaultLng);
+        const center = hasCoords ? [defaultLat, defaultLng] : [55.751244, 37.618423];
+        const map = new ymaps.Map(mapCanvas, {
+            center,
+            zoom: hasCoords ? 15 : 10,
+            controls: ["zoomControl"],
+        });
+        const marker = new ymaps.Placemark(center, {}, {
+            draggable: true,
+            preset: "islands#redDotIcon",
+        });
+        map.geoObjects.add(marker);
+
+        const syncFields = (coords, resolvedAddress) => {
+            latField.value = Number(coords[0]).toFixed(6);
+            lngField.value = Number(coords[1]).toFixed(6);
+            if (resolvedAddress) {
+                locationField.value = resolvedAddress;
+            }
+        };
+
+        marker.events.add("dragend", () => {
+            const coords = marker.geometry.getCoordinates();
+            if (!coords) return;
+            ymaps.geocode(coords).then((result) => {
+                const first = result.geoObjects.get(0);
+                const address = first ? first.getAddressLine() : "";
+                syncFields(coords, address);
+            });
+        });
+
+        map.events.add("click", (event) => {
+            const coords = event.get("coords");
+            marker.geometry.setCoordinates(coords);
+            syncFields(coords, "");
+        });
+
+        const runSearch = () => {
+            const query = (searchField?.value || locationField.value || "").trim();
+            if (!query) return;
+            ymaps.geocode(query, { results: 1 }).then((result) => {
+                const first = result.geoObjects.get(0);
+                if (!first) {
+                    return;
+                }
+                const coords = first.geometry.getCoordinates();
+                const address = first.getAddressLine();
+                map.setCenter(coords);
+                map.setZoom(16);
+                marker.geometry.setCoordinates(coords);
+                syncFields(coords, address || "");
+            });
+        };
+
+        if (searchButton) {
+            searchButton.addEventListener("click", runSearch);
+        }
+        if (searchField) {
+            searchField.addEventListener("keydown", (event) => {
+                if (event.key === "Enter") {
+                    event.preventDefault();
+                    runSearch();
+                }
+            });
+        }
+        runSearch();
+    };
+
+    if (window.ymaps) {
+        window.ymaps.ready(window.__initWorkplaceMap);
+    }
+})();
+</script>
+<script src="https://api-maps.yandex.ru/2.1/?apikey={{ yandex_maps_api_key }}&lang=ru_RU" type="text/javascript"></script>
+<script>
+if (window.ymaps && window.__initWorkplaceMap) {
+    window.ymaps.ready(window.__initWorkplaceMap);
+}
+</script>
+{% endif %}
 {% endblock %}

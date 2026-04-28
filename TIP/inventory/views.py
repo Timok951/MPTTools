@@ -118,6 +118,16 @@ REQUEST_STATUS_HELPERS = {
     },
 }
 
+EQUIPMENT_STATUS_HELPERS = {
+    "in_stock": {"badge_class": "badge badge-approved"},
+    "assigned": {"badge_class": "badge badge-issued"},
+    "checked_out": {"badge_class": "badge badge-pending"},
+    "repair": {"badge_class": "badge badge-rejected"},
+    "retired": {"badge_class": "badge badge-closed"},
+}
+
+VISIBLE_EQUIPMENT_STATUSES = ("in_stock", "repair", "retired")
+
 
 def _can_manage_timers(user) -> bool:
     return False
@@ -156,7 +166,7 @@ def _can_process_request_status(user) -> bool:
 
 
 def _can_create_checkout(user) -> bool:
-    return user_has_capability(user, "checkout_operations")
+    return False
 
 
 def _can_create_usage(user) -> bool:
@@ -174,6 +184,12 @@ def _decorate_request(item: EquipmentRequest):
     helper = REQUEST_STATUS_HELPERS.get(item.status, {})
     item.badge_class = helper.get("badge_class", "badge")
     item.quick_actions = helper.get("quick_actions", [])
+    return item
+
+
+def _decorate_equipment(item: Equipment):
+    helper = EQUIPMENT_STATUS_HELPERS.get(item.status, {})
+    item.status_badge_class = helper.get("badge_class", "badge")
     return item
 
 
@@ -384,6 +400,10 @@ def equipment_list(request):
             | Q(model__icontains=query)
         )
 
+    status_base_qs = queryset
+    if status and status not in VISIBLE_EQUIPMENT_STATUSES:
+        status = ""
+
     if status:
         queryset = queryset.filter(status=status)
 
@@ -403,13 +423,51 @@ def equipment_list(request):
         queryset = queryset.filter(quantity_available__lte=F("low_stock_threshold"))
 
     page_obj = _paginate(request, queryset, page_size)
+    equipment_items = [_decorate_equipment(item) for item in page_obj.object_list]
+    status_counts_raw = status_base_qs.values("status").annotate(count=Count("id"))
+    status_counts = {item["status"]: item["count"] for item in status_counts_raw}
+
+    base_filters = {
+        "q": query,
+        "category": category,
+        "workplace": workplace,
+        "cabinet": cabinet,
+        "consumable": consumable,
+    }
+    status_filter_links = []
+    all_query = urlencode({key: value for key, value in base_filters.items() if value})
+    status_filter_links.append(
+        {
+            "label": "Все статусы",
+            "value": "",
+            "count": status_base_qs.count(),
+            "is_active": not status,
+            "url": f"{reverse('equipment_list')}?{all_query}" if all_query else reverse("equipment_list"),
+        }
+    )
+    status_label_map = dict(Equipment._meta.get_field("status").choices)
+    for value in VISIBLE_EQUIPMENT_STATUSES:
+        label = status_label_map.get(value, value)
+        query_with_status = {**base_filters, "status": value}
+        query_with_status = {key: item for key, item in query_with_status.items() if item}
+        encoded = urlencode(query_with_status)
+        status_filter_links.append(
+            {
+                "label": label,
+                "value": value,
+                "count": status_counts.get(value, 0),
+                "is_active": status == value,
+                "url": f"{reverse('equipment_list')}?{encoded}" if encoded else reverse("equipment_list"),
+            }
+        )
 
     context = {
-        "equipment": page_obj.object_list,
+        "equipment": equipment_items,
         "categories": EquipmentCategory.objects.all(),
         "workplaces": Workplace.objects.all(),
         "cabinets": Cabinet.objects.all(),
-        "status_choices": Equipment._meta.get_field("status").choices,
+        "status_choices": [(value, status_label_map.get(value, value)) for value in VISIBLE_EQUIPMENT_STATUSES],
+        "status_filter_links": status_filter_links,
         "filters": {
             "q": query,
             "status": status,
@@ -430,8 +488,37 @@ def usage_history(request):
     preferences = _get_user_preferences(request.user)
     page_size = preferences.page_size if preferences else 25
     show_deleted = bool(request.session.get("show_deleted_global", False))
+    request_id = (request.GET.get("request_id") or "").strip()
+    initial_request_id = int(request_id) if request_id.isdigit() else None
+    can_create_usage = _can_create_usage(request.user)
+
+    usage_form = MaterialUsageForm(initial_request_id=initial_request_id) if can_create_usage else None
+    if request.method == "POST":
+        if not can_create_usage:
+            return forbidden(request, "Списание доступно только уполномоченным ролям.")
+        usage_form = MaterialUsageForm(request.POST, initial_request_id=initial_request_id)
+        if usage_form.is_valid():
+            usage_obj = usage_form.save(commit=False)
+            if usage_obj.related_request and usage_obj.related_request.processed_by_id:
+                usage_obj.used_by = usage_obj.related_request.processed_by
+            else:
+                usage_obj.used_by = request.user
+            usage_obj._actor = request.user
+            usage_obj.save()
+            messages.success(request, "Операция сохранена: выдача расходуемого или списание сломанного оборудования.")
+            redirect_params = {}
+            date_from_post = (request.POST.get("from") or "").strip()
+            date_to_post = (request.POST.get("to") or "").strip()
+            if date_from_post:
+                redirect_params["from"] = date_from_post
+            if date_to_post:
+                redirect_params["to"] = date_to_post
+            if redirect_params:
+                return redirect(f"{reverse('usage_history')}?{urlencode(redirect_params)}")
+            return redirect("usage_history")
+
     usage_manager = MaterialUsage.all_objects if show_deleted else MaterialUsage.objects
-    usage = usage_manager.select_related("equipment", "used_by", "workplace").order_by("-used_at")
+    usage = usage_manager.select_related("equipment", "equipment__cabinet", "used_by", "workplace").order_by("-used_at")
     if not _can_view_all_operational_data(request.user):
         usage = usage.filter(used_by=request.user)
     date_from = request.GET.get("from", "").strip()
@@ -449,7 +536,12 @@ def usage_history(request):
         {
             "usage": page_obj.object_list,
             "filters": {"from": date_from, "to": date_to},
-            "can_create_usage": _can_create_usage(request.user),
+            "can_create_usage": can_create_usage,
+            "usage_form": usage_form,
+            "request_quantity_map": getattr(usage_form, "request_quantity_map", {}) if usage_form else {},
+            "request_equipment_map": getattr(usage_form, "request_equipment_map", {}) if usage_form else {},
+            "request_workplace_map": getattr(usage_form, "request_workplace_map", {}) if usage_form else {},
+            "prefilled_request_id": initial_request_id,
             **_with_page_context(page_obj),
         },
     )
@@ -640,33 +732,7 @@ def cabinets(request):
 
 @login_required
 def checkouts(request):
-    preferences = _get_user_preferences(request.user)
-    page_size = preferences.page_size if preferences else 25
-    show_deleted = bool(request.session.get("show_deleted_global", False))
-    checkout_manager = EquipmentCheckout.all_objects if show_deleted else EquipmentCheckout.objects
-    checkout_qs = checkout_manager.select_related("equipment", "taken_by", "workplace", "cabinet", "related_request")
-    if not _can_view_all_operational_data(request.user):
-        checkout_qs = checkout_qs.filter(taken_by=request.user)
-    status = request.GET.get("status", "").strip()
-    if not status and "status" not in request.GET and preferences and preferences.default_checkout_status:
-        status = preferences.default_checkout_status
-    if status == "active":
-        checkout_qs = checkout_qs.filter(returned_at__isnull=True)
-    elif status == "returned":
-        checkout_qs = checkout_qs.filter(returned_at__isnull=False)
-    page_obj = _paginate(request, checkout_qs, page_size)
-    for checkout in page_obj.object_list:
-        checkout.can_return = (not checkout.returned_at) and (not checkout.deleted_at) and _can_return_checkout(request.user, checkout)
-    return render(
-        request,
-        "inventory/checkouts.html",
-        {
-            "checkouts": page_obj.object_list,
-            "filters": {"status": status},
-            "can_create_checkout": _can_create_checkout(request.user),
-            **_with_page_context(page_obj),
-        },
-    )
+    return forbidden(request, "Раздел выдач отключён. Используйте раздел выдачи расходуемого/списания.")
 
 
 @login_required
@@ -876,7 +942,7 @@ def request_detail(request, request_id: int):
                 messages.success(request, "Фото добавлено.")
                 return redirect("request_detail", request_id=item.pk)
 
-    request_usage_url = reverse("usage_create")
+    request_usage_url = reverse("usage_history")
     request_usage_url = f"{request_usage_url}?request_id={item.pk}"
     threaded_messages = _build_request_message_thread(
         item.messages.select_related("author", "parent").all()
@@ -937,34 +1003,10 @@ def request_update_status(request, request_id: int):
 
 @login_required
 def usage_create(request):
-    if not _can_create_usage(request.user):
-        return forbidden(request, "Списание доступно только уполномоченным ролям.")
-
     request_id = (request.GET.get("request_id") or "").strip()
-    initial_request_id = int(request_id) if request_id.isdigit() else None
-    if request.method == "POST":
-        form = MaterialUsageForm(request.POST)
-        if form.is_valid():
-            usage = form.save(commit=False)
-            usage.used_by = request.user
-            usage._actor = request.user
-            usage.save()
-            messages.success(request, "Usage record saved.")
-            return redirect("usage_history")
-    else:
-        form = MaterialUsageForm(initial_request_id=initial_request_id)
-
-    return render(
-        request,
-        "inventory/usage_form.html",
-        {
-            "form": form,
-            "request_quantity_map": getattr(form, "request_quantity_map", {}),
-            "request_equipment_map": getattr(form, "request_equipment_map", {}),
-            "request_workplace_map": getattr(form, "request_workplace_map", {}),
-            "prefilled_request_id": initial_request_id,
-        },
-    )
+    if request_id:
+        return redirect(f"{reverse('usage_history')}?request_id={request_id}")
+    return redirect("usage_history")
 
 
 @login_required
@@ -1004,43 +1046,13 @@ def timer_stop(request, timer_id: int):
 
 @login_required
 def checkout_create(request):
-    if not _can_create_checkout(request.user):
-        return forbidden(request, "Выдача доступна только уполномоченным ролям.")
-
-    if request.method == "POST":
-        form = EquipmentCheckoutForm(request.POST, user=request.user)
-        if form.is_valid():
-            checkout = form.save(commit=False)
-            checkout.taken_by = request.user
-            checkout._actor = request.user
-            checkout.save()
-            messages.success(request, "Checkout saved.")
-            return redirect("checkouts")
-    else:
-        form = EquipmentCheckoutForm(
-            initial={
-                "taken_at": timezone.localtime().strftime("%Y-%m-%dT%H:%M"),
-                "due_at": (timezone.localtime() + timedelta(days=7)).strftime("%Y-%m-%dT%H:%M"),
-            },
-            user=request.user,
-        )
-
-    return render(request, "inventory/checkout_form.html", {"form": form})
+    return forbidden(request, "Форма выдач отключена. Оформляйте только выдачу расходуемого в разделе списаний.")
 
 
 @login_required
 @require_POST
 def checkout_return(request, checkout_id: int):
-    checkout = get_object_or_404(EquipmentCheckout, pk=checkout_id)
-    if not _can_return_checkout(request.user, checkout):
-        return forbidden(request, "Возврат выдачи доступен только владельцу, складу или администратору.")
-    if checkout.returned_at:
-        return redirect("checkouts")
-    checkout.returned_at = timezone.now()
-    checkout._actor = request.user
-    checkout.save(update_fields=["returned_at"])
-    messages.success(request, "Checkout marked as returned.")
-    return redirect("checkouts")
+    return forbidden(request, "Возвраты отключены вместе с разделом выдач.")
 
 
 @login_required
@@ -1078,9 +1090,19 @@ def api_docs(request):
                 "/api/v1/categories/",
                 "/api/v1/requests/",
                 "/api/v1/usage/",
-                "/api/v1/adjustments/",
-                "/api/v1/checkouts/",
             ]
+        },
+    )
+
+
+@login_required
+def about_site(request):
+    return render(
+        request,
+        "inventory/about_site.html",
+        {
+            "yandex_maps_terms_url": "https://yandex.ru/legal/maps_api/ru/",
+            "yandex_maps_service_terms_url": "https://yandex.ru/legal/maps_termsofuse/",
         },
     )
 

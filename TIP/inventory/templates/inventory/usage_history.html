@@ -5,8 +5,8 @@
 <div class="card">
     <div class="card-header">
         <div>
-            <div class="kicker">Списания</div>
-            <h2>История списаний</h2>
+            <div class="kicker">Операции по расходу</div>
+            <h2>История выдачи расходуемого и списаний</h2>
         </div>
         <div class="table-meta">Строк на странице: {{ page_size }}</div>
     </div>
@@ -20,31 +20,63 @@
             <input id="id_to" type="date" name="to" value="{{ filters.to }}" />
         </div>
         <div>
-            <button class="btn" type="submit">Применить</button>
+            <button class="btn" type="submit">Отбор</button>
         </div>
+        {% if filters.from or filters.to %}
+        <div>
+            <a class="secondary" href="{% url 'usage_history' %}">Сбросить отбор</a>
+        </div>
+        {% endif %}
     </form>
 </div>
 
 <div class="card">
     <div class="toolbar-spread">
         <div class="table-meta">Показано: {{ usage|length }} / {{ total_rows }}</div>
-        <div class="actions">
+        <div class="actions usage-history-actions">
             {% if can_create_usage %}
-            <a href="{% url 'usage_create' %}">Списать оборудование</a>
-            {% endif %}
-            {% if user|has_group:"Administrator" %}
-            <a class="secondary" href="{% url 'portal_list' entity='usage' %}">🧰 Управление списаниями</a>
+            <a href="#new_usage_operation">Новая операция</a>
             {% endif %}
         </div>
     </div>
+    {% if can_create_usage and usage_form %}
+    <div id="new_usage_operation" class="card compact-widget" style="margin-top: 10px;">
+        <h3>Новая операция</h3>
+        <form method="post" class="form-shell">
+            {% csrf_token %}
+            <input type="hidden" name="from" value="{{ filters.from }}">
+            <input type="hidden" name="to" value="{{ filters.to }}">
+            {% if usage_form.non_field_errors %}
+                <div class="form-errors">
+                    {% for error in usage_form.non_field_errors %}
+                        <div>{{ error }}</div>
+                    {% endfor %}
+                </div>
+            {% endif %}
+            <div class="form-grid">
+                {% include "inventory/_form_field.html" with field=usage_form.equipment %}
+                {% include "inventory/_form_field.html" with field=usage_form.workplace %}
+                {% include "inventory/_form_field.html" with field=usage_form.quantity %}
+                {% include "inventory/_form_field.html" with field=usage_form.related_request %}
+                {% include "inventory/_form_field.html" with field=usage_form.note full_width=True %}
+            </div>
+            <div class="actions">
+                <button class="btn" type="submit">Сохранить операцию</button>
+                <a class="secondary" href="{% url 'usage_history' %}{% if filters.from or filters.to %}?from={{ filters.from|urlencode }}&to={{ filters.to|urlencode }}{% endif %}">Очистить форму</a>
+            </div>
+        </form>
+    </div>
+    {% endif %}
     <table>
         <thead>
             <tr>
                 <th>ID</th>
                 <th>Оборудование</th>
+                <th>Тип операции</th>
                 <th>Количество</th>
                 <th>Пользователь</th>
                 <th>Рабочее место</th>
+                <th>Кабинет</th>
                 <th>Дата</th>
                 <th>Заявка</th>
                 {% if user|has_group:"Administrator" %}<th>Действия</th>{% endif %}
@@ -55,9 +87,17 @@
             <tr>
                 <td>{{ item.id }}</td>
                 <td>{{ item.equipment }}</td>
+                <td>
+                    {% if item.equipment and item.equipment.is_consumable %}
+                    <span class="badge badge-issued">Выдача расходуемого</span>
+                    {% else %}
+                    <span class="badge badge-rejected">Списание нерасходуемого</span>
+                    {% endif %}
+                </td>
                 <td>{{ item.quantity }}</td>
                 <td>{{ item.used_by }}</td>
                 <td>{{ item.workplace }}</td>
+                <td>{{ item.equipment.cabinet|default:"-" }}</td>
                 <td>{{ item.used_at|date:preferred_datetime_format }}</td>
                 <td>{{ item.related_request }}</td>
                 {% if user|has_group:"Administrator" %}
@@ -68,10 +108,74 @@
                 {% endif %}
             </tr>
             {% empty %}
-            <tr><td colspan="{% if user|has_group:'Administrator' %}8{% else %}7{% endif %}" class="muted">История списаний пока пуста.</td></tr>
+            <tr><td colspan="{% if user|has_group:'Administrator' %}10{% else %}9{% endif %}" class="muted">История операций пока пуста.</td></tr>
             {% endfor %}
         </tbody>
     </table>
     {% include "inventory/_pagination.html" %}
 </div>
+{% endblock %}
+
+{% block scripts %}
+{{ request_quantity_map|json_script:"request-quantity-map" }}
+{{ request_equipment_map|json_script:"request-equipment-map" }}
+{{ request_workplace_map|json_script:"request-workplace-map" }}
+<script>
+(() => {
+    const requestField = document.getElementById("id_related_request");
+    const quantityField = document.getElementById("id_quantity");
+    const equipmentField = document.getElementById("id_equipment");
+    const workplaceField = document.getElementById("id_workplace");
+    const quantityMapNode = document.getElementById("request-quantity-map");
+    const equipmentMapNode = document.getElementById("request-equipment-map");
+    const workplaceMapNode = document.getElementById("request-workplace-map");
+    if (!requestField || !quantityField || !quantityMapNode || !equipmentField || !workplaceField || !equipmentMapNode || !workplaceMapNode) {
+        return;
+    }
+
+    let quantityMap = {};
+    let equipmentMap = {};
+    let workplaceMap = {};
+    try { quantityMap = JSON.parse(quantityMapNode.textContent || "{}"); } catch (e) { quantityMap = {}; }
+    try { equipmentMap = JSON.parse(equipmentMapNode.textContent || "{}"); } catch (e) { equipmentMap = {}; }
+    try { workplaceMap = JSON.parse(workplaceMapNode.textContent || "{}"); } catch (e) { workplaceMap = {}; }
+
+    const syncFromRequest = () => {
+        const requestId = requestField.value;
+        if (requestId && Object.prototype.hasOwnProperty.call(quantityMap, requestId)) {
+            quantityField.value = quantityMap[requestId];
+            quantityField.readOnly = true;
+            if (Object.prototype.hasOwnProperty.call(equipmentMap, requestId) && equipmentMap[requestId]) {
+                equipmentField.value = String(equipmentMap[requestId]);
+                equipmentField.disabled = true;
+            }
+            if (Object.prototype.hasOwnProperty.call(workplaceMap, requestId) && workplaceMap[requestId]) {
+                workplaceField.value = String(workplaceMap[requestId]);
+                workplaceField.disabled = true;
+            }
+        } else {
+            quantityField.readOnly = false;
+            equipmentField.disabled = false;
+            workplaceField.disabled = false;
+        }
+    };
+
+    const form = requestField.closest("form");
+    if (form) {
+        form.addEventListener("submit", () => {
+            equipmentField.disabled = false;
+            workplaceField.disabled = false;
+        });
+    }
+    requestField.addEventListener("change", syncFromRequest);
+    syncFromRequest();
+
+    if ("{{ prefilled_request_id|default:'' }}") {
+        const widget = document.getElementById("new_usage_operation");
+        if (widget) {
+            widget.scrollIntoView({ behavior: "smooth", block: "start" });
+        }
+    }
+})();
+</script>
 {% endblock %}

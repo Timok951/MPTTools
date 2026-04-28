@@ -5,12 +5,12 @@
 <div class="card">
     <div class="card-header">
         <div>
-            <div class="kicker">{% trans "Requests" %}</div>
-            <h2>{% trans "New request" %}</h2>
-            <p class="muted">{% trans "Create a clear request so it can be approved and fulfilled faster." %}</p>
+            <div class="kicker">Заявки</div>
+            <h2>Новая заявка</h2>
+            <p class="muted">Оформите понятную заявку, чтобы её быстрее согласовали и выполнили.</p>
         </div>
         <div class="actions">
-            <a class="secondary" href="{% url 'request_history' %}">{% trans "Back to requests" %}</a>
+            <a class="secondary" href="{% url 'request_history' %}">Назад к заявкам</a>
         </div>
     </div>
     <div class="split-layout">
@@ -32,16 +32,16 @@
                 {% include "inventory/_form_field.html" with field=form.comment full_width=True %}
             </div>
             <div class="actions">
-                <button class="btn" type="submit">{% trans "Submit request" %}</button>
+                <button class="btn" type="submit">Создать заявку</button>
             </div>
         </form>
         <div class="field-list">
             <div class="aside-panel">
-                <h3>{% trans "Approval tips" %}</h3>
+                <h3>Подсказки для согласования</h3>
                 <ul>
-                    <li>{% trans "Choose the exact equipment item when possible." %}</li>
-                    <li>{% trans "Add a due date for planned work instead of leaving it ambiguous." %}</li>
-                    <li>{% trans "Use the note field to explain urgency, task, or delivery context." %}</li>
+                    <li>По возможности выбирайте конкретную позицию оборудования.</li>
+                    <li>Для плановых работ указывайте срок, чтобы не оставлять заявку неопределённой.</li>
+                    <li>В комментарии укажите срочность, задачу и контекст выдачи.</li>
                 </ul>
             </div>
         </div>

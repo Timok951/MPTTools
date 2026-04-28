@@ -4,6 +4,13 @@
 {% block content %}
 <div class="card">
     <h2>{% trans "Equipment" %}</h2>
+    <div class="request-shortcuts">
+        {% for item in status_filter_links %}
+        <a class="shortcut-chip {% if item.is_active %}is-active{% endif %}" href="{{ item.url }}">
+            {{ item.label }} ({{ item.count }})
+        </a>
+        {% endfor %}
+    </div>
     <form method="get" class="filters">
         <div>
             <label for="id_q">{% trans "Search" %}</label>
@@ -54,14 +61,7 @@
             </select>
         </div>
         <div>
-            <label for="id_low_stock">{% trans "Low stock" %}</label>
-            <select id="id_low_stock" name="low_stock">
-                <option value="">{% trans "All" %}</option>
-                <option value="1" {% if filters.low_stock == "1" %}selected{% endif %}>{% trans "Only low stock" %}</option>
-            </select>
-        </div>
-        <div>
-            <button class="btn" type="submit">{% trans "Apply" %}</button>
+            <button class="btn" type="submit">Отбор</button>
         </div>
     </form>
 </div>
@@ -73,9 +73,6 @@
             {% if user|has_group:"Administrator" %}
                 <a href="{% url 'portal_create' entity='equipment' %}">➕ {% trans "Add" %}</a>
                 <a class="secondary" href="{% url 'portal_list' entity='equipment' %}">🧰 {% trans "Manage equipment" %}</a>
-            {% endif %}
-            {% if user|has_group:"Administrator" or user|has_group:"Warehouse" %}
-                <a class="secondary" href="{% url 'adjustment_create' %}">{% trans "Adjust stock" %}</a>
             {% endif %}
         </div>
     </div>
@@ -105,8 +102,14 @@
                         <strong>{{ item.get_status_display }}</strong>
                     </div>
                     <div class="equipment-card-row">
-                        <span>{% ui_text "Доступно" "Available" %}</span>
-                        <strong>{{ item.quantity_available }} / {{ item.quantity_total }}</strong>
+                        <span>{% ui_text "Доступность" "Availability" %}</span>
+                        <strong>
+                            {% if item.status != "repair" and item.status != "retired" %}
+                                {% ui_text "Доступно" "Available" %}
+                            {% else %}
+                                {% ui_text "Недоступно" "Unavailable" %}
+                            {% endif %}
+                        </strong>
                     </div>
                     <div class="equipment-card-row">
                         <span>{% ui_text "Рабочее место" "Workplace" %}</span>
@@ -123,12 +126,7 @@
                 </div>
 
                 <div class="equipment-card-flags">
-                    {% if item.is_low_stock %}
-                    <span class="badge warn">{% ui_text "Малый остаток" "Low stock" %}</span>
-                    {% else %}
-                    <span class="badge">OK</span>
-                    {% endif %}
-
+                    <span class="{{ item.status_badge_class }}">{{ item.get_status_display }}</span>
                 </div>
 
                 <div class="actions">

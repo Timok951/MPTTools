@@ -1,0 +1,32 @@
+{% extends "inventory/base.html" %}
+{% load i18n %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header">
+        <div>
+            <div class="kicker">О сайте</div>
+            <h2>MPT Tools</h2>
+            <p class="muted">Система учёта оборудования, заявок, списаний и рабочих мест.</p>
+        </div>
+    </div>
+    <div class="split-layout">
+        <div class="aside-panel">
+            <h3>Используемые сервисы</h3>
+            <ul>
+                <li>Яндекс.Карты API используются для выбора локации рабочих мест.</li>
+                <li>Адрес и координаты сохраняются только для внутренних задач учёта.</li>
+                <li>Доступ к разделам контролируется ролевой моделью.</li>
+            </ul>
+        </div>
+        <div class="aside-panel">
+            <h3>Правовая информация по картам</h3>
+            <ul>
+                <li><a href="{{ yandex_maps_terms_url }}" target="_blank" rel="noopener">Условия использования отдельных сервисов Яндекс.Карт</a></li>
+                <li><a href="{{ yandex_maps_service_terms_url }}" target="_blank" rel="noopener">Условия использования сервиса Яндекс.Карты</a></li>
+            </ul>
+            <p class="muted">При использовании карт соблюдаются требования правообладателя сервиса.</p>
+        </div>
+    </div>
+</div>
+{% endblock %}

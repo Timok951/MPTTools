@@ -25,6 +25,11 @@
                 </span>
             {% endif %}
             <div class="muted">{{ workplace.location }}</div>
+            {% if workplace.latitude and workplace.longitude %}
+            <div class="actions" style="margin: 6px 0;">
+                <a class="secondary" target="_blank" rel="noopener" href="https://yandex.ru/maps/?pt={{ workplace.longitude }},{{ workplace.latitude }}&z=16&l=map">Открыть на карте</a>
+            </div>
+            {% endif %}
             <div>{{ workplace.description }}</div>
             <table>
                 <thead>

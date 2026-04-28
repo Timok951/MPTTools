@@ -4,13 +4,14 @@ from typing import Any
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import Group, User
+from django.conf import settings
 from django.db import models
 from django.db import IntegrityError
 from django.db.models import ProtectedError
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils.translation import gettext_lazy as _
 
-from assets.models import Equipment, EquipmentCheckout, InventoryAdjustment
+from assets.models import Equipment
 from core.models import Cabinet, EquipmentCategory, Workplace, WorkplaceMember
 from operations.models import EquipmentRequest, MaterialUsage
 from audit.models import AdminPortalLog
@@ -21,11 +22,9 @@ from .authz import is_portal_admin
 from .portal_forms import (
     PortalCabinetForm,
     PortalEquipmentCategoryForm,
-    PortalEquipmentCheckoutForm,
     PortalEquipmentForm,
     PortalEquipmentRequestForm,
     PortalGroupForm,
-    PortalInventoryAdjustmentForm,
     PortalMaterialUsageForm,
     PortalUserForm,
     PortalWorkplaceForm,
@@ -45,15 +44,13 @@ class PortalEntity:
 
 
 PORTAL_ENTITIES: tuple[PortalEntity, ...] = (
-    PortalEntity("equipment", Equipment, PortalEquipmentForm, ("name", "inventory_number", "status", "quantity_available", "deleted_at"), "Оборудование"),
+    PortalEntity("equipment", Equipment, PortalEquipmentForm, ("name", "inventory_number", "status", "quantity_total", "deleted_at"), "Оборудование"),
     PortalEntity("categories", EquipmentCategory, PortalEquipmentCategoryForm, ("name", "deleted_at"), "Категории"),
     PortalEntity("workplaces", Workplace, PortalWorkplaceForm, ("name", "location", "deleted_at"), "Рабочие места"),
-    PortalEntity("cabinets", Cabinet, PortalCabinetForm, ("code", "name", "workplace", "deleted_at"), "Шкафы"),
+    PortalEntity("cabinets", Cabinet, PortalCabinetForm, ("code", "name", "workplace", "deleted_at"), "Кабинеты"),
     PortalEntity("workplace-members", WorkplaceMember, PortalWorkplaceMemberForm, ("workplace", "user", "role", "deleted_at"), "Сотрудники"),
-    PortalEntity("adjustments", InventoryAdjustment, PortalInventoryAdjustmentForm, ("equipment", "delta", "reason", "created_at", "deleted_at"), "Корректировки"),
-    PortalEntity("checkouts", EquipmentCheckout, PortalEquipmentCheckoutForm, ("equipment", "quantity", "taken_by", "returned_at", "deleted_at"), "Выдачи"),
     PortalEntity("requests", EquipmentRequest, PortalEquipmentRequestForm, ("requester", "equipment", "quantity", "status", "deleted_at"), "Заявки"),
-    PortalEntity("usage", MaterialUsage, PortalMaterialUsageForm, ("equipment", "quantity", "used_by", "used_at", "deleted_at"), "Списания"),
+    PortalEntity("usage", MaterialUsage, PortalMaterialUsageForm, ("equipment", "quantity", "used_by", "used_at", "deleted_at"), "Выдача расходуемого"),
     PortalEntity("users", User, PortalUserForm, ("username", "email", "is_active", "is_staff", "is_superuser"), "Пользователи"),
     PortalEntity("groups", Group, PortalGroupForm, ("name",), "Группы и роли"),
 )
@@ -62,6 +59,13 @@ PORTAL_BY_SLUG = {e.slug: e for e in PORTAL_ENTITIES}
 
 def _portal_nav_context(current_slug: str | None = None):
     return {"entities": PORTAL_ENTITIES, "current_entity_slug": current_slug}
+
+
+def _portal_common_context(current_slug: str | None = None):
+    return {
+        **_portal_nav_context(current_slug),
+        "yandex_maps_api_key": getattr(settings, "YANDEX_MAPS_API_KEY", ""),
+    }
 
 
 def _procedure_cards():
@@ -150,6 +154,8 @@ def portal_list(request, entity: str):
     if resp := _portal_guard(request):
         return resp
     cfg = _get_entity_or_404(entity)
+    if cfg.slug == "usage":
+        return redirect("usage_history")
     show_deleted = bool(request.session.get("show_deleted_global", False))
     has_soft_delete = any(f.name == "deleted_at" for f in cfg.model._meta.fields)
     qs = _manager(cfg.model).all()
@@ -176,6 +182,8 @@ def portal_create(request, entity: str):
     if resp := _portal_guard(request):
         return resp
     cfg = _get_entity_or_404(entity)
+    if cfg.slug == "usage":
+        return redirect("usage_history")
     Form = cfg.form_class
     if request.method == "POST":
         form = Form(request.POST, request.FILES)
@@ -193,7 +201,11 @@ def portal_create(request, entity: str):
                 form.add_error(None, _friendly_integrity_message(exc))
     else:
         form = Form()
-    return render(request, "inventory/portal/object_form.html", {**_portal_nav_context(cfg.slug), "cfg": cfg, "form": form, "is_edit": False})
+    return render(
+        request,
+        "inventory/portal/object_form.html",
+        {**_portal_common_context(cfg.slug), "cfg": cfg, "form": form, "is_edit": False},
+    )
 
 
 @login_required
@@ -219,7 +231,11 @@ def portal_edit(request, entity: str, pk: int):
                 form.add_error(None, _friendly_integrity_message(exc))
     else:
         form = Form(instance=obj)
-    return render(request, "inventory/portal/object_form.html", {**_portal_nav_context(cfg.slug), "cfg": cfg, "form": form, "is_edit": True, "object": obj})
+    return render(
+        request,
+        "inventory/portal/object_form.html",
+        {**_portal_common_context(cfg.slug), "cfg": cfg, "form": form, "is_edit": True, "object": obj},
+    )
 
 
 @login_required

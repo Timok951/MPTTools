@@ -219,10 +219,16 @@ class EquipmentRequestForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.fields["workplace"].label = "Рабочее место"
         self.fields["workplace"].empty_label = "Выберите рабочее место"
+        self.fields["request_kind"].label = "Тип заявки"
+        self.fields["equipment"].label = "Оборудование"
         self.fields["equipment"].empty_label = "Выберите оборудование"
+        self.fields["quantity"].label = "Количество"
         self.fields["quantity"].help_text = "Запрошенное количество не может превышать доступный остаток."
+        self.fields["needed_by"].label = "Нужно до"
         self.fields["needed_by"].help_text = "Необязательная плановая дата, когда оборудование должно понадобиться."
+        self.fields["comment"].label = "Комментарий"
         self.fields["comment"].help_text = "Добавьте детали, которые помогут быстрее согласовать заявку."
 
     def clean_quantity(self):
@@ -278,29 +284,26 @@ class MaterialUsageForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
         self.fields["equipment"].empty_label = "Выберите оборудование"
         self.fields["workplace"].empty_label = "Выберите рабочее место"
-        self.fields["related_request"].queryset = (
-            EquipmentRequest.objects.select_related("equipment", "requester")
-            .filter(status__in=[REQUEST_APPROVED, REQUEST_ISSUED, REQUEST_CLOSED])
+        request_base_qs = (
+            EquipmentRequest.objects.filter(status__in=[REQUEST_APPROVED, REQUEST_ISSUED, REQUEST_CLOSED])
             .order_by("-requested_at")
         )
+        self.fields["related_request"].queryset = request_base_qs.select_related("equipment", "requester")
         self.fields["related_request"].empty_label = "Без связанной заявки"
-        self.request_quantity_map = {
-            str(item.pk): item.quantity for item in self.fields["related_request"].queryset.only("id", "quantity")
-        }
-        self.request_equipment_map = {
-            str(item.pk): (item.equipment_id or "")
-            for item in self.fields["related_request"].queryset.only("id", "equipment_id")
-        }
-        self.request_workplace_map = {
-            str(item.pk): (item.workplace_id or "")
-            for item in self.fields["related_request"].queryset.only("id", "workplace_id")
-        }
+        request_rows = request_base_qs.values("id", "quantity", "equipment_id", "workplace_id")
+        self.request_quantity_map = {str(item["id"]): item["quantity"] for item in request_rows}
+        request_rows = request_base_qs.values("id", "quantity", "equipment_id", "workplace_id")
+        self.request_equipment_map = {str(item["id"]): (item["equipment_id"] or "") for item in request_rows}
+        request_rows = request_base_qs.values("id", "quantity", "equipment_id", "workplace_id")
+        self.request_workplace_map = {str(item["id"]): (item["workplace_id"] or "") for item in request_rows}
         if initial_request_id:
             self.initial["related_request"] = initial_request_id
-        self.fields["quantity"].help_text = "Если выбрана заявка, количество автоматически берётся из неё."
+        self.fields["quantity"].help_text = (
+            "Для расходуемого оборудования укажите объём выдачи. "
+            "Если выбрана заявка, количество автоматически берётся из неё."
+        )
         self.fields["related_request"].help_text = (
-            "Для нерасходного оборудования обязательно укажите связанную заявку. "
-            "Оборудование, рабочее место и количество подставятся автоматически."
+            "Необязательно. Если выбрана заявка, оборудование, рабочее место и количество подставятся автоматически."
         )
 
     def clean_quantity(self):
@@ -320,15 +323,15 @@ class MaterialUsageForm(forms.ModelForm):
         if equipment and quantity > equipment.quantity_available:
             self.add_error("quantity", "Недостаточно доступного остатка.")
         if equipment and not equipment.is_consumable:
-            if not related_request:
-                self.add_error("related_request", "Для списания запрошенного оборудования нужно выбрать заявку.")
-            else:
-                if related_request.equipment_id != equipment.id:
-                    self.add_error("equipment", "Оборудование должно совпадать с выбранной заявкой.")
-                if related_request.status in {"pending", "rejected"}:
-                    self.add_error("related_request", "Списание доступно только для обработанных заявок.")
-                if quantity > related_request.quantity:
-                    self.add_error("quantity", "Количество списания превышает количество в заявке.")
+            note = (cleaned.get("note") or "").strip()
+            if not note:
+                self.add_error("note", "Для нерасходуемого оборудования укажите причину списания (например, сломано).")
+            if quantity != 1:
+                self.add_error("quantity", "Нерасходуемое оборудование списывается поштучно (количество = 1).")
+        if related_request and equipment and related_request.equipment_id != equipment.id:
+            self.add_error("equipment", "Оборудование должно совпадать с выбранной заявкой.")
+        if related_request and related_request.status in {"pending", "rejected"}:
+            self.add_error("related_request", "Операция доступна только для обработанных заявок.")
         return cleaned
 
 
@@ -336,6 +339,11 @@ class InventoryAdjustmentForm(forms.ModelForm):
     class Meta:
         model = InventoryAdjustment
         fields = ["equipment", "delta", "reason"]
+        labels = {
+            "equipment": "Оборудование",
+            "delta": "Изменение остатка",
+            "reason": "Причина",
+        }
         widgets = {
             "reason": forms.TextInput(attrs={"placeholder": "Почему требуется корректировка остатка?"}),
         }

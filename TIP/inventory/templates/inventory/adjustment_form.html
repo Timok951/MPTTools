@@ -5,12 +5,12 @@
 <div class="card">
     <div class="card-header">
         <div>
-            <div class="kicker">{% trans "Warehouse" %}</div>
-            <h2>{% trans "Adjust stock" %}</h2>
-            <p class="muted">{% trans "Record inventory corrections with a clear reason for audit and history." %}</p>
+            <div class="kicker">Склад</div>
+            <h2>Корректировка остатка</h2>
+            <p class="muted">Зафиксируйте изменение остатка с понятной причиной для аудита и истории.</p>
         </div>
         <div class="actions">
-            <a class="secondary" href="{% url 'equipment_list' %}">{% trans "Back to equipment" %}</a>
+            <a class="secondary" href="{% url 'equipment_list' %}">Назад к оборудованию</a>
         </div>
     </div>
     <div class="split-layout">
@@ -29,16 +29,16 @@
                 {% include "inventory/_form_field.html" with field=form.reason full_width=True %}
             </div>
             <div class="actions">
-                <button class="btn" type="submit">{% trans "Apply adjustment" %}</button>
+                <button class="btn" type="submit">Применить корректировку</button>
             </div>
         </form>
         <div class="field-list">
             <div class="aside-panel">
-                <h3>{% trans "Delta guide" %}</h3>
+                <h3>Памятка по изменению остатка</h3>
                 <ul>
-                    <li>{% trans "Positive values add stock." %}</li>
-                    <li>{% trans "Negative values remove stock." %}</li>
-                    <li>{% trans "The result cannot make total or available stock go below zero." %}</li>
+                    <li>Положительные значения увеличивают остаток.</li>
+                    <li>Отрицательные значения уменьшают остаток.</li>
+                    <li>После корректировки общий и доступный остаток не могут быть меньше нуля.</li>
                 </ul>
             </div>
         </div>

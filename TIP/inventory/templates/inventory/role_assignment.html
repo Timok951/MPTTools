@@ -5,24 +5,31 @@
 <div class="card">
     <h2>Выдача ролей</h2>
     <p class="muted">Назначьте роль каждому пользователю. Роль определяет уровень доступа.</p>
-    <div class="grid cols-4">
+    <div class="grid role-overview-grid">
         {% for role, description in roles.items %}
-        <div class="stat">
-            <strong>{{ role }}</strong>
-            <div class="badge">{{ role_counts|dict_get:role }} чел.</div>
-            <div class="muted">{{ description }}</div>
-            <div style="margin-top:8px;">
-                {% for capability in role_capability_map|dict_get:role %}
-                <div class="muted">- {{ capability }}</div>
-                {% endfor %}
+        <article class="stat role-stat">
+            <div class="role-stat-head">
+                <strong>{{ role }}</strong>
+                <div class="badge">{{ role_counts|dict_get:role }} чел.</div>
             </div>
-        </div>
+            <div class="role-section-title">Функционал</div>
+            <ul class="role-capability-list">
+                {% for capability in role_capability_map|dict_get:role %}
+                <li>{{ capability }}</li>
+                {% endfor %}
+            </ul>
+            <div class="role-section-title">Описание</div>
+            <div class="muted">{{ description }}</div>
+        </article>
         {% endfor %}
-        <div class="stat">
+        <article class="stat role-stat">
             <strong>Без роли</strong>
             <div class="badge warn">{{ without_role_count }} чел.</div>
+            <div class="role-section-title">Функционал</div>
+            <div class="muted">Доступ не назначен.</div>
+            <div class="role-section-title">Описание</div>
             <div class="muted">Пользователи, которым ещё не назначен доступ.</div>
-        </div>
+        </article>
     </div>
 </div>
 

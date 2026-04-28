@@ -518,6 +518,42 @@
         .stat strong {
             font-size: 20px;
         }
+        .role-overview-grid {
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            align-items: stretch;
+        }
+        .role-stat {
+            display: grid;
+            gap: 8px;
+            align-content: start;
+            min-height: 100%;
+        }
+        .role-stat-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+        }
+        .role-stat-head strong {
+            font-size: 18px;
+            line-height: 1.25;
+        }
+        .role-section-title {
+            font-size: 12px;
+            font-weight: 700;
+            color: var(--accent-2);
+            text-transform: uppercase;
+            letter-spacing: 0.03em;
+            margin-top: 4px;
+        }
+        .role-capability-list {
+            margin: 0;
+            padding-left: 18px;
+            color: var(--muted);
+            display: grid;
+            gap: 4px;
+            font-size: 14px;
+        }
         .kpi-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
@@ -657,6 +693,32 @@
             font-size: 12px;
             border-radius: 10px;
         }
+        .inline-field-with-action {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) 36px;
+            gap: 8px;
+            align-items: center;
+        }
+        .quick-add-btn {
+            width: 36px;
+            height: 36px;
+            border-radius: 10px;
+            border: 1px solid var(--ring);
+            background: var(--surface);
+            color: var(--accent-2);
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 22px;
+            line-height: 1;
+            font-weight: 700;
+        }
+        .quick-add-btn:hover {
+            border-color: var(--accent);
+            color: var(--accent);
+            transform: translateY(-1px);
+        }
         .quick-role-btn.is-active {
             border-color: var(--accent);
             background: rgba(76, 103, 255, 0.14);
@@ -691,6 +753,16 @@
             border-color: var(--accent);
             background: rgba(76, 103, 255, 0.14);
             color: var(--accent);
+        }
+        .shortcut-chip.status-stock.is-active {
+            background: rgba(46, 184, 92, 0.16);
+            color: #1f8a44;
+            border-color: rgba(46, 184, 92, 0.3);
+        }
+        .shortcut-chip.status-repair.is-active {
+            background: rgba(217, 63, 63, 0.16);
+            color: #ba2f2f;
+            border-color: rgba(217, 63, 63, 0.3);
         }
         body.theme-dark .shortcut-chip {
             background: rgba(31, 46, 82, 0.95);
@@ -758,6 +830,17 @@
             display: flex;
             flex-wrap: wrap;
             gap: 10px;
+        }
+        .usage-history-actions {
+            justify-content: flex-end;
+            align-items: center;
+        }
+        .usage-history-actions a {
+            min-height: 38px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            white-space: nowrap;
         }
         .actions a,
         .btn {
@@ -828,7 +911,7 @@
             display: block;
             margin-bottom: 4px;
         }
-        input, select, textarea {
+        input:not([type="checkbox"]), select, textarea {
             width: 100%;
             padding: 8px 10px;
             border-radius: 10px;
@@ -837,20 +920,95 @@
             background: var(--surface-strong);
             color: var(--ink);
         }
-        input:focus, select:focus, textarea:focus {
+        input:not([type="checkbox"]):focus, select:focus, textarea:focus {
             outline: none;
             border-color: var(--accent);
             box-shadow: 0 0 0 3px rgba(76, 103, 255, 0.18);
         }
-        body.theme-dark input,
+        body.theme-dark input:not([type="checkbox"]),
         body.theme-dark select,
         body.theme-dark textarea {
             color: var(--ink);
             border-color: rgba(157, 178, 255, 0.42);
         }
-        body.theme-dark input::placeholder,
+        body.theme-dark input:not([type="checkbox"])::placeholder,
         body.theme-dark textarea::placeholder {
             color: rgba(224, 231, 255, 0.5);
+        }
+        .input-locked,
+        input[readonly].input-locked {
+            background: rgba(31, 42, 68, 0.06);
+            border-style: dashed;
+            color: rgba(31, 42, 68, 0.72);
+            cursor: not-allowed;
+            box-shadow: inset 0 0 0 1px rgba(31, 42, 68, 0.04);
+        }
+        .input-locked:focus,
+        input[readonly].input-locked:focus {
+            border-color: var(--border);
+            box-shadow: inset 0 0 0 1px rgba(31, 42, 68, 0.04);
+        }
+        body.theme-dark .input-locked,
+        body.theme-dark input[readonly].input-locked {
+            background: rgba(16, 24, 44, 0.92);
+            color: rgba(224, 232, 255, 0.72);
+            border-color: rgba(157, 178, 255, 0.3);
+            box-shadow: inset 0 0 0 1px rgba(157, 178, 255, 0.12);
+        }
+        input[type="file"] {
+            padding: 6px 8px;
+            border-radius: 12px;
+            border: 1px solid var(--border);
+            background: var(--surface-strong);
+            color: var(--muted);
+            font-size: 13px;
+        }
+        input[type="file"]::file-selector-button {
+            margin-right: 10px;
+            border: 1px solid var(--ring);
+            border-radius: 10px;
+            padding: 6px 12px;
+            font-family: inherit;
+            font-size: 13px;
+            font-weight: 700;
+            cursor: pointer;
+            color: #fff;
+            background: linear-gradient(180deg, #5b73ff, #4c67ff);
+            box-shadow: 0 6px 14px rgba(76, 103, 255, 0.24);
+            transition: transform 0.15s ease, box-shadow 0.15s ease;
+        }
+        input[type="file"]::file-selector-button:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 8px 18px rgba(76, 103, 255, 0.32);
+        }
+        input[type="file"]::-webkit-file-upload-button {
+            margin-right: 10px;
+            border: 1px solid var(--ring);
+            border-radius: 10px;
+            padding: 6px 12px;
+            font-family: inherit;
+            font-size: 13px;
+            font-weight: 700;
+            cursor: pointer;
+            color: #fff;
+            background: linear-gradient(180deg, #5b73ff, #4c67ff);
+            box-shadow: 0 6px 14px rgba(76, 103, 255, 0.24);
+            transition: transform 0.15s ease, box-shadow 0.15s ease;
+        }
+        input[type="file"]::-webkit-file-upload-button:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 8px 18px rgba(76, 103, 255, 0.32);
+        }
+        body.theme-dark input[type="file"] {
+            color: rgba(232, 240, 255, 0.84);
+            border-color: rgba(157, 178, 255, 0.42);
+            background: rgba(25, 36, 64, 0.98);
+        }
+        body.theme-dark input[type="file"]::file-selector-button,
+        body.theme-dark input[type="file"]::-webkit-file-upload-button {
+            color: #eef3ff;
+            background: linear-gradient(180deg, #6f89ff, #5d79ff);
+            border-color: rgba(157, 178, 255, 0.52);
         }
         .timeline {
             display: grid;
@@ -1053,9 +1211,9 @@
                         {% endif %}
                         <a href="{% url 'equipment_list' %}">{% ui_text "Оборудование" "Equipment" %}</a>
                         <a href="{% url 'inventory_search' %}">{% ui_text "Поиск" "Search" %}</a>
+                        <a href="{% url 'about_site' %}">{% ui_text "О сайте" "About" %}</a>
                         <a href="{% url 'request_history' %}">{% ui_text "Заявки" "Requests" %}</a>
-                        <a href="{% url 'usage_history' %}">{% ui_text "Списания" "Usage" %}</a>
-                        <a href="{% url 'checkouts' %}">{% ui_text "Выдачи" "Checkouts" %}</a>
+                        <a href="{% url 'usage_history' %}">{% ui_text "Выдача расходуемого" "Consumable usage" %}</a>
                         <a href="{% url 'direct_messages' %}">{% ui_text "Сообщения" "Messages" %}</a>
                         <a href="{% url 'workplaces' %}">{% ui_text "Рабочие места" "Workplaces" %}</a>
                         <a href="{% url 'cabinets' %}">{% ui_text "Кабинеты" "Cabinets" %}</a>
@@ -1133,8 +1291,7 @@
                     <div class="hotkey-grid">
                         <div class="hotkey-item"><code>G</code><code>E</code> {% ui_text "Оборудование" "Equipment" %}</div>
                         <div class="hotkey-item"><code>G</code><code>R</code> {% ui_text "Заявки" "Requests" %}</div>
-                        <div class="hotkey-item"><code>G</code><code>U</code> {% ui_text "Списания" "Usage" %}</div>
-                        <div class="hotkey-item"><code>G</code><code>C</code> {% ui_text "Выдачи" "Checkouts" %}</div>
+                        <div class="hotkey-item"><code>G</code><code>U</code> {% ui_text "Выдача расходуемого" "Consumable usage" %}</div>
                         <div class="hotkey-item"><code>G</code><code>S</code> {% ui_text "Поиск" "Search" %}</div>
                         <div class="hotkey-item"><code>N</code><code>R</code> {% ui_text "Новая заявка" "New request" %}</div>
                         <div class="hotkey-item"><code>?</code> {% ui_text "Показать или скрыть подсказку" "Show or hide help" %}</div>
@@ -1154,7 +1311,6 @@
                 "ge": "{% url 'equipment_list' %}",
                 "gr": "{% url 'request_history' %}",
                 "gu": "{% url 'usage_history' %}",
-                "gc": "{% url 'checkouts' %}",
                 "gs": "{% url 'inventory_search' %}",
                 "nr": "{% url 'request_create' %}",
             };
@@ -1166,7 +1322,6 @@
                 KeyE: "e",
                 KeyR: "r",
                 KeyU: "u",
-                KeyC: "c",
                 KeyS: "s",
             };
 

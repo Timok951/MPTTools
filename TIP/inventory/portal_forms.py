@@ -12,9 +12,19 @@ def _model_fields(model, omit=("deleted_at",)):
 
 
 class PortalEquipmentForm(forms.ModelForm):
+    VISIBLE_STATUS_CHOICES = (
+        ("in_stock", "На складе"),
+        ("repair", "В ремонте"),
+        ("retired", "Списано"),
+    )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["status"].choices = self.VISIBLE_STATUS_CHOICES
+
     class Meta:
         model = Equipment
-        fields = _model_fields(Equipment, omit=("deleted_at", "cabinet"))
+        fields = _model_fields(Equipment, omit=("deleted_at", "cabinet", "quantity_available"))
         labels = {
             "name": "Название",
             "inventory_number": "Инвентарный номер",
@@ -25,7 +35,6 @@ class PortalEquipmentForm(forms.ModelForm):
             "is_consumable": "Это расходник",
             "status": "Статус",
             "quantity_total": "Количество всего",
-            "quantity_available": "Количество доступно",
             "low_stock_threshold": "Порог остатка",
             "purchase_date": "Дата покупки",
             "warranty_end": "Гарантия до",
@@ -59,11 +68,46 @@ class PortalEquipmentCategoryForm(forms.ModelForm):
 
 
 class PortalWorkplaceForm(forms.ModelForm):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["location"].widget.attrs["readonly"] = "readonly"
+        existing_class = self.fields["location"].widget.attrs.get("class", "").strip()
+        self.fields["location"].widget.attrs["class"] = f"{existing_class} input-locked".strip()
+        self.fields["location"].help_text = "Поле заполняется автоматически через карту."
+
     class Meta:
         model = Workplace
-        fields = _model_fields(Workplace)
-        labels = {"name": "Название", "location": "Локация", "description": "Описание"}
-        widgets = {"description": forms.Textarea(attrs={"rows": 4})}
+        fields = _model_fields(Workplace, omit=("map_address",))
+        labels = {
+            "name": "Название",
+            "location": "Локация",
+            "latitude": "Широта",
+            "longitude": "Долгота",
+            "description": "Описание",
+        }
+        widgets = {
+            "description": forms.Textarea(attrs={"rows": 4}),
+            "location": forms.TextInput(attrs={"placeholder": "Адрес будет заполнен с карты"}),
+            "latitude": forms.NumberInput(attrs={"step": "0.000001", "placeholder": "55.755826"}),
+            "longitude": forms.NumberInput(attrs={"step": "0.000001", "placeholder": "37.617300"}),
+        }
+
+    def clean(self):
+        cleaned = super().clean()
+        location = (cleaned.get("location") or "").strip()
+        latitude = cleaned.get("latitude")
+        longitude = cleaned.get("longitude")
+        if location and (latitude is None or longitude is None):
+            self.add_error("location", "Адрес должен быть выбран на карте (с координатами).")
+        return cleaned
+
+    def save(self, commit=True):
+        instance = super().save(commit=False)
+        instance.map_address = (self.cleaned_data.get("location") or "").strip()
+        if commit:
+            instance.save()
+            self.save_m2m()
+        return instance
 
 
 class PortalCabinetForm(forms.ModelForm):

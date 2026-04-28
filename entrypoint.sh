@@ -49,6 +49,20 @@ PY
 echo "Running migrations..."
 python manage.py migrate --noinput
 
+echo "Initializing default role groups..."
+python manage.py init_roles
+
+RUN_TESTS_ON_START="${RUN_TESTS_ON_START:-true}"
+TEST_SUITE_ON_START="${TEST_SUITE_ON_START:-inventory.tests}"
+
+if [[ "${RUN_TESTS_ON_START,,}" == "true" || "${RUN_TESTS_ON_START}" == "1" || "${RUN_TESTS_ON_START,,}" == "yes" ]]; then
+    echo "Running test suite before server start: ${TEST_SUITE_ON_START}"
+    python manage.py test "${TEST_SUITE_ON_START}" --noinput
+    echo "Test suite completed successfully."
+else
+    echo "Skipping test suite on startup (RUN_TESTS_ON_START=${RUN_TESTS_ON_START})."
+fi
+
 if [[ -n "${DJANGO_SUPERUSER_USERNAME:-}" && -n "${DJANGO_SUPERUSER_PASSWORD:-}" ]]; then
     echo "Ensuring Django superuser exists..."
     python manage.py shell <<'PY'

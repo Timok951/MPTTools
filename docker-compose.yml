@@ -39,6 +39,8 @@ services:
       EMAIL_USE_TLS: ${EMAIL_USE_TLS:-false}
       EMAIL_USE_SSL: ${EMAIL_USE_SSL:-false}
       DEFAULT_FROM_EMAIL: ${DEFAULT_FROM_EMAIL:-noreply@mpt-tools.local}
+      RUN_TESTS_ON_START: ${RUN_TESTS_ON_START:-true}
+      TEST_SUITE_ON_START: ${TEST_SUITE_ON_START:-inventory.tests}
     ports:
       - "${MPTTOOLS_WEB_PORT:-18080}:8000"
     depends_on:

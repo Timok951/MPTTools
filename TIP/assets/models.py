@@ -1,11 +1,9 @@
-from datetime import timedelta
-
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import models
 from django.utils import timezone
 
-from core.models import Cabinet, EquipmentCategory, SoftDeleteModel, Supplier, Workplace
+from core.models import Cabinet, EquipmentCategory, SoftDeleteModel, Workplace
 
 STATUS_IN_STOCK = "in_stock"
 STATUS_ASSIGNED = "assigned"
@@ -26,7 +24,6 @@ class Equipment(SoftDeleteModel):
     name = models.CharField(max_length=200)
     inventory_number = models.CharField(max_length=100, unique=True)
     category = models.ForeignKey(EquipmentCategory, on_delete=models.SET_NULL, null=True, blank=True)
-    supplier = models.ForeignKey(Supplier, on_delete=models.SET_NULL, null=True, blank=True)
     photo = models.ImageField(upload_to="equipment/", null=True, blank=True, verbose_name="Фото")
     serial_number = models.CharField(max_length=100, blank=True)
     model = models.CharField(max_length=200, blank=True)
@@ -39,8 +36,6 @@ class Equipment(SoftDeleteModel):
     low_stock_threshold = models.PositiveIntegerField(default=0)
     purchase_date = models.DateField(null=True, blank=True)
     warranty_end = models.DateField(null=True, blank=True)
-    last_inventory_at = models.DateField(null=True, blank=True)
-    inventory_interval_days = models.PositiveIntegerField(default=180)
     notes = models.TextField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -54,19 +49,6 @@ class Equipment(SoftDeleteModel):
     @property
     def is_low_stock(self) -> bool:
         return self.quantity_available <= self.low_stock_threshold
-
-    @property
-    def inventory_due_at(self):
-        if not self.last_inventory_at:
-            return None
-        return self.last_inventory_at + timedelta(days=self.inventory_interval_days)
-
-    @property
-    def is_inventory_due(self) -> bool:
-        due_at = self.inventory_due_at
-        if not due_at:
-            return True
-        return due_at <= timezone.now().date()
 
     def clean(self) -> None:
         if self.quantity_available > self.quantity_total:

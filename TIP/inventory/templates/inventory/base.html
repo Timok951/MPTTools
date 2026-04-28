@@ -11,29 +11,29 @@
     <style>
         :root {
             color-scheme: light;
-            --bg: #f0f0f0;
-            --panel: #f8f8fb;
-            --panel-soft: rgba(249, 217, 73, 0.18);
-            --surface: rgba(255, 255, 255, 0.72);
-            --surface-strong: rgba(255, 255, 255, 0.84);
+            --bg: #f5f7fb;
+            --panel: #ffffff;
+            --panel-soft: rgba(76, 103, 255, 0.08);
+            --surface: rgba(255, 255, 255, 0.88);
+            --surface-strong: #ffffff;
             --surface-solid: #ffffff;
-            --ink: #3c486b;
-            --muted: rgba(60, 72, 107, 0.72);
-            --accent: #f45050;
-            --accent-2: #3c486b;
-            --accent-3: #f9d949;
-            --warn: #f9d949;
-            --border: rgba(60, 72, 107, 0.14);
-            --ring: rgba(249, 217, 73, 0.72);
-            --shadow: 0 18px 40px rgba(60, 72, 107, 0.12);
+            --ink: #1f2a44;
+            --muted: rgba(31, 42, 68, 0.62);
+            --accent: #4c67ff;
+            --accent-2: #2d3f7a;
+            --accent-3: #9db2ff;
+            --warn: #f59f00;
+            --border: rgba(31, 42, 68, 0.1);
+            --ring: rgba(76, 103, 255, 0.36);
+            --shadow: 0 14px 30px rgba(31, 42, 68, 0.08);
         }
         * { box-sizing: border-box; }
         body {
             margin: 0;
             font-family: "Space Grotesk", "Segoe UI", sans-serif;
             background:
-                radial-gradient(circle at 12% 0%, rgba(249, 217, 73, 0.34) 0%, transparent 38%),
-                radial-gradient(circle at 92% 12%, rgba(244, 80, 80, 0.16) 0%, transparent 34%),
+                radial-gradient(circle at 8% 0%, rgba(157, 178, 255, 0.26) 0%, transparent 34%),
+                radial-gradient(circle at 92% 10%, rgba(76, 103, 255, 0.1) 0%, transparent 30%),
                 var(--bg);
             color: var(--ink);
         }
@@ -54,27 +54,27 @@
         }
         body.theme-dark {
             color-scheme: dark;
-            --bg: #0f1524;
-            --panel: #151d31;
-            --panel-soft: rgba(249, 217, 73, 0.12);
-            --surface: rgba(24, 34, 58, 0.88);
-            --surface-strong: rgba(30, 41, 68, 0.96);
-            --surface-solid: #1f2a44;
-            --ink: #eef2ff;
-            --muted: rgba(224, 231, 255, 0.72);
-            --accent: #ff6b6b;
-            --accent-2: #f9d949;
-            --accent-3: #8ea6ff;
-            --warn: #f9d949;
-            --border: rgba(142, 166, 255, 0.22);
-            --ring: rgba(249, 217, 73, 0.28);
-            --shadow: 0 22px 48px rgba(0, 0, 0, 0.34);
+            --bg: #0b1020;
+            --panel: #141c33;
+            --panel-soft: rgba(92, 122, 255, 0.18);
+            --surface: rgba(25, 36, 64, 0.96);
+            --surface-strong: rgba(30, 44, 77, 0.98);
+            --surface-solid: #23345f;
+            --ink: #f3f7ff;
+            --muted: rgba(226, 235, 255, 0.86);
+            --accent: #7d96ff;
+            --accent-2: #dce5ff;
+            --accent-3: #9db2ff;
+            --warn: #ffc857;
+            --border: rgba(157, 178, 255, 0.34);
+            --ring: rgba(125, 150, 255, 0.45);
+            --shadow: 0 20px 44px rgba(0, 0, 0, 0.42);
         }
         body.theme-dark {
             background:
-                radial-gradient(circle at 14% 0%, rgba(249, 217, 73, 0.12) 0%, transparent 34%),
-                radial-gradient(circle at 88% 10%, rgba(142, 166, 255, 0.18) 0%, transparent 30%),
-                linear-gradient(180deg, #121a2c 0%, #0c1220 100%);
+                radial-gradient(circle at 14% 0%, rgba(125, 150, 255, 0.2) 0%, transparent 34%),
+                radial-gradient(circle at 88% 10%, rgba(76, 103, 255, 0.18) 0%, transparent 30%),
+                linear-gradient(180deg, #0f1730 0%, #090f1d 100%);
         }
         .page {
             min-height: 100vh;
@@ -85,38 +85,38 @@
             position: sticky;
             top: 0;
             z-index: 10;
-            background: color-mix(in srgb, var(--bg) 88%, white 12%);
+            background: color-mix(in srgb, var(--bg) 92%, white 8%);
             backdrop-filter: blur(10px);
             border-bottom: 1px solid var(--border);
         }
         .topbar {
             max-width: 1200px;
             margin: 0 auto;
-            padding: 20px 24px;
+            padding: 6px 12px;
             display: flex;
             flex-wrap: wrap;
-            gap: 16px;
+            gap: 8px;
             align-items: center;
             justify-content: space-between;
         }
         .header-main {
             display: flex;
             flex-wrap: wrap;
-            gap: 12px;
+            gap: 6px;
             align-items: center;
             flex: 1 1 760px;
         }
         .header-tools {
             display: flex;
             flex-wrap: wrap;
-            gap: 10px;
+            gap: 6px;
             align-items: center;
             justify-content: flex-end;
             flex: 1 1 260px;
         }
         .header-tools a.admin-quick {
             text-decoration: none;
-            padding: 7px 12px;
+            padding: 4px 9px;
             border-radius: 999px;
             border: 1px solid var(--accent);
             background: linear-gradient(180deg, var(--accent), #db4444);
@@ -133,34 +133,36 @@
         }
         body.theme-dark .header-tools a.admin-quick-muted {
             color: var(--ink);
+            border-color: var(--border);
+            background: var(--surface-strong);
         }
         .brand {
             display: grid;
-            gap: 6px;
+            gap: 2px;
         }
         .brand h1 {
             margin: 0;
             font-family: "DM Serif Display", serif;
-            font-size: 24px;
+            font-size: 16px;
             letter-spacing: 0.5px;
         }
         .brand span {
             color: var(--muted);
-            font-size: 13px;
+            font-size: 10px;
         }
         nav {
             display: flex;
             flex-wrap: wrap;
-            gap: 8px;
+            gap: 4px;
         }
         nav a {
             text-decoration: none;
             color: var(--ink);
-            padding: 6px 12px;
-            border-radius: 999px;
+            padding: 3px 8px;
+            border-radius: 10px;
             border: 1px solid var(--border);
             background: var(--surface);
-            font-size: 13px;
+            font-size: 12px;
             font-weight: 600;
             transition: all 0.2s ease;
         }
@@ -169,10 +171,18 @@
             color: var(--accent-2);
             transform: translateY(-1px);
         }
+        body.theme-dark nav a {
+            color: #eaf0ff;
+            background: rgba(26, 38, 68, 0.96);
+        }
+        body.theme-dark nav a:hover {
+            background: rgba(38, 56, 98, 0.96);
+            color: #ffffff;
+        }
         .user-chip {
             background: rgba(249, 217, 73, 0.2);
             border: 1px solid var(--border);
-            padding: 6px 14px;
+            padding: 3px 8px;
             border-radius: 999px;
             font-size: 12px;
             font-weight: 600;
@@ -186,8 +196,8 @@
         .switch-btn {
             display: inline-flex;
             align-items: center;
-            gap: 10px;
-            padding: 8px 12px;
+            gap: 7px;
+            padding: 5px 9px;
             border-radius: 999px;
             border: 1px solid var(--border);
             background: var(--surface);
@@ -204,12 +214,12 @@
         }
         .switch-btn.is-on {
             border-color: var(--accent);
-            background: rgba(244, 80, 80, 0.12);
+            background: rgba(125, 150, 255, 0.18);
             color: var(--accent);
         }
         .switch-track {
-            width: 34px;
-            height: 20px;
+            width: 30px;
+            height: 18px;
             border-radius: 999px;
             background: rgba(60, 72, 107, 0.16);
             padding: 2px;
@@ -221,8 +231,8 @@
             background: rgba(244, 80, 80, 0.28);
         }
         .switch-dot {
-            width: 16px;
-            height: 16px;
+            width: 14px;
+            height: 14px;
             border-radius: 999px;
             background: var(--surface-solid);
             box-shadow: 0 2px 6px rgba(60, 72, 107, 0.2);
@@ -230,7 +240,7 @@
             transition: transform 0.15s ease;
         }
         .switch-btn.is-on .switch-dot {
-            transform: translateX(14px);
+            transform: translateX(12px);
         }
         .switch-copy {
             display: grid;
@@ -241,11 +251,11 @@
             line-height: 1.1;
         }
         .switch-state {
-            font-size: 11px;
+            font-size: 10px;
             color: var(--muted);
         }
         .switch-btn.is-on .switch-state {
-            color: rgba(244, 80, 80, 0.82);
+            color: var(--accent);
         }
         main {
             flex: 1;
@@ -288,11 +298,15 @@
         .card {
             background: var(--panel);
             border: 1px solid var(--border);
-            border-radius: 18px;
-            padding: 18px;
+            border-radius: 16px;
+            padding: 14px;
             box-shadow: var(--shadow);
             margin-bottom: 18px;
             animation: rise 0.4s ease both;
+        }
+        .card.compact-widget {
+            border-radius: 14px;
+            padding: 12px;
         }
         @keyframes rise {
             from { opacity: 0; transform: translateY(8px); }
@@ -323,8 +337,8 @@
             gap: 6px;
             padding: 4px 10px;
             border-radius: 999px;
-            background: rgba(249, 217, 73, 0.2);
-            color: var(--accent-2);
+            background: rgba(76, 103, 255, 0.12);
+            color: var(--accent);
             font-size: 12px;
             font-weight: 700;
             text-transform: uppercase;
@@ -350,6 +364,31 @@
         .form-field {
             display: grid;
             gap: 6px;
+        }
+        .checkbox-field {
+            display: grid;
+            gap: 8px;
+            align-content: start;
+            padding-top: 18px;
+        }
+        .checkbox-control {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            margin: 0;
+        }
+        .checkbox-control input[type="checkbox"] {
+            width: 22px;
+            height: 22px;
+            margin: 0;
+            accent-color: var(--accent);
+            cursor: pointer;
+        }
+        .checkbox-control span {
+            line-height: 1.2;
         }
         .form-field.full {
             grid-column: 1 / -1;
@@ -462,13 +501,73 @@
             margin-right: 6px;
         }
         .stat {
-            background: linear-gradient(135deg, rgba(249, 217, 73, 0.16), var(--surface-strong));
+            background: linear-gradient(135deg, rgba(76, 103, 255, 0.08), var(--surface-strong));
             border: 1px solid var(--border);
             border-radius: 16px;
             padding: 14px;
+            position: relative;
+            overflow: hidden;
+        }
+        .stat::before {
+            content: "";
+            position: absolute;
+            inset: 0 auto 0 0;
+            width: 4px;
+            background: linear-gradient(180deg, var(--accent), var(--accent-3));
         }
         .stat strong {
             font-size: 20px;
+        }
+        .kpi-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+            gap: 12px;
+        }
+        .kpi-card {
+            background: var(--surface-strong);
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            padding: 12px;
+            display: grid;
+            gap: 8px;
+            box-shadow: 0 10px 20px rgba(31, 42, 68, 0.06);
+        }
+        .kpi-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+        }
+        .kpi-label {
+            color: var(--muted);
+            font-size: 12px;
+            font-weight: 600;
+        }
+        .kpi-value {
+            font-size: 26px;
+            line-height: 1;
+            font-weight: 700;
+            color: var(--ink);
+        }
+        .kpi-icon {
+            width: 34px;
+            height: 34px;
+            border-radius: 10px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(76, 103, 255, 0.15);
+            color: var(--accent);
+            font-weight: 700;
+            font-size: 15px;
+        }
+        body.theme-dark .kpi-card {
+            background: rgba(25, 36, 64, 0.98);
+            box-shadow: 0 12px 24px rgba(0, 0, 0, 0.32);
+        }
+        body.theme-dark .kpi-icon {
+            background: rgba(125, 150, 255, 0.24);
+            color: #f1f5ff;
         }
         .badge {
             display: inline-flex;
@@ -477,19 +576,19 @@
             padding: 4px 10px;
             border-radius: 999px;
             font-size: 12px;
-            background: rgba(249, 217, 73, 0.22);
+            background: rgba(76, 103, 255, 0.12);
             color: var(--accent-2);
             font-weight: 600;
         }
         .badge.warn {
-            background: rgba(244, 80, 80, 0.14);
-            color: var(--accent);
+            background: rgba(245, 159, 0, 0.14);
+            color: #c97a00;
         }
         body.theme-dark .badge,
         body.theme-dark .kicker,
         body.theme-dark .pagination-links span.current {
-            background: rgba(249, 217, 73, 0.16);
-            color: var(--accent-2);
+            background: rgba(125, 150, 255, 0.2);
+            color: #eef3ff;
         }
         .actions {
             display: flex;
@@ -501,18 +600,18 @@
             text-decoration: none;
             border: none;
             padding: 8px 14px;
-            border-radius: 10px;
+            border-radius: 12px;
             font-weight: 600;
-            background: linear-gradient(180deg, var(--accent), #db4444);
+            background: linear-gradient(180deg, #5b73ff, #4c67ff);
             color: white;
             cursor: pointer;
-            box-shadow: 0 8px 18px rgba(244, 80, 80, 0.24);
+            box-shadow: 0 8px 18px rgba(76, 103, 255, 0.28);
             transition: transform 0.15s ease, box-shadow 0.15s ease;
         }
         .actions a:hover,
         .btn:hover {
             transform: translateY(-1px);
-            box-shadow: 0 10px 22px rgba(244, 80, 80, 0.3);
+            box-shadow: 0 10px 22px rgba(76, 103, 255, 0.34);
         }
         .actions a.secondary,
         .btn.secondary,
@@ -522,16 +621,32 @@
             border: 1px solid var(--ring);
             box-shadow: none;
         }
+        body.theme-dark .actions a.secondary,
+        body.theme-dark .btn.secondary,
+        body.theme-dark a.secondary {
+            background: rgba(31, 46, 82, 0.95);
+            color: #eef3ff;
+        }
         table {
             width: 100%;
             border-collapse: collapse;
             margin-top: 12px;
             font-size: 14px;
+            background: var(--surface-strong);
+            border-radius: 12px;
+            overflow: hidden;
         }
         th, td {
             text-align: left;
             padding: 10px 8px;
             border-bottom: 1px solid var(--border);
+        }
+        thead th {
+            background: #f1f4ff;
+        }
+        body.theme-dark thead th {
+            background: #1d2a4d;
+            color: #eff4ff;
         }
         tbody tr:hover {
             background: var(--panel-soft);
@@ -561,12 +676,13 @@
         input:focus, select:focus, textarea:focus {
             outline: none;
             border-color: var(--accent);
-            box-shadow: 0 0 0 3px rgba(244, 80, 80, 0.14);
+            box-shadow: 0 0 0 3px rgba(76, 103, 255, 0.18);
         }
         body.theme-dark input,
         body.theme-dark select,
         body.theme-dark textarea {
             color: var(--ink);
+            border-color: rgba(157, 178, 255, 0.42);
         }
         body.theme-dark input::placeholder,
         body.theme-dark textarea::placeholder {
@@ -598,9 +714,9 @@
         }
         .equipment-card-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-            gap: 18px;
-            margin-top: 16px;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 12px;
+            margin-top: 12px;
         }
         .equipment-card {
             overflow: hidden;
@@ -608,7 +724,7 @@
         }
         .equipment-card-media {
             position: relative;
-            aspect-ratio: 4 / 3;
+            aspect-ratio: 16 / 10;
             background: linear-gradient(135deg, var(--surface-strong), var(--panel-soft));
             border-bottom: 1px solid var(--border);
         }
@@ -635,22 +751,22 @@
             bottom: 10px;
         }
         .equipment-card-body {
-            padding: 14px;
+            padding: 10px;
             display: grid;
-            gap: 10px;
+            gap: 8px;
         }
         .equipment-card-title {
             margin: 0;
-            font-size: 16px;
+            font-size: 14px;
         }
         .equipment-card-subtitle {
-            font-size: 13px;
+            font-size: 12px;
             color: var(--muted);
         }
         .equipment-card-meta {
             display: grid;
-            gap: 8px;
-            font-size: 13px;
+            gap: 6px;
+            font-size: 12px;
         }
         .equipment-card-row {
             display: flex;
@@ -776,11 +892,9 @@
                         <a href="{% url 'request_history' %}">{% ui_text "Заявки" "Requests" %}</a>
                         <a href="{% url 'usage_history' %}">{% ui_text "Списания" "Usage" %}</a>
                         <a href="{% url 'checkouts' %}">{% ui_text "Выдачи" "Checkouts" %}</a>
-                        <a href="{% url 'timer_panel' %}">{% ui_text "Таймеры" "Timers" %}</a>
                         <a href="{% url 'direct_messages' %}">{% ui_text "Сообщения" "Messages" %}</a>
                         <a href="{% url 'workplaces' %}">{% ui_text "Рабочие места" "Workplaces" %}</a>
                         <a href="{% url 'cabinets' %}">{% ui_text "Кабинеты" "Cabinets" %}</a>
-                        <a href="{% url 'suppliers' %}">{% ui_text "Поставщики" "Suppliers" %}</a>
                         {% if user|has_group:"Administrator" %}
                         <a href="{% url 'history' %}">{% ui_text "История" "History" %}</a>
                         {% endif %}
@@ -857,10 +971,8 @@
                         <div class="hotkey-item"><code>G</code><code>R</code> {% ui_text "Заявки" "Requests" %}</div>
                         <div class="hotkey-item"><code>G</code><code>U</code> {% ui_text "Списания" "Usage" %}</div>
                         <div class="hotkey-item"><code>G</code><code>C</code> {% ui_text "Выдачи" "Checkouts" %}</div>
-                        <div class="hotkey-item"><code>G</code><code>T</code> {% ui_text "Таймеры" "Timers" %}</div>
                         <div class="hotkey-item"><code>G</code><code>S</code> {% ui_text "Поиск" "Search" %}</div>
                         <div class="hotkey-item"><code>N</code><code>R</code> {% ui_text "Новая заявка" "New request" %}</div>
-                        <div class="hotkey-item"><code>N</code><code>T</code> {% ui_text "Новый таймер" "New timer" %}</div>
                         <div class="hotkey-item"><code>?</code> {% ui_text "Показать или скрыть подсказку" "Show or hide help" %}</div>
                     </div>
                 </div>
@@ -879,10 +991,8 @@
                 "gr": "{% url 'request_history' %}",
                 "gu": "{% url 'usage_history' %}",
                 "gc": "{% url 'checkouts' %}",
-                "gt": "{% url 'timer_panel' %}",
                 "gs": "{% url 'inventory_search' %}",
                 "nr": "{% url 'request_create' %}",
-                "nt": "{% url 'timer_create' %}",
             };
             const leaderCodes = {
                 KeyG: "g",
@@ -893,7 +1003,6 @@
                 KeyR: "r",
                 KeyU: "u",
                 KeyC: "c",
-                KeyT: "t",
                 KeyS: "s",
             };
 

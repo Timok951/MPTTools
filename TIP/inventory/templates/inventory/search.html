@@ -85,12 +85,6 @@
             {% for item in cabinet_results %}<li>{{ item.code }} - {{ item.name }}</li>{% empty %}<li class="muted">{% trans "No records." %}</li>{% endfor %}
         </ul>
     </div>
-    <div class="card">
-        <h3>{% trans "Suppliers" %}</h3>
-        <ul>
-            {% for item in supplier_results %}<li>{{ item.name }}</li>{% empty %}<li class="muted">{% trans "No records." %}</li>{% endfor %}
-        </ul>
-    </div>
 </div>
 {% endif %}
 {% endblock %}

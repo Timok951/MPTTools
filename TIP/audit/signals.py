@@ -1,15 +1,14 @@
-﻿from django.contrib.contenttypes.models import ContentType
+from django.contrib.contenttypes.models import ContentType
 from django.db.models.signals import post_save, pre_save
 from django.dispatch import receiver
 
 from assets.models import Equipment, EquipmentCheckout, InventoryAdjustment
-from core.models import Cabinet, EquipmentCategory, Supplier, Workplace, WorkplaceMember
-from operations.models import EquipmentRequest, MaterialUsage, WorkTimer
+from core.models import Cabinet, EquipmentCategory, Workplace, WorkplaceMember
+from operations.models import EquipmentRequest, MaterialUsage
 
 from .models import AuditLog
 
 TRACKED_MODELS = (
-    Supplier,
     EquipmentCategory,
     Workplace,
     Cabinet,
@@ -19,7 +18,6 @@ TRACKED_MODELS = (
     EquipmentCheckout,
     EquipmentRequest,
     MaterialUsage,
-    WorkTimer,
 )
 
 IGNORED_FIELDS = {"updated_at"}

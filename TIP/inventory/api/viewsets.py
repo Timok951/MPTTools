@@ -6,7 +6,7 @@ from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.response import Response
 
 from assets.models import Equipment, EquipmentCheckout, InventoryAdjustment
-from core.models import Cabinet, EquipmentCategory, Supplier, Workplace
+from core.models import Cabinet, EquipmentCategory, Workplace
 from inventory.authz import GROUP_ADMIN, GROUP_BUILDER, GROUP_SYSADMIN, GROUP_WAREHOUSE, user_in_group
 from operations.models import (
     REQUEST_APPROVED,
@@ -15,7 +15,6 @@ from operations.models import (
     REQUEST_PENDING,
     EquipmentRequest,
     MaterialUsage,
-    WorkTimer,
 )
 
 from .permissions import ALL_API_ROLES, CanAccessInventoryApi
@@ -27,8 +26,6 @@ from .serializers import (
     EquipmentRequestSerializer,
     EquipmentSerializer,
     MaterialUsageSerializer,
-    SupplierSerializer,
-    WorkTimerSerializer,
     WorkplaceSerializer,
 )
 
@@ -126,13 +123,11 @@ class EquipmentViewSet(InventoryModelViewSet):
         "low_stock_threshold",
         "workplace",
         "cabinet",
-        "last_inventory_at",
-        "inventory_interval_days",
         "notes",
     }
 
     def get_queryset(self):
-        return Equipment.objects.select_related("category", "supplier", "workplace", "cabinet").order_by("name", "inventory_number")
+        return Equipment.objects.select_related("category", "workplace", "cabinet").order_by("name", "inventory_number")
 
     def perform_create(self, serializer):
         self._save_with_actor(serializer)
@@ -161,11 +156,6 @@ class CabinetViewSet(InventoryModelViewSet):
 class EquipmentCategoryViewSet(InventoryModelViewSet):
     queryset = EquipmentCategory.objects.order_by("name")
     serializer_class = EquipmentCategorySerializer
-
-
-class SupplierViewSet(InventoryModelViewSet):
-    queryset = Supplier.objects.order_by("name")
-    serializer_class = SupplierSerializer
 
 
 class EquipmentRequestViewSet(InventoryModelViewSet):
@@ -349,26 +339,3 @@ class EquipmentCheckoutViewSet(InventoryModelViewSet):
             super().perform_destroy(instance)
 
 
-class WorkTimerViewSet(InventoryModelViewSet):
-    queryset = WorkTimer.objects.select_related("user", "workplace", "equipment").order_by("-started_at")
-    serializer_class = WorkTimerSerializer
-    role_matrix = {
-        "read": ALL_API_ROLES,
-        "create": (GROUP_ADMIN, GROUP_SYSADMIN, GROUP_BUILDER),
-        "update": (GROUP_ADMIN, GROUP_SYSADMIN, GROUP_BUILDER),
-        "delete": (GROUP_ADMIN,),
-    }
-    privileged_read_roles = (GROUP_WAREHOUSE,)
-    privileged_update_roles = (GROUP_ADMIN,)
-    owner_field = "user"
-    owner_read_roles = (GROUP_SYSADMIN, GROUP_BUILDER)
-    owner_update_roles = (GROUP_SYSADMIN, GROUP_BUILDER)
-
-    def scope_queryset_for_user(self, queryset):
-        return queryset.filter(user=self.request.user)
-
-    def perform_create(self, serializer):
-        self._save_with_actor(serializer, user=self.request.user)
-
-    def perform_update(self, serializer):
-        self._save_with_actor(serializer)

@@ -12,8 +12,6 @@ from inventory.api.viewsets import (
     EquipmentRequestViewSet,
     EquipmentViewSet,
     MaterialUsageViewSet,
-    SupplierViewSet,
-    WorkTimerViewSet,
     WorkplaceViewSet,
 )
 
@@ -22,12 +20,10 @@ router.register("equipment", EquipmentViewSet, basename="api-equipment")
 router.register("workplaces", WorkplaceViewSet, basename="api-workplace")
 router.register("cabinets", CabinetViewSet, basename="api-cabinet")
 router.register("categories", EquipmentCategoryViewSet, basename="api-category")
-router.register("suppliers", SupplierViewSet, basename="api-supplier")
 router.register("requests", EquipmentRequestViewSet, basename="api-request")
 router.register("usage", MaterialUsageViewSet, basename="api-usage")
 router.register("adjustments", InventoryAdjustmentViewSet, basename="api-adjustment")
 router.register("checkouts", EquipmentCheckoutViewSet, basename="api-checkout")
-router.register("timers", WorkTimerViewSet, basename="api-timer")
 
 schema_view = get_schema_view(
     title="TIP Inventory API",

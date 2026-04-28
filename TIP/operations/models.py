@@ -61,6 +61,39 @@ class EquipmentRequest(SoftDeleteModel):
             raise ValidationError("Requested quantity exceeds available stock.")
 
 
+class EquipmentRequestMessage(models.Model):
+    request = models.ForeignKey(EquipmentRequest, on_delete=models.CASCADE, related_name="messages")
+    author = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="request_messages")
+    body = models.TextField()
+    created_at = models.DateTimeField(default=timezone.now, db_index=True)
+
+    class Meta:
+        ordering = ["created_at", "id"]
+
+    def __str__(self) -> str:
+        return f"Request message #{self.pk} for request #{self.request_id}"
+
+
+class EquipmentRequestPhoto(models.Model):
+    request = models.ForeignKey(EquipmentRequest, on_delete=models.CASCADE, related_name="photos")
+    image = models.ImageField(upload_to="requests/")
+    caption = models.CharField(max_length=200, blank=True)
+    uploaded_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="uploaded_request_photos",
+    )
+    uploaded_at = models.DateTimeField(default=timezone.now, db_index=True)
+
+    class Meta:
+        ordering = ["-uploaded_at", "-id"]
+
+    def __str__(self) -> str:
+        return f"Request photo #{self.pk} for request #{self.request_id}"
+
+
 class MaterialUsage(SoftDeleteModel):
     equipment = models.ForeignKey(Equipment, on_delete=models.SET_NULL, null=True, blank=True)
     workplace = models.ForeignKey(Workplace, on_delete=models.SET_NULL, null=True, blank=True)
@@ -81,26 +114,3 @@ class MaterialUsage(SoftDeleteModel):
             raise ValidationError("Usage quantity exceeds available stock.")
 
 
-class WorkTimer(SoftDeleteModel):
-    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
-    workplace = models.ForeignKey(Workplace, on_delete=models.SET_NULL, null=True, blank=True)
-    equipment = models.ForeignKey(Equipment, on_delete=models.SET_NULL, null=True, blank=True)
-    started_at = models.DateTimeField(default=timezone.now)
-    ended_at = models.DateTimeField(null=True, blank=True)
-    note = models.TextField(blank=True)
-
-    class Meta:
-        ordering = ["-started_at"]
-
-    def __str__(self) -> str:
-        return f"Timer #{self.pk} ({self.user})"
-
-    @property
-    def duration_seconds(self) -> int:
-        if not self.ended_at:
-            return 0
-        return int((self.ended_at - self.started_at).total_seconds())
-
-    def clean(self) -> None:
-        if self.ended_at and self.ended_at < self.started_at:
-            raise ValidationError("End time cannot be before start time.")

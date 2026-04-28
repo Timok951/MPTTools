@@ -2,8 +2,9 @@ from django import forms
 from django.contrib.auth.models import Group, User
 
 from assets.models import Equipment, EquipmentCheckout, InventoryAdjustment
-from core.models import Cabinet, EquipmentCategory, Supplier, Workplace, WorkplaceMember
-from operations.models import EquipmentRequest, MaterialUsage, WorkTimer
+from core.models import Cabinet, EquipmentCategory, Workplace, WorkplaceMember
+from operations.models import EquipmentRequest, MaterialUsage
+from .authz import ROLE_ALIASES
 
 
 def _model_fields(model, omit=("deleted_at",)):
@@ -18,7 +19,6 @@ class PortalEquipmentForm(forms.ModelForm):
             "name": "Название",
             "inventory_number": "Инвентарный номер",
             "category": "Категория",
-            "supplier": "Поставщик",
             "serial_number": "Серийный номер",
             "model": "Модель",
             "workplace": "Рабочее место",
@@ -29,15 +29,12 @@ class PortalEquipmentForm(forms.ModelForm):
             "low_stock_threshold": "Порог остатка",
             "purchase_date": "Дата покупки",
             "warranty_end": "Гарантия до",
-            "last_inventory_at": "Последняя инвентаризация",
-            "inventory_interval_days": "Интервал инвентаризации (дни)",
             "notes": "Примечание",
             "photo": "Фото",
         }
         widgets = {
             "purchase_date": forms.DateInput(attrs={"type": "date"}),
             "warranty_end": forms.DateInput(attrs={"type": "date"}),
-            "last_inventory_at": forms.DateInput(attrs={"type": "date"}),
             "notes": forms.Textarea(attrs={"rows": 4}),
         }
 
@@ -59,21 +56,6 @@ class PortalEquipmentCategoryForm(forms.ModelForm):
         fields = _model_fields(EquipmentCategory)
         labels = {"name": "Название", "description": "Описание"}
         widgets = {"description": forms.Textarea(attrs={"rows": 4})}
-
-
-class PortalSupplierForm(forms.ModelForm):
-    class Meta:
-        model = Supplier
-        fields = _model_fields(Supplier)
-        labels = {
-            "name": "Название",
-            "contact_name": "Контакт",
-            "phone": "Телефон",
-            "email": "Почта",
-            "address": "Адрес",
-            "notes": "Примечание",
-        }
-        widgets = {"notes": forms.Textarea(attrs={"rows": 4})}
 
 
 class PortalWorkplaceForm(forms.ModelForm):
@@ -182,25 +164,6 @@ class PortalMaterialUsageForm(forms.ModelForm):
         widgets = {"note": forms.Textarea(attrs={"rows": 3})}
 
 
-class PortalWorkTimerForm(forms.ModelForm):
-    class Meta:
-        model = WorkTimer
-        fields = _model_fields(WorkTimer)
-        labels = {
-            "user": "Пользователь",
-            "workplace": "Рабочее место",
-            "equipment": "Оборудование",
-            "started_at": "Начало",
-            "ended_at": "Конец",
-            "note": "Примечание",
-        }
-        widgets = {
-            "started_at": forms.DateTimeInput(attrs={"type": "datetime-local"}),
-            "ended_at": forms.DateTimeInput(attrs={"type": "datetime-local"}),
-            "note": forms.Textarea(attrs={"rows": 3}),
-        }
-
-
 class PortalUserForm(forms.ModelForm):
     password1 = forms.CharField(required=False, strip=False, widget=forms.PasswordInput(), label="Пароль")
     password2 = forms.CharField(required=False, strip=False, widget=forms.PasswordInput(), label="Подтверждение пароля")
@@ -229,9 +192,12 @@ class PortalUserForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields["groups"].queryset = Group.objects.filter(
-            name__in=["Administrator", "Warehouse", "Sysadmin", "Builder"]
-        ).order_by("name")
+        for role_name in ROLE_ALIASES:
+            Group.objects.get_or_create(name=role_name)
+        role_names = set(ROLE_ALIASES.keys())
+        for aliases in ROLE_ALIASES.values():
+            role_names.update(aliases)
+        self.fields["groups"].queryset = Group.objects.filter(name__in=sorted(role_names)).order_by("name")
 
     def clean(self):
         cleaned = super().clean()

@@ -1,0 +1,101 @@
+{% extends "inventory/base.html" %}
+{% load i18n %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header">
+        <div>
+            <div class="kicker">Заявка #{{ item.pk }}</div>
+            <h2>{{ item.equipment|default:"Без оборудования" }}</h2>
+            <p class="muted">Создал: {{ item.requester }} | Кол-во: {{ item.quantity }} | Статус: {{ item.get_status_display }}</p>
+        </div>
+        <div class="actions">
+            <a class="secondary" href="{% url 'request_history' %}">К списку заявок</a>
+        </div>
+    </div>
+    {% if can_quick_status %}
+    <form method="post" action="{% url 'request_update_status' request_id=item.pk %}" class="filters">
+        {% csrf_token %}
+        <div>
+            <label for="id_status">Быстрая смена статуса</label>
+            <select id="id_status" name="status">
+                {% for value, label in status_choices %}
+                <option value="{{ value }}" {% if item.status == value %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div><button class="btn" type="submit">Обновить</button></div>
+    </form>
+    <div class="actions" style="margin-top:8px;">
+        <form method="post" action="{% url 'request_update_status' request_id=item.pk %}">
+            {% csrf_token %}
+            <input type="hidden" name="status" value="approved" />
+            <button class="btn secondary" type="submit">Быстро: Одобрить</button>
+        </form>
+        <form method="post" action="{% url 'request_update_status' request_id=item.pk %}">
+            {% csrf_token %}
+            <input type="hidden" name="status" value="rejected" />
+            <button class="btn secondary" type="submit">Быстро: Отклонить</button>
+        </form>
+        <form method="post" action="{% url 'request_update_status' request_id=item.pk %}">
+            {% csrf_token %}
+            <input type="hidden" name="status" value="closed" />
+            <button class="btn secondary" type="submit">Быстро: Закрыть</button>
+        </form>
+    </div>
+    {% endif %}
+</div>
+
+<div class="grid cols-2">
+    <div class="card">
+        <h3>Сообщения</h3>
+        <form method="post" class="form-shell">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="add_message" />
+            {% include "inventory/_form_field.html" with field=message_form.body full_width=True %}
+            <div class="actions"><button class="btn" type="submit">Добавить сообщение</button></div>
+        </form>
+        <div class="timeline">
+            {% for msg in messages_list %}
+            <div class="timeline-item">
+                <div class="timeline-time">{{ msg.created_at|date:preferred_datetime_format }}</div>
+                <div class="timeline-body">
+                    <strong>{{ msg.author }}</strong>
+                    <div>{{ msg.body }}</div>
+                </div>
+            </div>
+            {% empty %}
+            <div class="muted">Сообщений пока нет.</div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <div class="card">
+        <h3>Фотографии</h3>
+        <form method="post" enctype="multipart/form-data" class="form-shell">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="add_photo" />
+            <div class="form-grid single">
+                {% include "inventory/_form_field.html" with field=photo_form.image %}
+                {% include "inventory/_form_field.html" with field=photo_form.caption %}
+            </div>
+            <div class="actions"><button class="btn" type="submit">Добавить фото</button></div>
+        </form>
+        <div class="equipment-card-grid">
+            {% for photo in photos %}
+            <article class="card equipment-card">
+                <div class="equipment-card-media">
+                    <img src="{{ photo.image.url }}" alt="request-photo-{{ photo.pk }}" loading="lazy" />
+                </div>
+                <div class="equipment-card-body">
+                    <div class="equipment-card-subtitle">{{ photo.uploaded_by|default:"-" }} • {{ photo.uploaded_at|date:preferred_datetime_format }}</div>
+                    {% if photo.caption %}<div>{{ photo.caption }}</div>{% endif %}
+                </div>
+            </article>
+            {% empty %}
+            <div class="muted">Фото пока не добавлены.</div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+{% endblock %}

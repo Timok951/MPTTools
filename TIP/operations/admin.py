@@ -1,7 +1,7 @@
-﻿from django.contrib import admin
+from django.contrib import admin
 
 from core.admin_utils import SoftDeleteAdmin
-from .models import EquipmentRequest, MaterialUsage, WorkTimer
+from .models import EquipmentRequest, MaterialUsage
 
 
 @admin.register(EquipmentRequest)
@@ -26,10 +26,3 @@ class MaterialUsageAdmin(SoftDeleteAdmin):
     list_display = ("id", "equipment", "quantity", "used_by", "used_at", "workplace", "deleted_at")
     list_filter = ("used_at", "workplace", "deleted_at")
     search_fields = ("equipment__name", "used_by__username", "note")
-
-
-@admin.register(WorkTimer)
-class WorkTimerAdmin(SoftDeleteAdmin):
-    list_display = ("id", "user", "workplace", "equipment", "started_at", "ended_at", "deleted_at")
-    list_filter = ("started_at", "workplace", "deleted_at")
-    search_fields = ("user__username", "equipment__name", "note")

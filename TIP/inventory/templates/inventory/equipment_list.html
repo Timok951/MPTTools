@@ -46,15 +46,6 @@
             </select>
         </div>
         <div>
-            <label for="id_supplier">{% trans "Suppliers" %}</label>
-            <select id="id_supplier" name="supplier">
-                <option value="">{% trans "All" %}</option>
-                {% for item in suppliers %}
-                <option value="{{ item.id }}" {% if filters.supplier == item.id|stringformat:"s" %}selected{% endif %}>{{ item.name }}</option>
-                {% endfor %}
-            </select>
-        </div>
-        <div>
             <label for="id_consumable">{% trans "Consumable" %}</label>
             <select id="id_consumable" name="consumable">
                 <option value="">{% trans "All" %}</option>
@@ -67,13 +58,6 @@
             <select id="id_low_stock" name="low_stock">
                 <option value="">{% trans "All" %}</option>
                 <option value="1" {% if filters.low_stock == "1" %}selected{% endif %}>{% trans "Only low stock" %}</option>
-            </select>
-        </div>
-        <div>
-            <label for="id_inventory_due">{% trans "Inventory" %}</label>
-            <select id="id_inventory_due" name="inventory_due">
-                <option value="">{% trans "All" %}</option>
-                <option value="1" {% if filters.inventory_due == "1" %}selected{% endif %}>{% trans "Due now" %}</option>
             </select>
         </div>
         <div>
@@ -145,11 +129,6 @@
                     <span class="badge">OK</span>
                     {% endif %}
 
-                    {% if item.is_inventory_due %}
-                    <span class="badge warn">{% ui_text "Инвентаризация нужна" "Due now" %}</span>
-                    {% else %}
-                    <span class="badge">{% ui_text "Инвентаризация актуальна" "Inventory ok" %}</span>
-                    {% endif %}
                 </div>
 
                 <div class="actions">

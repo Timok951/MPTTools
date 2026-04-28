@@ -6,7 +6,7 @@ from django.db.models import F
 from django.utils import timezone
 
 from assets.models import Equipment, InventoryAdjustment
-from operations.models import REQUEST_PENDING, REQUEST_REJECTED, EquipmentRequest, WorkTimer
+from operations.models import REQUEST_PENDING, REQUEST_REJECTED, EquipmentRequest
 
 
 @dataclass(frozen=True)
@@ -75,48 +75,6 @@ def reject_stale_requests(*, actor, stale_days: int) -> ProcedureResult:
     )
 
 
-def finish_abandoned_timers(*, actor, stale_hours: int) -> ProcedureResult:
-    cutoff = timezone.now() - timedelta(hours=stale_hours)
-    processed = WorkTimer.objects.filter(
-        ended_at__isnull=True,
-        started_at__lt=cutoff,
-    ).count()
-
-    if _is_postgresql():
-        with transaction.atomic():
-            _set_db_actor(actor.pk)
-            with connection.cursor() as cursor:
-                cursor.execute("CALL finish_abandoned_timers(%s, %s)", [actor.pk, stale_hours])
-        return ProcedureResult(
-            slug="finish_abandoned_timers",
-            title="Finish abandoned timers",
-            processed_count=processed,
-            detail=f"Finished {processed} active timer(s) older than {stale_hours} hour(s).",
-            execution_mode="postgresql_procedure",
-        )
-
-    with transaction.atomic():
-        for timer in WorkTimer.objects.select_for_update().filter(
-            ended_at__isnull=True,
-            started_at__lt=cutoff,
-        ):
-            timer.ended_at = timezone.now()
-            timer.note = _append_reason(
-                timer.note,
-                f"Finished automatically by admin procedure after {stale_hours} hour(s).",
-            )
-            timer._actor = actor
-            timer.save(update_fields=["ended_at", "note"])
-            processed += 1
-
-    return ProcedureResult(
-        slug="finish_abandoned_timers",
-        title="Finish abandoned timers",
-        processed_count=processed,
-        detail=f"Finished {processed} active timer(s) older than {stale_hours} hour(s).",
-    )
-
-
 def restock_low_stock_consumables(*, actor) -> ProcedureResult:
     processed = Equipment.objects.filter(
         is_consumable=True,
@@ -169,6 +127,5 @@ def restock_low_stock_consumables(*, actor) -> ProcedureResult:
 
 PROCEDURE_REGISTRY = {
     "reject_stale_requests": reject_stale_requests,
-    "finish_abandoned_timers": finish_abandoned_timers,
     "restock_low_stock_consumables": restock_low_stock_consumables,
 }

@@ -11,19 +11,14 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.utils.translation import gettext_lazy as _
 
 from assets.models import Equipment, EquipmentCheckout, InventoryAdjustment
-from core.models import Cabinet, EquipmentCategory, Supplier, Workplace, WorkplaceMember
-from operations.models import EquipmentRequest, MaterialUsage, WorkTimer
+from core.models import Cabinet, EquipmentCategory, Workplace, WorkplaceMember
+from operations.models import EquipmentRequest, MaterialUsage
 from audit.models import AdminPortalLog
 from audit.portal_log import log_portal_action
 
-from .admin_procedures import (
-    finish_abandoned_timers,
-    reject_stale_requests,
-    restock_low_stock_consumables,
-)
+from .admin_procedures import reject_stale_requests, restock_low_stock_consumables
 from .authz import is_portal_admin
 from .portal_forms import (
-    FinishAbandonedTimersProcedureForm,
     PortalCabinetForm,
     PortalEquipmentCategoryForm,
     PortalEquipmentCheckoutForm,
@@ -32,11 +27,9 @@ from .portal_forms import (
     PortalGroupForm,
     PortalInventoryAdjustmentForm,
     PortalMaterialUsageForm,
-    PortalSupplierForm,
     PortalUserForm,
     PortalWorkplaceForm,
     PortalWorkplaceMemberForm,
-    PortalWorkTimerForm,
     RejectStaleRequestsProcedureForm,
 )
 from .views import forbidden
@@ -54,7 +47,6 @@ class PortalEntity:
 PORTAL_ENTITIES: tuple[PortalEntity, ...] = (
     PortalEntity("equipment", Equipment, PortalEquipmentForm, ("name", "inventory_number", "status", "quantity_available", "deleted_at"), "Оборудование"),
     PortalEntity("categories", EquipmentCategory, PortalEquipmentCategoryForm, ("name", "deleted_at"), "Категории"),
-    PortalEntity("suppliers", Supplier, PortalSupplierForm, ("name", "phone", "deleted_at"), "Поставщики"),
     PortalEntity("workplaces", Workplace, PortalWorkplaceForm, ("name", "location", "deleted_at"), "Рабочие места"),
     PortalEntity("cabinets", Cabinet, PortalCabinetForm, ("code", "name", "workplace", "deleted_at"), "Шкафы"),
     PortalEntity("workplace-members", WorkplaceMember, PortalWorkplaceMemberForm, ("workplace", "user", "role", "deleted_at"), "Сотрудники"),
@@ -62,7 +54,6 @@ PORTAL_ENTITIES: tuple[PortalEntity, ...] = (
     PortalEntity("checkouts", EquipmentCheckout, PortalEquipmentCheckoutForm, ("equipment", "quantity", "taken_by", "returned_at", "deleted_at"), "Выдачи"),
     PortalEntity("requests", EquipmentRequest, PortalEquipmentRequestForm, ("requester", "equipment", "quantity", "status", "deleted_at"), "Заявки"),
     PortalEntity("usage", MaterialUsage, PortalMaterialUsageForm, ("equipment", "quantity", "used_by", "used_at", "deleted_at"), "Списания"),
-    PortalEntity("timers", WorkTimer, PortalWorkTimerForm, ("user", "equipment", "started_at", "ended_at", "deleted_at"), "Таймеры"),
     PortalEntity("users", User, PortalUserForm, ("username", "email", "is_active", "is_staff", "is_superuser"), "Пользователи"),
     PortalEntity("groups", Group, PortalGroupForm, ("name",), "Группы и роли"),
 )
@@ -80,12 +71,6 @@ def _procedure_cards():
             "title": _("Отклонить старые заявки"),
             "description": _("Помечает старые необработанные заявки как отклонённые и фиксирует, кто их обработал."),
             "form": RejectStaleRequestsProcedureForm(prefix="reject"),
-        },
-        {
-            "slug": "finish_abandoned_timers",
-            "title": _("Завершить брошенные таймеры"),
-            "description": _("Закрывает давно запущенные таймеры, которые остались незавершёнными."),
-            "form": FinishAbandonedTimersProcedureForm(prefix="timers"),
         },
         {
             "slug": "restock_low_stock_consumables",
@@ -291,12 +276,6 @@ def portal_procedure_run(request, slug: str):
             messages.error(request, _("Укажите корректный срок давности для заявок."))
             return redirect("portal_home")
         result = reject_stale_requests(actor=request.user, stale_days=form.cleaned_data["stale_days"])
-    elif slug == "finish_abandoned_timers":
-        form = FinishAbandonedTimersProcedureForm(request.POST, prefix="timers")
-        if not form.is_valid():
-            messages.error(request, _("Укажите корректный срок давности для таймеров."))
-            return redirect("portal_home")
-        result = finish_abandoned_timers(actor=request.user, stale_hours=form.cleaned_data["stale_hours"])
     elif slug == "restock_low_stock_consumables":
         result = restock_low_stock_consumables(actor=request.user)
     else:

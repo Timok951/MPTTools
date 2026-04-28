@@ -1,4 +1,5 @@
 from django import template
+from inventory.authz import ROLE_ALIASES
 
 register = template.Library()
 
@@ -14,7 +15,14 @@ def get_item(mapping, key):
 def has_group(user, group_name: str) -> bool:
     if not user or not user.is_authenticated:
         return False
-    return user.is_superuser or user.groups.filter(name=group_name).exists()
+    if user.is_superuser:
+        return True
+    allowed_names = {group_name}
+    for canonical_name, aliases in ROLE_ALIASES.items():
+        if group_name == canonical_name or group_name in aliases:
+            allowed_names.add(canonical_name)
+            allowed_names.update(aliases)
+    return user.groups.filter(name__in=allowed_names).exists()
 
 
 @register.filter

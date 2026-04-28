@@ -1,5 +1,4 @@
 from django.contrib import admin
-from django.utils import timezone
 
 from core.admin_utils import SoftDeleteAdmin
 from .models import Equipment, EquipmentCheckout, InventoryAdjustment
@@ -7,7 +6,7 @@ from .models import Equipment, EquipmentCheckout, InventoryAdjustment
 
 @admin.register(Equipment)
 class EquipmentAdmin(SoftDeleteAdmin):
-    actions = SoftDeleteAdmin.actions + ["mark_inventory_today"]
+    actions = SoftDeleteAdmin.actions
     list_display = (
         "name",
         "inventory_number",
@@ -23,11 +22,6 @@ class EquipmentAdmin(SoftDeleteAdmin):
     )
     list_filter = ("status", "is_consumable", "category", "workplace", "cabinet", "deleted_at")
     search_fields = ("name", "inventory_number", "serial_number", "model")
-
-    @admin.action(description="Mark inventory checked today")
-    def mark_inventory_today(self, request, queryset):
-        queryset.update(last_inventory_at=timezone.now().date())
-
 
 @admin.register(InventoryAdjustment)
 class InventoryAdjustmentAdmin(SoftDeleteAdmin):

@@ -34,48 +34,62 @@ from core.models import (
     DirectMessage,
     EquipmentCategory,
     PasswordResetCode,
-    Supplier,
     UserPreference,
     Workplace,
     WorkplaceMember,
 )
-from operations.models import EquipmentRequest, MaterialUsage, WorkTimer, REQUEST_PENDING
-from .authz import GROUP_ADMIN, GROUP_BUILDER, GROUP_SYSADMIN, GROUP_WAREHOUSE, user_in_group
+from operations.models import (
+    EquipmentRequest,
+    EquipmentRequestMessage,
+    EquipmentRequestPhoto,
+    MaterialUsage,
+    REQUEST_PENDING,
+)
+from .authz import (
+    GROUP_ADMIN,
+    GROUP_BUILDER,
+    GROUP_FIRST_LINE_SUPPORT,
+    ROLE_ALIASES,
+    GROUP_SENIOR_TECHNICIAN,
+    GROUP_SYSADMIN,
+    GROUP_WAREHOUSE,
+    user_in_group,
+)
 from .forms import (
     BackupImportForm,
     DirectMessageForm,
     EquipmentCheckoutForm,
+    EquipmentRequestMessageForm,
+    EquipmentRequestPhotoForm,
     EquipmentRequestForm,
     InventoryAdjustmentForm,
     PasswordResetConfirmForm,
     PasswordResetRequestForm,
     MaterialUsageForm,
-    QuickTimerStartForm,
     RussianAuthenticationForm,
     RussianUserCreationForm,
     UserPreferenceForm,
-    WorkTimerForm,
 )
 from .quality_report import generate_quality_report, load_quality_report
 
 ROLE_DESCRIPTIONS = {
-    GROUP_ADMIN: "Полный доступ, аналитика и контроль.",
-    GROUP_WAREHOUSE: "Учёт склада, корректировки и выдача материалов.",
-    GROUP_SYSADMIN: "Техническое обслуживание и заявки на оборудование.",
-    GROUP_BUILDER: "Заявки и расход строительного оборудования.",
+    GROUP_SENIOR_TECHNICIAN: "Работа со складом и обработка оборудования.",
+    GROUP_BUILDER: "Создание заявок на оборудование.",
+    GROUP_SYSADMIN: "Пользователи, сайт и кабинеты.",
+    GROUP_FIRST_LINE_SUPPORT: "Обработка и смена статусов заявок.",
 }
 
 
 def _can_manage_timers(user) -> bool:
-    return (
-        user_in_group(user, GROUP_ADMIN)
-        or user_in_group(user, GROUP_SYSADMIN)
-        or user_in_group(user, GROUP_BUILDER)
-    )
+    return False
 
 
 def _can_view_all_operational_data(user) -> bool:
-    return user_in_group(user, GROUP_ADMIN) or user_in_group(user, GROUP_WAREHOUSE)
+    return (
+        user_in_group(user, GROUP_ADMIN)
+        or user_in_group(user, GROUP_WAREHOUSE)
+        or user_in_group(user, GROUP_FIRST_LINE_SUPPORT)
+    )
 
 
 def _can_access_history(user) -> bool:
@@ -107,6 +121,15 @@ def _can_create_request(user) -> bool:
         user_in_group(user, GROUP_ADMIN)
         or user_in_group(user, GROUP_SYSADMIN)
         or user_in_group(user, GROUP_BUILDER)
+        or user_in_group(user, GROUP_FIRST_LINE_SUPPORT)
+    )
+
+
+def _can_process_request_status(user) -> bool:
+    return (
+        user_in_group(user, GROUP_ADMIN)
+        or user_in_group(user, GROUP_WAREHOUSE)
+        or user_in_group(user, GROUP_FIRST_LINE_SUPPORT)
     )
 
 
@@ -125,10 +148,6 @@ def _can_create_usage(user) -> bool:
         or user_in_group(user, GROUP_SYSADMIN)
         or user_in_group(user, GROUP_BUILDER)
     )
-
-
-def _can_stop_timer(user, timer: WorkTimer) -> bool:
-    return user_in_group(user, GROUP_ADMIN) or timer.user_id == user.pk
 
 
 def _can_return_checkout(user, checkout: EquipmentCheckout) -> bool:
@@ -220,7 +239,6 @@ def analytics(request):
     low_stock_total = Equipment.objects.filter(quantity_available__lte=F("low_stock_threshold")).count()
     requests_pending = EquipmentRequest.objects.filter(status=REQUEST_PENDING).count()
     active_checkouts = EquipmentCheckout.objects.filter(returned_at__isnull=True).count()
-    inventory_due_total = sum(1 for item in Equipment.objects.all() if item.is_inventory_due)
 
     equipment_status_labels = dict(Equipment._meta.get_field("status").choices)
     equipment_by_status_raw = Equipment.objects.values("status").annotate(count=Count("id")).order_by("status")
@@ -290,7 +308,6 @@ def analytics(request):
         "low_stock_total": low_stock_total,
         "requests_pending": requests_pending,
         "active_checkouts": active_checkouts,
-        "inventory_due_total": inventory_due_total,
         "recent_requests": recent_requests,
         "recent_usage": recent_usage,
         "equipment_by_status": equipment_by_status,
@@ -310,17 +327,15 @@ def equipment_list(request):
     page_size = preferences.page_size if preferences else 25
     show_deleted = bool(request.session.get("show_deleted_global", False))
     manager = Equipment.all_objects if show_deleted else Equipment.objects
-    queryset = manager.select_related("category", "supplier", "workplace", "cabinet")
+    queryset = manager.select_related("category", "workplace", "cabinet")
 
     query = request.GET.get("q", "").strip()
     status = request.GET.get("status", "").strip()
     category = request.GET.get("category", "").strip()
     workplace = request.GET.get("workplace", "").strip()
-    supplier = request.GET.get("supplier", "").strip()
     cabinet = request.GET.get("cabinet", "").strip()
     consumable = request.GET.get("consumable", "").strip()
     low_stock = request.GET.get("low_stock", "").strip()
-    inventory_due = request.GET.get("inventory_due", "").strip()
 
     if query:
         queryset = queryset.filter(
@@ -339,9 +354,6 @@ def equipment_list(request):
     if workplace:
         queryset = queryset.filter(workplace_id=workplace)
 
-    if supplier:
-        queryset = queryset.filter(supplier_id=supplier)
-
     if cabinet:
         queryset = queryset.filter(cabinet_id=cabinet)
 
@@ -351,16 +363,12 @@ def equipment_list(request):
     if low_stock:
         queryset = queryset.filter(quantity_available__lte=F("low_stock_threshold"))
 
-    if inventory_due:
-        queryset = [item for item in queryset if item.is_inventory_due]
-
     page_obj = _paginate(request, queryset, page_size)
 
     context = {
         "equipment": page_obj.object_list,
         "categories": EquipmentCategory.objects.all(),
         "workplaces": Workplace.objects.all(),
-        "suppliers": Supplier.objects.all(),
         "cabinets": Cabinet.objects.all(),
         "status_choices": Equipment._meta.get_field("status").choices,
         "filters": {
@@ -368,11 +376,9 @@ def equipment_list(request):
             "status": status,
             "category": category,
             "workplace": workplace,
-            "supplier": supplier,
             "cabinet": cabinet,
             "consumable": consumable,
             "low_stock": low_stock,
-            "inventory_due": inventory_due,
             "show_deleted": "1" if show_deleted else "",
         },
         **_with_page_context(page_obj),
@@ -438,6 +444,7 @@ def request_history(request):
         requests = requests.filter(requested_at__date__lte=date_to)
 
     page_obj = _paginate(request, requests, page_size)
+    can_quick_status = _can_process_request_status(request.user)
 
     return render(
         request,
@@ -448,6 +455,7 @@ def request_history(request):
             "kind_choices": EquipmentRequest._meta.get_field("request_kind").choices,
             "filters": {"status": status, "kind": kind, "from": date_from, "to": date_to},
             "can_create_request": _can_create_request(request.user),
+            "can_quick_status": can_quick_status,
             **_with_page_context(page_obj),
         },
     )
@@ -455,49 +463,7 @@ def request_history(request):
 
 @login_required
 def timer_panel(request):
-    preferences = _get_user_preferences(request.user)
-    page_size = preferences.page_size if preferences else 25
-    show_deleted = bool(request.session.get("show_deleted_global", False))
-    timers_manager = WorkTimer.all_objects if show_deleted else WorkTimer.objects
-    timers = timers_manager.select_related("user", "workplace", "equipment").order_by("-started_at")
-    if not _can_view_all_operational_data(request.user):
-        timers = timers.filter(user=request.user)
-    timer_status = request.GET.get("status", "").strip()
-    using_default_status_filter = False
-    if not timer_status and "status" not in request.GET and preferences and preferences.default_timer_status:
-        timer_status = preferences.default_timer_status
-        using_default_status_filter = True
-    if timer_status == "active":
-        timers = timers.filter(ended_at__isnull=True)
-    elif timer_status == "finished":
-        timers = timers.filter(ended_at__isnull=False)
-
-    active_timers_qs = timers_manager.filter(ended_at__isnull=True)
-    if not _can_view_all_operational_data(request.user):
-        active_timers_qs = active_timers_qs.filter(user=request.user)
-    active_timers_total = active_timers_qs.count()
-    page_obj = _paginate(request, timers, page_size)
-    now = timezone.now()
-    for timer in page_obj.object_list:
-        if timer.ended_at:
-            timer.duration_seconds_live = max(int((timer.ended_at - timer.started_at).total_seconds()), 0)
-            timer.is_active = False
-        else:
-            timer.duration_seconds_live = max(int((now - timer.started_at).total_seconds()), 0)
-            timer.is_active = True
-        timer.can_stop = _can_stop_timer(request.user, timer)
-
-    context = {
-        "timers": page_obj.object_list,
-        "filters": {"status": timer_status},
-        "active_timers_total": active_timers_total,
-        "can_manage_timers": _can_manage_timers(request.user),
-        "can_create_timer": _can_manage_timers(request.user),
-        "quick_timer_form": QuickTimerStartForm(),
-        "using_default_status_filter": using_default_status_filter,
-        **_with_page_context(page_obj),
-    }
-    return render(request, "inventory/timer_panel.html", context)
+    return forbidden(request, "Раздел таймеров отключён.")
 
 
 @login_required
@@ -514,7 +480,6 @@ def inventory_search(request):
                 "checkout_results": [],
                 "workplace_results": [],
                 "cabinet_results": [],
-                "supplier_results": [],
             }
         )
         return render(request, "inventory/search.html", context)
@@ -525,10 +490,9 @@ def inventory_search(request):
     checkouts_manager = EquipmentCheckout.all_objects if show_deleted else EquipmentCheckout.objects
     workplaces_manager = Workplace.all_objects if show_deleted else Workplace.objects
     cabinets_manager = Cabinet.all_objects if show_deleted else Cabinet.objects
-    suppliers_manager = Supplier.all_objects if show_deleted else Supplier.objects
 
     equipment_results = (
-        equipment_manager.select_related("category", "workplace", "supplier")
+        equipment_manager.select_related("category", "workplace")
         .filter(
             Q(name__icontains=q)
             | Q(inventory_number__icontains=q)
@@ -537,7 +501,6 @@ def inventory_search(request):
             | Q(category__name__icontains=q)
             | Q(workplace__name__icontains=q)
             | Q(cabinet__code__icontains=q)
-            | Q(supplier__name__icontains=q)
         )
         .order_by("name")[:25]
     )
@@ -583,14 +546,6 @@ def inventory_search(request):
     cabinet_results = cabinets_manager.select_related("workplace").filter(
         Q(code__icontains=q) | Q(name__icontains=q) | Q(workplace__name__icontains=q) | Q(description__icontains=q)
     ).order_by("code")[:25]
-    supplier_results = suppliers_manager.filter(
-        Q(name__icontains=q)
-        | Q(contact_name__icontains=q)
-        | Q(phone__icontains=q)
-        | Q(email__icontains=q)
-        | Q(address__icontains=q)
-    ).order_by("name")[:25]
-
     context.update(
         {
             "equipment_results": equipment_results,
@@ -599,7 +554,6 @@ def inventory_search(request):
             "checkout_results": checkout_results,
             "workplace_results": workplace_results,
             "cabinet_results": cabinet_results,
-            "supplier_results": supplier_results,
         }
     )
     return render(request, "inventory/search.html", context)
@@ -625,10 +579,7 @@ def workplaces(request):
 
 @login_required
 def suppliers(request):
-    show_deleted = bool(request.session.get("show_deleted_global", False))
-    suppliers_manager = Supplier.all_objects if show_deleted else Supplier.objects
-    suppliers_qs = suppliers_manager.all().order_by("name")
-    return render(request, "inventory/suppliers.html", {"suppliers": suppliers_qs, "show_deleted": show_deleted})
+    return forbidden(request, "Раздел поставщиков отключён.")
 
 
 @login_required
@@ -839,6 +790,75 @@ def request_create(request):
 
 
 @login_required
+def request_detail(request, request_id: int):
+    item = get_object_or_404(
+        EquipmentRequest.objects.select_related("requester", "equipment", "workplace", "processed_by"),
+        pk=request_id,
+    )
+    can_access = _can_view_all_operational_data(request.user) or item.requester_id == request.user.pk
+    if not can_access:
+        return forbidden(request, "Просмотр этой заявки недоступен.")
+
+    message_form = EquipmentRequestMessageForm()
+    photo_form = EquipmentRequestPhotoForm()
+    if request.method == "POST":
+        action = request.POST.get("action")
+        if action == "add_message":
+            message_form = EquipmentRequestMessageForm(request.POST)
+            if message_form.is_valid():
+                message_obj = message_form.save(commit=False)
+                message_obj.request = item
+                message_obj.author = request.user
+                message_obj.save()
+                messages.success(request, "Сообщение добавлено.")
+                return redirect("request_detail", request_id=item.pk)
+        elif action == "add_photo":
+            photo_form = EquipmentRequestPhotoForm(request.POST, request.FILES)
+            if photo_form.is_valid():
+                photo_obj = photo_form.save(commit=False)
+                photo_obj.request = item
+                photo_obj.uploaded_by = request.user
+                photo_obj.save()
+                messages.success(request, "Фото добавлено.")
+                return redirect("request_detail", request_id=item.pk)
+
+    return render(
+        request,
+        "inventory/request_detail.html",
+        {
+            "item": item,
+            "messages_list": item.messages.select_related("author").all(),
+            "photos": item.photos.select_related("uploaded_by").all(),
+            "message_form": message_form,
+            "photo_form": photo_form,
+            "can_quick_status": _can_process_request_status(request.user),
+            "status_choices": EquipmentRequest._meta.get_field("status").choices,
+        },
+    )
+
+
+@login_required
+@require_POST
+def request_update_status(request, request_id: int):
+    item = get_object_or_404(EquipmentRequest, pk=request_id)
+    if not _can_process_request_status(request.user):
+        return forbidden(request, "Быстрая смена статуса недоступна.")
+    new_status = (request.POST.get("status") or "").strip()
+    allowed_statuses = {value for value, _ in EquipmentRequest._meta.get_field("status").choices}
+    if new_status not in allowed_statuses:
+        messages.error(request, "Некорректный статус.")
+        return redirect(request.META.get("HTTP_REFERER") or reverse("request_history"))
+    if new_status != item.status:
+        item.status = new_status
+        item.processed_by = request.user
+        item.processed_at = timezone.now()
+        item._actor = request.user
+        item.save(update_fields=["status", "processed_by", "processed_at"])
+        messages.success(request, "Статус обновлён.")
+    return redirect(request.META.get("HTTP_REFERER") or reverse("request_history"))
+
+
+@login_required
 def usage_create(request):
     if not _can_create_usage(request.user):
         return forbidden(request, "Списание доступно только уполномоченным ролям.")
@@ -855,7 +875,14 @@ def usage_create(request):
     else:
         form = MaterialUsageForm()
 
-    return render(request, "inventory/usage_form.html", {"form": form})
+    return render(
+        request,
+        "inventory/usage_form.html",
+        {
+            "form": form,
+            "request_quantity_map": getattr(form, "request_quantity_map", {}),
+        },
+    )
 
 
 @login_required
@@ -880,60 +907,17 @@ def adjustment_create(request):
 
 @login_required
 def timer_create(request):
-    if not _can_manage_timers(request.user):
-        return forbidden(request, "Таймер доступен только уполномоченным ролям.")
-
-    if request.method == "POST":
-        form = WorkTimerForm(request.POST)
-        if form.is_valid():
-            timer = form.save(commit=False)
-            timer.user = request.user
-            timer._actor = request.user
-            timer.save()
-            messages.success(request, "Timer entry saved.")
-            return redirect("timer_panel")
-    else:
-        form = WorkTimerForm()
-
-    return render(request, "inventory/timer_form.html", {"form": form, "quick_form": QuickTimerStartForm()})
+    return forbidden(request, "Раздел таймеров отключён.")
 
 
 @login_required
 def timer_quick_start(request):
-    if not _can_manage_timers(request.user):
-        return forbidden(request, "Таймер доступен только уполномоченным ролям.")
-    if request.method != "POST":
-        return redirect("timer_panel")
-
-    form = QuickTimerStartForm(request.POST)
-    if form.is_valid():
-        timer = WorkTimer(
-            user=request.user,
-            workplace=form.cleaned_data["workplace"],
-            equipment=form.cleaned_data["equipment"],
-            note=form.cleaned_data["note"],
-            started_at=timezone.now(),
-        )
-        timer._actor = request.user
-        timer.save()
-        messages.success(request, "Timer started.")
-    else:
-        messages.error(request, "Quick timer could not be started. Check the selected values.")
-    return redirect("timer_panel")
+    return forbidden(request, "Раздел таймеров отключён.")
 
 
 @login_required
 def timer_stop(request, timer_id: int):
-    timer = get_object_or_404(WorkTimer, pk=timer_id)
-    if not _can_stop_timer(request.user, timer):
-        return forbidden(request, "Таймер доступен только уполномоченным ролям.")
-    if timer.ended_at:
-        return redirect("timer_panel")
-    timer.ended_at = timezone.now()
-    timer._actor = request.user
-    timer.save(update_fields=["ended_at"])
-    messages.success(request, "Timer stopped.")
-    return redirect("timer_panel")
+    return forbidden(request, "Раздел таймеров отключён.")
 
 
 @login_required
@@ -1010,12 +994,10 @@ def api_docs(request):
                 "/api/v1/workplaces/",
                 "/api/v1/cabinets/",
                 "/api/v1/categories/",
-                "/api/v1/suppliers/",
                 "/api/v1/requests/",
                 "/api/v1/usage/",
                 "/api/v1/adjustments/",
                 "/api/v1/checkouts/",
-                "/api/v1/timers/",
             ]
         },
     )
@@ -1115,11 +1097,25 @@ def role_assignment(request):
             target_user.groups.add(groups[role_name])
         return redirect("role_assignment")
 
-    users = User.objects.all().order_by("username")
+    users = User.objects.prefetch_related("groups").all().order_by("username")
+    user_role_map = {}
+    for item in users:
+        if item.is_superuser:
+            user_role_map[item.pk] = GROUP_SYSADMIN
+            continue
+        current_names = {group.name for group in item.groups.all()}
+        resolved = ""
+        for canonical_name in ROLE_DESCRIPTIONS:
+            all_names = {canonical_name}
+            all_names.update(ROLE_ALIASES.get(canonical_name, set()))
+            if current_names & all_names:
+                resolved = canonical_name
+                break
+        user_role_map[item.pk] = resolved
     return render(
         request,
         "inventory/role_assignment.html",
-        {"users": users, "roles": ROLE_DESCRIPTIONS},
+        {"users": users, "roles": ROLE_DESCRIPTIONS, "user_role_map": user_role_map},
     )
 
 

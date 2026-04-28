@@ -3,40 +3,12 @@
 
 {% block content %}
 <div class="card">
-    <h2>Резервные копии / PDF</h2>
-    <p class="muted">Инструменты резервного копирования доступны администратору и системному администратору. Импорт JSON-резервной копии оставлен только администратору.</p>
-    <div class="actions">
-        <a href="{% url 'download_json_backup' %}">Скачать JSON-резервную копию</a>
-        {% if sqlite_available %}
-            <a class="secondary" href="{% url 'download_sqlite_backup' %}">Скачать SQLite-базу</a>
-        {% endif %}
-        <a class="secondary" href="{% url 'reports_export' 'cabinets' %}">Экспорт кабинетов (CSV)</a>
-        <a class="secondary" href="{% url 'reports_export' 'materials' %}">Экспорт материалов (CSV)</a>
-        <a class="secondary" href="{% url 'export_portal_logs_csv' %}">Экспорт журнала портала (CSV)</a>
-        <a class="secondary" href="{% url 'api_docs' %}">Документация API</a>
-    </div>
+    <h2>Импорт JSON-резервной копии</h2>
+    <p class="muted">Автоматический серверный бэкап добавлен через Docker.</p>
 </div>
-
-{% if postgresql_available %}
-<div class="card">
-    <h3>Резервное копирование и восстановление PostgreSQL</h3>
-    <p class="muted">Для PostgreSQL используйте логический дамп и восстановление через стандартные утилиты. Это удобно показать на защите как регламент восстановления.</p>
-    <div class="aside-panel">
-        <p><strong>Резервная копия</strong></p>
-        <pre><code>pg_dump -h {{ db_host|default:"localhost" }} -p {{ db_port|default:"5432" }} -U {{ db_user|default:"postgres" }} -d {{ db_name }} -Fc -f backup.dump</code></pre>
-        <p><strong>Восстановление</strong></p>
-        <pre><code>pg_restore -h {{ db_host|default:"localhost" }} -p {{ db_port|default:"5432" }} -U {{ db_user|default:"postgres" }} -d {{ db_name }} --clean --if-exists backup.dump</code></pre>
-        <p class="muted">После восстановления проверьте вход в систему, список оборудования, API `/api/v1/schema/` и запуск одной админской процедуры из портала.</p>
-        <p><strong>SQL-объекты PostgreSQL</strong></p>
-        <p class="muted">Если нужно вручную прогнать объекты БД в PostgreSQL, используйте файл <code>db/postgresql/001_inventory_objects.sql</code>. В нём лежат views, процедуры и audit triggers.</p>
-        <pre><code>psql -h {{ db_host|default:"localhost" }} -p {{ db_port|default:"5432" }} -U {{ db_user|default:"postgres" }} -d {{ db_name }} -f db/postgresql/001_inventory_objects.sql</code></pre>
-    </div>
-</div>
-{% endif %}
 
 {% if can_import_backup %}
 <div class="card">
-    <h3>Импорт JSON-резервной копии</h3>
     <p class="muted">Загрузите файл, созданный экспортом JSON-резервной копии. Существующие записи с теми же идентификаторами будут обновлены.</p>
     <form method="post" action="{% url 'import_json_backup' %}" enctype="multipart/form-data" class="grid" style="gap: 12px; max-width: 560px;">
         {% csrf_token %}
@@ -48,25 +20,6 @@
             <button class="btn" type="submit">Импортировать резервную копию</button>
         </div>
     </form>
-</div>
-{% endif %}
-
-{% if postgresql_available %}
-<div class="card">
-    <h3>Автоматический серверный бэкап</h3>
-    <p class="muted">Для сервера можно настроить ежедневный автоматический дамп PostgreSQL через Docker-контейнер с cron, без привязки к Windows.</p>
-    <div class="aside-panel">
-        <p><strong>Команда Django</strong></p>
-        <pre><code>.venv\Scripts\python.exe TIP\manage.py create_server_backup --label nightly</code></pre>
-        <p><strong>Переменные окружения</strong></p>
-        <pre><code>BACKUP_KEEP_COUNT=14
-BACKUP_CRON_SCHEDULE=0 2 * * *</code></pre>
-        <p><strong>Docker Compose</strong></p>
-        <pre><code>docker compose -f docker-compose.backup.yml up -d --build</code></pre>
-        <p><strong>Логи контейнера</strong></p>
-        <pre><code>docker compose logs -f backup</code></pre>
-        <p class="muted">Файлы Docker-автобэкапа лежат в <code>docker-compose.backup.yml</code> и папке <code>docker/backup/</code>. Дампы сохраняются в <code>backups/postgresql</code>.</p>
-    </div>
 </div>
 {% endif %}
 {% endblock %}

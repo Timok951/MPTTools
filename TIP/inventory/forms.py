@@ -9,7 +9,15 @@ from assets.models import Equipment, EquipmentCheckout, InventoryAdjustment
 from django.contrib.auth.models import User
 
 from core.models import DirectMessage, UserPreference, Workplace
-from operations.models import EquipmentRequest, MaterialUsage, WorkTimer
+from operations.models import (
+    EquipmentRequest,
+    EquipmentRequestMessage,
+    EquipmentRequestPhoto,
+    MaterialUsage,
+    REQUEST_APPROVED,
+    REQUEST_CLOSED,
+    REQUEST_ISSUED,
+)
 
 
 def _lang_label(ru_text: str, en_text: str, language_code: str) -> str:
@@ -112,26 +120,6 @@ class DirectMessageForm(forms.ModelForm):
         return recipient
 
 
-class QuickTimerStartForm(forms.Form):
-    workplace = forms.ModelChoiceField(
-        label="Рабочее место",
-        queryset=Workplace.objects.order_by("name"),
-        required=False,
-        empty_label="Выберите рабочее место",
-    )
-    equipment = forms.ModelChoiceField(
-        label="Оборудование",
-        queryset=Equipment.objects.order_by("name"),
-        required=False,
-        empty_label="Выберите оборудование",
-    )
-    note = forms.CharField(
-        label="Примечание",
-        required=False,
-        widget=forms.Textarea(attrs={"rows": 3, "placeholder": "Над чем вы сейчас работаете?"}),
-    )
-
-
 class UserPreferenceForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         language_code = kwargs.pop("language_code", "ru")
@@ -159,12 +147,6 @@ class UserPreferenceForm(forms.ModelForm):
             ("compact", t("ДД.ММ.ГГГГ ЧЧ:ММ", "DD.MM.YYYY HH:MM")),
             ("iso", t("ГГГГ-ММ-ДД ЧЧ:ММ", "YYYY-MM-DD HH:MM")),
             ("verbose", t("Развёрнутый локальный формат", "Verbose local format")),
-        ]
-        self.fields["default_timer_status"].label = t("Фильтр таймеров по умолчанию", "Default timer filter")
-        self.fields["default_timer_status"].choices = [
-            ("", t("Все таймеры", "All timers")),
-            ("active", t("Активные таймеры", "Active timers")),
-            ("finished", t("Завершённые таймеры", "Finished timers")),
         ]
         self.fields["default_checkout_status"].label = t("Фильтр выдач по умолчанию", "Default checkout filter")
         self.fields["default_checkout_status"].choices = [
@@ -217,7 +199,6 @@ class UserPreferenceForm(forms.ModelForm):
             "preferred_language",
             "page_size",
             "date_display_format",
-            "default_timer_status",
             "default_request_status",
             "default_request_kind",
             "default_usage_period_days",
@@ -259,22 +240,54 @@ class EquipmentRequestForm(forms.ModelForm):
         return cleaned
 
 
+class EquipmentRequestMessageForm(forms.ModelForm):
+    class Meta:
+        model = EquipmentRequestMessage
+        fields = ["body"]
+        widgets = {
+            "body": forms.Textarea(attrs={"rows": 3, "placeholder": "Добавьте сообщение по заявке."}),
+        }
+
+
+class EquipmentRequestPhotoForm(forms.ModelForm):
+    class Meta:
+        model = EquipmentRequestPhoto
+        fields = ["image", "caption"]
+        widgets = {
+            "caption": forms.TextInput(attrs={"placeholder": "Подпись к фото (необязательно)."}),
+        }
+
+
 class MaterialUsageForm(forms.ModelForm):
     class Meta:
         model = MaterialUsage
         fields = ["equipment", "workplace", "quantity", "related_request", "note"]
+        labels = {
+            "equipment": "Оборудование",
+            "workplace": "Рабочее место",
+            "quantity": "Количество",
+            "related_request": "Связанная заявка",
+            "note": "Комментарий",
+        }
         widgets = {
             "note": forms.Textarea(attrs={"rows": 4, "placeholder": "Необязательная причина или детали списания."}),
         }
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields["equipment"].queryset = self.fields["equipment"].queryset.filter(is_consumable=True)
-        self.fields["equipment"].empty_label = "Выберите расходник"
+        self.fields["equipment"].empty_label = "Выберите оборудование"
         self.fields["workplace"].empty_label = "Выберите рабочее место"
+        self.fields["related_request"].queryset = (
+            EquipmentRequest.objects.select_related("equipment", "requester")
+            .filter(status__in=[REQUEST_APPROVED, REQUEST_ISSUED, REQUEST_CLOSED])
+            .order_by("-requested_at")
+        )
         self.fields["related_request"].empty_label = "Без связанной заявки"
-        self.fields["quantity"].help_text = "Здесь можно списывать только расходные материалы."
-        self.fields["related_request"].help_text = "При наличии привяжите списание к одобренной заявке."
+        self.request_quantity_map = {
+            str(item.pk): item.quantity for item in self.fields["related_request"].queryset.only("id", "quantity")
+        }
+        self.fields["quantity"].help_text = "Если выбрана заявка, количество автоматически берётся из неё."
+        self.fields["related_request"].help_text = "Для нерасходного оборудования обязательно укажите связанную заявку."
 
     def clean_quantity(self):
         quantity = self.cleaned_data.get("quantity") or 0
@@ -285,11 +298,23 @@ class MaterialUsageForm(forms.ModelForm):
     def clean(self):
         cleaned = super().clean()
         equipment = cleaned.get("equipment")
+        related_request = cleaned.get("related_request")
         quantity = cleaned.get("quantity") or 0
-        if equipment and not equipment.is_consumable:
-            self.add_error("equipment", "Списывать можно только расходники. Для многоразового инструмента используйте выдачу/возврат.")
+        if related_request:
+            quantity = related_request.quantity
+            cleaned["quantity"] = quantity
         if equipment and quantity > equipment.quantity_available:
             self.add_error("quantity", "Недостаточно доступного остатка.")
+        if equipment and not equipment.is_consumable:
+            if not related_request:
+                self.add_error("related_request", "Для списания запрошенного оборудования нужно выбрать заявку.")
+            else:
+                if related_request.equipment_id != equipment.id:
+                    self.add_error("equipment", "Оборудование должно совпадать с выбранной заявкой.")
+                if related_request.status in {"pending", "rejected"}:
+                    self.add_error("related_request", "Списание доступно только для обработанных заявок.")
+                if quantity > related_request.quantity:
+                    self.add_error("quantity", "Количество списания превышает количество в заявке.")
         return cleaned
 
 
@@ -316,35 +341,6 @@ class InventoryAdjustmentForm(forms.ModelForm):
             new_available = equipment.quantity_available + delta
             if new_total < 0 or new_available < 0:
                 raise ValidationError("Корректировка приведёт к отрицательному остатку.")
-        return cleaned
-
-
-class WorkTimerForm(forms.ModelForm):
-    class Meta:
-        model = WorkTimer
-        fields = ["workplace", "equipment", "started_at", "ended_at", "note"]
-        widgets = {
-            "started_at": forms.DateTimeInput(attrs={"type": "datetime-local"}, format="%Y-%m-%dT%H:%M"),
-            "ended_at": forms.DateTimeInput(attrs={"type": "datetime-local"}, format="%Y-%m-%dT%H:%M"),
-            "note": forms.Textarea(attrs={"rows": 4, "placeholder": "Необязательные заметки о рабочей сессии."}),
-        }
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.fields["workplace"].empty_label = "Выберите рабочее место"
-        self.fields["equipment"].empty_label = "Выберите оборудование"
-        self.fields["started_at"].input_formats = ["%Y-%m-%dT%H:%M"]
-        self.fields["ended_at"].input_formats = ["%Y-%m-%dT%H:%M"]
-        self.fields["started_at"].initial = self.fields["started_at"].initial or timezone.localtime().strftime("%Y-%m-%dT%H:%M")
-        self.fields["ended_at"].help_text = "Оставьте пустым, если таймер ещё работает."
-        self.fields["note"].help_text = "Для большинства живых задач используйте быстрый старт. Эта форма удобнее для ручного ввода."
-
-    def clean(self):
-        cleaned = super().clean()
-        started_at = cleaned.get("started_at")
-        ended_at = cleaned.get("ended_at")
-        if started_at and ended_at and ended_at < started_at:
-            raise ValidationError("Время завершения не может быть раньше времени начала.")
         return cleaned
 
 

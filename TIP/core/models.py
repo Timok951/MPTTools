@@ -47,21 +47,6 @@ class SoftDeleteModel(models.Model):
         return self.deleted_at is not None
 
 
-class Supplier(SoftDeleteModel):
-    name = models.CharField(max_length=200, unique=True)
-    contact_name = models.CharField(max_length=200, blank=True)
-    phone = models.CharField(max_length=50, blank=True)
-    email = models.EmailField(blank=True)
-    address = models.CharField(max_length=300, blank=True)
-    notes = models.TextField(blank=True)
-
-    class Meta:
-        ordering = ["name"]
-
-    def __str__(self) -> str:
-        return self.name
-
-
 class EquipmentCategory(SoftDeleteModel):
     name = models.CharField(max_length=200, unique=True)
     description = models.TextField(blank=True)
@@ -134,15 +119,6 @@ class UserPreference(models.Model):
         (DATE_FORMAT_VERBOSE, _("Развёрнутый локальный формат")),
     ]
 
-    TIMER_FILTER_ALL = ""
-    TIMER_FILTER_ACTIVE = "active"
-    TIMER_FILTER_FINISHED = "finished"
-    TIMER_FILTER_CHOICES = [
-        (TIMER_FILTER_ALL, _("Все таймеры")),
-        (TIMER_FILTER_ACTIVE, _("Активные таймеры")),
-        (TIMER_FILTER_FINISHED, _("Завершённые таймеры")),
-    ]
-
     PAGE_SIZE_CHOICES = [
         (10, "10"),
         (25, "25"),
@@ -153,7 +129,7 @@ class UserPreference(models.Model):
     CHECKOUT_FILTER_RETURNED = "returned"
     CHECKOUT_FILTER_CHOICES = [
         (CHECKOUT_FILTER_ALL, _("Все выдачи")),
-        (TIMER_FILTER_ACTIVE, _("Активные выдачи")),
+        ("active", _("Активные выдачи")),
         (CHECKOUT_FILTER_RETURNED, _("Возвращённые выдачи")),
     ]
 
@@ -162,7 +138,6 @@ class UserPreference(models.Model):
     page_size = models.PositiveSmallIntegerField(choices=PAGE_SIZE_CHOICES, default=25)
     preferred_language = models.CharField(max_length=10, default="ru")
     date_display_format = models.CharField(max_length=20, choices=DATE_FORMAT_CHOICES, default=DATE_FORMAT_COMPACT)
-    default_timer_status = models.CharField(max_length=20, choices=TIMER_FILTER_CHOICES, blank=True, default=TIMER_FILTER_ALL)
     default_request_status = models.CharField(max_length=20, blank=True, default="")
     default_request_kind = models.CharField(max_length=20, blank=True, default="")
     default_usage_period_days = models.PositiveSmallIntegerField(default=30)

@@ -1,13 +1,7 @@
 from django.contrib import admin
 
 from .admin_utils import SoftDeleteAdmin
-from .models import Cabinet, DirectMessage, EquipmentCategory, PasswordResetCode, Supplier, UserPreference, Workplace, WorkplaceMember
-
-
-@admin.register(Supplier)
-class SupplierAdmin(SoftDeleteAdmin):
-    list_display = ("name", "contact_name", "phone", "email", "deleted_at")
-    search_fields = ("name", "contact_name", "phone", "email")
+from .models import Cabinet, DirectMessage, EquipmentCategory, PasswordResetCode, UserPreference, Workplace, WorkplaceMember
 
 
 @admin.register(EquipmentCategory)
@@ -37,8 +31,8 @@ class WorkplaceMemberAdmin(SoftDeleteAdmin):
 
 @admin.register(UserPreference)
 class UserPreferenceAdmin(admin.ModelAdmin):
-    list_display = ("user", "theme_variant", "page_size", "date_display_format", "default_timer_status", "updated_at")
-    list_filter = ("theme_variant", "page_size", "date_display_format", "default_timer_status")
+    list_display = ("user", "theme_variant", "page_size", "date_display_format", "updated_at")
+    list_filter = ("theme_variant", "page_size", "date_display_format")
     search_fields = ("user__username", "user__email")
 
 

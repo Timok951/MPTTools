@@ -1,10 +1,10 @@
-﻿from django.contrib.auth.models import Group, Permission
+from django.contrib.auth.models import Group, Permission
 from django.core.management.base import BaseCommand
 
-GROUP_ADMIN = "Administrator"
-GROUP_WAREHOUSE = "Warehouse"
-GROUP_SYSADMIN = "Sysadmin"
-GROUP_BUILDER = "Builder"
+GROUP_SENIOR_TECHNICIAN = "Старший техник"
+GROUP_TECHNICIAN = "Техник"
+GROUP_SYSADMIN = "Системный администратор"
+GROUP_FIRST_LINE_SUPPORT = "Поддержка первой линии"
 
 
 class Command(BaseCommand):
@@ -12,8 +12,8 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         groups = {
-            GROUP_ADMIN: None,
-            GROUP_WAREHOUSE: [
+            GROUP_SYSADMIN: None,
+            GROUP_SENIOR_TECHNICIAN: [
                 "view_equipment",
                 "change_equipment",
                 "view_equipmentrequest",
@@ -22,35 +22,22 @@ class Command(BaseCommand):
                 "view_inventoryadjustment",
                 "add_materialusage",
                 "view_materialusage",
-                "view_supplier",
                 "view_workplace",
                 "view_cabinet",
             ],
-            GROUP_SYSADMIN: [
+            GROUP_TECHNICIAN: [
                 "view_equipment",
                 "view_equipmentrequest",
                 "add_equipmentrequest",
                 "add_equipmentcheckout",
                 "view_equipmentcheckout",
-                "view_materialusage",
-                "add_worktimer",
-                "view_worktimer",
-                "view_supplier",
                 "view_workplace",
                 "view_cabinet",
             ],
-            GROUP_BUILDER: [
-                "view_equipment",
+            GROUP_FIRST_LINE_SUPPORT: [
                 "view_equipmentrequest",
-                "add_equipmentrequest",
-                "add_equipmentcheckout",
-                "view_equipmentcheckout",
-                "view_materialusage",
-                "add_worktimer",
-                "view_worktimer",
-                "view_supplier",
-                "view_workplace",
-                "view_cabinet",
+                "change_equipmentrequest",
+                "view_equipment",
             ],
         }
 

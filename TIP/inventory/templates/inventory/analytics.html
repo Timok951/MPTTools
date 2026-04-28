@@ -13,31 +13,42 @@
     </div>
     {% endif %}
     <h2>{% trans "Analytics" %}</h2>
-    <div class="grid cols-4">
-        <div class="stat">
-            <div class="muted">{% trans "Total equipment units" %}</div>
-            <strong>{{ equipment_total }}</strong>
-        </div>
-        <div class="stat">
-            <div class="muted">{% trans "Consumables" %}</div>
-            <strong>{{ consumables_total }}</strong>
-        </div>
-        <div class="stat">
-            <div class="muted">{% trans "Low stock" %}</div>
-            <strong>{{ low_stock_total }}</strong>
-        </div>
-        <div class="stat">
-            <div class="muted">{% trans "Pending requests" %}</div>
-            <strong>{{ requests_pending }}</strong>
-        </div>
-        <div class="stat">
-            <div class="muted">{% trans "Active checkouts" %}</div>
-            <strong>{{ active_checkouts }}</strong>
-        </div>
-        <div class="stat">
-            <div class="muted">{% trans "Inventory due" %}</div>
-            <strong>{{ inventory_due_total }}</strong>
-        </div>
+    <div class="kpi-grid">
+        <article class="kpi-card">
+            <div class="kpi-head">
+                <span class="kpi-label">{% trans "Total equipment units" %}</span>
+                <span class="kpi-icon">EQ</span>
+            </div>
+            <strong class="kpi-value">{{ equipment_total }}</strong>
+        </article>
+        <article class="kpi-card">
+            <div class="kpi-head">
+                <span class="kpi-label">{% trans "Consumables" %}</span>
+                <span class="kpi-icon">CS</span>
+            </div>
+            <strong class="kpi-value">{{ consumables_total }}</strong>
+        </article>
+        <article class="kpi-card">
+            <div class="kpi-head">
+                <span class="kpi-label">{% trans "Low stock" %}</span>
+                <span class="kpi-icon">LS</span>
+            </div>
+            <strong class="kpi-value">{{ low_stock_total }}</strong>
+        </article>
+        <article class="kpi-card">
+            <div class="kpi-head">
+                <span class="kpi-label">{% trans "Pending requests" %}</span>
+                <span class="kpi-icon">RQ</span>
+            </div>
+            <strong class="kpi-value">{{ requests_pending }}</strong>
+        </article>
+        <article class="kpi-card">
+            <div class="kpi-head">
+                <span class="kpi-label">{% trans "Active checkouts" %}</span>
+                <span class="kpi-icon">CO</span>
+            </div>
+            <strong class="kpi-value">{{ active_checkouts }}</strong>
+        </article>
     </div>
 </div>
 

@@ -5,12 +5,12 @@
 <div class="card">
     <div class="card-header">
         <div>
-            <div class="kicker">{% trans "Usage" %}</div>
-            <h2>{% trans "Record usage" %}</h2>
-            <p class="muted">{% trans "Use this form only for consumables written off from stock." %}</p>
+            <div class="kicker">Списания</div>
+            <h2>Оформить списание</h2>
+            <p class="muted">Списывайте расходники и оборудование по ранее созданной заявке.</p>
         </div>
         <div class="actions">
-            <a class="secondary" href="{% url 'usage_history' %}">{% trans "Back to usage history" %}</a>
+            <a class="secondary" href="{% url 'usage_history' %}">Назад к истории списаний</a>
         </div>
     </div>
     <div class="split-layout">
@@ -31,19 +31,53 @@
                 {% include "inventory/_form_field.html" with field=form.note full_width=True %}
             </div>
             <div class="actions">
-                <button class="btn" type="submit">{% trans "Save usage" %}</button>
+                <button class="btn" type="submit">Сохранить списание</button>
             </div>
         </form>
         <div class="field-list">
             <div class="aside-panel">
-                <h3>{% trans "Before saving" %}</h3>
+                <h3>Перед сохранением</h3>
                 <ul>
-                    <li>{% trans "Select a consumable item, not reusable equipment." %}</li>
-                    <li>{% trans "Link a related request when this write-off fulfills a planned task." %}</li>
-                    <li>{% trans "If the quantity is rejected, check current available stock first." %}</li>
+                    <li>Расходники можно списывать напрямую.</li>
+                    <li>Для оборудования выберите связанную заявку.</li>
+                    <li>Количество автоматически берётся из выбранной заявки.</li>
                 </ul>
             </div>
         </div>
     </div>
 </div>
+{% endblock %}
+
+{% block scripts %}
+{{ request_quantity_map|json_script:"request-quantity-map" }}
+<script>
+(() => {
+    const requestField = document.getElementById("id_related_request");
+    const quantityField = document.getElementById("id_quantity");
+    const quantityMapNode = document.getElementById("request-quantity-map");
+    if (!requestField || !quantityField || !quantityMapNode) {
+        return;
+    }
+
+    let quantityMap = {};
+    try {
+        quantityMap = JSON.parse(quantityMapNode.textContent || "{}");
+    } catch (e) {
+        quantityMap = {};
+    }
+
+    const syncQuantity = () => {
+        const requestId = requestField.value;
+        if (requestId && Object.prototype.hasOwnProperty.call(quantityMap, requestId)) {
+            quantityField.value = quantityMap[requestId];
+            quantityField.readOnly = true;
+        } else {
+            quantityField.readOnly = false;
+        }
+    };
+
+    requestField.addEventListener("change", syncQuantity);
+    syncQuantity();
+})();
+</script>
 {% endblock %}

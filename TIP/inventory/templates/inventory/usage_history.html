@@ -30,7 +30,7 @@
         <div class="table-meta">Показано: {{ usage|length }} / {{ total_rows }}</div>
         <div class="actions">
             {% if can_create_usage %}
-            <a href="{% url 'usage_create' %}">Списать материал</a>
+            <a href="{% url 'usage_create' %}">Списать оборудование</a>
             {% endif %}
             {% if user|has_group:"Administrator" %}
             <a class="secondary" href="{% url 'portal_list' entity='usage' %}">🧰 Управление списаниями</a>
@@ -40,13 +40,13 @@
     <table>
         <thead>
             <tr>
-                <th>{% trans "ID" %}</th>
-                <th>{% trans "Equipment" %}</th>
-                <th>{% trans "Qty" %}</th>
-                <th>{% trans "User" %}</th>
-                <th>{% trans "Workplace" %}</th>
-                <th>{% trans "Date" %}</th>
-                <th>{% trans "Request" %}</th>
+                <th>ID</th>
+                <th>Оборудование</th>
+                <th>Количество</th>
+                <th>Пользователь</th>
+                <th>Рабочее место</th>
+                <th>Дата</th>
+                <th>Заявка</th>
                 {% if user|has_group:"Administrator" %}<th>Действия</th>{% endif %}
             </tr>
         </thead>

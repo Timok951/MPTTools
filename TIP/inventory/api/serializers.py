@@ -1,8 +1,8 @@
 from rest_framework import serializers
 
 from assets.models import Equipment, EquipmentCheckout, InventoryAdjustment
-from core.models import Cabinet, EquipmentCategory, Supplier, Workplace
-from operations.models import EquipmentRequest, MaterialUsage, WorkTimer
+from core.models import Cabinet, EquipmentCategory, Workplace
+from operations.models import EquipmentRequest, MaterialUsage
 
 
 class AuditActorModelSerializer(serializers.ModelSerializer):
@@ -47,16 +47,8 @@ class EquipmentCategorySerializer(AuditActorModelSerializer):
         read_only_fields = ["deleted_at"]
 
 
-class SupplierSerializer(AuditActorModelSerializer):
-    class Meta:
-        model = Supplier
-        fields = ["id", "name", "contact_name", "phone", "email", "address", "notes", "deleted_at"]
-        read_only_fields = ["deleted_at"]
-
-
 class EquipmentSerializer(AuditActorModelSerializer):
     category_name = serializers.CharField(source="category.name", read_only=True)
-    supplier_name = serializers.CharField(source="supplier.name", read_only=True)
     workplace_name = serializers.CharField(source="workplace.name", read_only=True)
     cabinet_code = serializers.CharField(source="cabinet.code", read_only=True)
 
@@ -68,8 +60,6 @@ class EquipmentSerializer(AuditActorModelSerializer):
             "inventory_number",
             "category",
             "category_name",
-            "supplier",
-            "supplier_name",
             "serial_number",
             "model",
             "workplace",
@@ -83,8 +73,6 @@ class EquipmentSerializer(AuditActorModelSerializer):
             "low_stock_threshold",
             "purchase_date",
             "warranty_end",
-            "last_inventory_at",
-            "inventory_interval_days",
             "notes",
             "created_at",
             "updated_at",
@@ -197,24 +185,3 @@ class EquipmentCheckoutSerializer(AuditActorModelSerializer):
         read_only_fields = ["taken_by", "deleted_at"]
 
 
-class WorkTimerSerializer(AuditActorModelSerializer):
-    user_username = serializers.CharField(source="user.username", read_only=True)
-    workplace_name = serializers.CharField(source="workplace.name", read_only=True)
-    equipment_name = serializers.CharField(source="equipment.name", read_only=True)
-
-    class Meta:
-        model = WorkTimer
-        fields = [
-            "id",
-            "user",
-            "user_username",
-            "workplace",
-            "workplace_name",
-            "equipment",
-            "equipment_name",
-            "started_at",
-            "ended_at",
-            "note",
-            "deleted_at",
-        ]
-        read_only_fields = ["user", "deleted_at"]

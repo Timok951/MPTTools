@@ -12,6 +12,7 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/5.2/ref/settings/
 """
 
+import importlib.util
 from pathlib import Path
 from django.utils.translation import gettext_lazy as _
 
@@ -55,7 +56,10 @@ CSRF_TRUSTED_ORIGINS = [o.strip() for o in _csrf_origins.split(",") if o.strip()
 
 # Application definition
 
+_ANYMAIL_INSTALLED = importlib.util.find_spec("anymail") is not None
+
 INSTALLED_APPS = [
+    *(['anymail'] if _ANYMAIL_INSTALLED else []),
     'django_prometheus',
     'django.contrib.admin',
     'django.contrib.auth',
@@ -69,8 +73,7 @@ INSTALLED_APPS = [
     'assets',
     'operations',
     'audit',
-    'inventory',
-]
+    'inventory']
 
 MIDDLEWARE = [
     'django_prometheus.middleware.PrometheusBeforeMiddleware',
@@ -201,7 +204,7 @@ LOGIN_URL = '/accounts/login/'
 LOGIN_REDIRECT_URL = '/'
 LOGOUT_REDIRECT_URL = '/accounts/login/'
 
-EMAIL_BACKEND = os.getenv("EMAIL_BACKEND", "django.core.mail.backends.console.EmailBackend").strip()
+EMAIL_BACKEND = os.getenv("EMAIL_BACKEND", "django.core.mail.backends.smtp.EmailBackend").strip()
 EMAIL_HOST = os.getenv("EMAIL_HOST", "localhost").strip()
 EMAIL_PORT = int(os.getenv("EMAIL_PORT", "25").strip() or "25")
 EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER", "").strip()
@@ -209,6 +212,17 @@ EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD", "").strip()
 EMAIL_USE_TLS = os.getenv("EMAIL_USE_TLS", "false").strip().lower() in {"1", "true", "yes", "on"}
 EMAIL_USE_SSL = os.getenv("EMAIL_USE_SSL", "false").strip().lower() in {"1", "true", "yes", "on"}
 DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", "noreply@mpt-tools.local").strip()
+ANYMAIL: dict[str, str] = {}
+if os.getenv("ANYMAIL_BREVO_API_KEY", "").strip():
+    ANYMAIL["BREVO_API_KEY"] = os.getenv("ANYMAIL_BREVO_API_KEY", "").strip()
+if os.getenv("ANYMAIL_SENDGRID_API_KEY", "").strip():
+    ANYMAIL["SENDGRID_API_KEY"] = os.getenv("ANYMAIL_SENDGRID_API_KEY", "").strip()
+if os.getenv("ANYMAIL_MAILGUN_API_KEY", "").strip():
+    ANYMAIL["MAILGUN_API_KEY"] = os.getenv("ANYMAIL_MAILGUN_API_KEY", "").strip()
+if os.getenv("ANYMAIL_MAILGUN_SENDER_DOMAIN", "").strip():
+    ANYMAIL["MAILGUN_SENDER_DOMAIN"] = os.getenv("ANYMAIL_MAILGUN_SENDER_DOMAIN", "").strip()
+if os.getenv("ANYMAIL_POSTMARK_SERVER_TOKEN", "").strip():
+    ANYMAIL["POSTMARK_SERVER_TOKEN"] = os.getenv("ANYMAIL_POSTMARK_SERVER_TOKEN", "").strip()
 YANDEX_MAPS_API_KEY = os.getenv("YANDEX_MAPS_API_KEY", "").strip()
 
 # Default primary key field type

@@ -1,0 +1,86 @@
+{% extends "inventory/base.html" %}
+{% load i18n inventory_extras %}
+
+{% block content %}
+<style>
+    @media print {
+        header, footer, .hotkey-legend, .flash-stack, .reports-print-toolbar {
+            display: none !important;
+        }
+        body {
+            background: white !important;
+        }
+        .page main {
+            padding: 12px !important;
+        }
+        .card {
+            box-shadow: none !important;
+        }
+        table { font-size: 11px; }
+    }
+</style>
+
+<div class="card reports-print-toolbar">
+    <div class="actions" style="flex-wrap: wrap; align-items: center;">
+        <p class="muted" style="margin:0; flex: 1 1 220px;">{% ui_text "В диалоге печати браузера выберите «Сохранить как PDF»." "In the browser print dialog, choose “Save as PDF”." %}</p>
+        <button class="btn" type="button" onclick="window.print()">{% ui_text "Печать / PDF" "Print / PDF" %}</button>
+        <a class="secondary" href="{% url 'usage_history' %}{% if export_query %}?{{ export_query }}{% endif %}">{% ui_text "Назад к операциям" "Back to usage" %}</a>
+    </div>
+</div>
+
+<div class="card">
+    <h2>{% ui_text "История выдачи и списаний" "Usage history" %} — {% ui_text "печать" "print" %}</h2>
+    <p class="muted">
+        {% if filters.from or filters.to %}
+        {% ui_text "Период:" "Period:" %} {{ filters.from|default:"—" }} — {{ filters.to|default:"—" }}
+        {% endif %}
+    </p>
+    <p class="muted">
+        {% ui_text "Строк в файле:" "Rows in export:" %} {{ exported_count }} / {{ total_matching }}
+        {% if truncated %} — {% ui_text "лимит 8000, выборка обрезана" "limit 8000, results truncated" %}{% endif %}
+    </p>
+</div>
+
+<div class="card">
+    <table>
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>{% ui_text "Оборудование" "Equipment" %}</th>
+                <th>{% ui_text "Тип операции" "Operation" %}</th>
+                <th>{% ui_text "Количество" "Qty" %}</th>
+                <th>{% ui_text "Пользователь" "User" %}</th>
+                <th>{% trans "Workplace" %}</th>
+                <th>{% ui_text "Кабинет" "Cabinet" %}</th>
+                <th>{% ui_text "Дата" "Date" %}</th>
+                <th>{% ui_text "Заявка" "Request" %}</th>
+                <th>{% ui_text "Примечание" "Note" %}</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in usage %}
+            <tr>
+                <td>{{ item.pk }}</td>
+                <td>{{ item.equipment|default:"—" }}</td>
+                <td>
+                    {% if item.equipment and item.equipment.is_consumable %}
+                    {% ui_text "Выдача расходуемого" "Consumable issue" %}
+                    {% else %}
+                    {% ui_text "Списание" "Write-off" %}
+                    {% endif %}
+                </td>
+                <td>{{ item.quantity }}</td>
+                <td>{{ item.used_by|default:"—" }}</td>
+                <td>{{ item.workplace|default:"—" }}</td>
+                <td>{{ item.equipment.cabinet|default:"—" }}</td>
+                <td>{{ item.used_at|date:"SHORT_DATETIME_FORMAT" }}</td>
+                <td>{% if item.related_request_id %}#{{ item.related_request_id }}{% else %}—{% endif %}</td>
+                <td>{{ item.note|default:""|truncatechars:80 }}</td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="10" class="muted">—</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

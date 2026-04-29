@@ -34,6 +34,8 @@
     <div class="toolbar-spread">
         <div class="table-meta">Показано: {{ usage|length }} / {{ total_rows }}</div>
         <div class="actions usage-history-actions">
+            <a class="secondary" href="{% url 'usage_export_csv' %}{% if export_query %}?{{ export_query }}{% endif %}">CSV</a>
+            <a class="secondary" href="{% url 'usage_print' %}{% if export_query %}?{{ export_query }}{% endif %}" target="_blank" rel="noopener noreferrer">PDF (печать)</a>
             {% if can_create_usage %}
             <a href="#new_usage_operation">Новая операция</a>
             {% endif %}

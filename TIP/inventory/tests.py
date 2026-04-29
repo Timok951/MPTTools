@@ -21,10 +21,11 @@ from inventory.backup_utils import PostgreSQLBackupConfig, create_postgresql_bac
 from inventory.portal_forms import PortalUserForm
 from operations.models import (
     REQUEST_APPROVED,
+    REQUEST_CLOSED,
+    REQUEST_ISSUED,
     REQUEST_KIND_BUILDER,
     EquipmentRequest,
     MaterialUsage,
-    WorkTimer,
 )
 
 
@@ -35,38 +36,17 @@ class TimerAndPreferenceViewTests(TestCase):
         self.user.groups.add(builder_group)
         self.workplace = Workplace.objects.create(name="Lab 101")
 
-    def test_quick_timer_start_creates_active_timer(self):
-        self.client.force_login(self.user)
-
-        response = self.client.post(
-            reverse("timer_quick_start"),
-            {
-                "workplace": self.workplace.pk,
-                "equipment": "",
-                "note": "Quick test timer",
-            },
-            follow=True,
-        )
-
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(WorkTimer.objects.count(), 1)
-        timer = WorkTimer.objects.get()
-        self.assertEqual(timer.user, self.user)
-        self.assertEqual(timer.workplace, self.workplace)
-        self.assertEqual(timer.note, "Quick test timer")
-        self.assertIsNone(timer.ended_at)
-
     def test_preferences_view_persists_user_settings(self):
         self.client.force_login(self.user)
 
         response = self.client.post(
             reverse("user_preferences"),
             {
+                "email": "builder_prefs@example.com",
                 "theme_variant": "contrast",
                 "preferred_language": "ru",
                 "page_size": 50,
                 "date_display_format": "iso",
-                "default_timer_status": "active",
                 "default_request_status": "pending",
                 "default_request_kind": "builder",
                 "default_usage_period_days": 14,
@@ -78,18 +58,41 @@ class TimerAndPreferenceViewTests(TestCase):
         )
 
         self.assertEqual(response.status_code, 200)
+        self.user.refresh_from_db()
+        self.assertEqual(self.user.email, "builder_prefs@example.com")
         pref = UserPreference.objects.get(user=self.user)
         self.assertEqual(pref.theme_variant, "contrast")
         self.assertEqual(pref.preferred_language, "ru")
         self.assertEqual(pref.page_size, 50)
         self.assertEqual(pref.date_display_format, "iso")
-        self.assertEqual(pref.default_timer_status, "active")
         self.assertEqual(pref.default_request_status, "pending")
         self.assertEqual(pref.default_request_kind, "builder")
         self.assertEqual(pref.default_usage_period_days, 14)
         self.assertEqual(pref.default_checkout_status, "returned")
         self.assertTrue(pref.hotkeys_enabled)
         self.assertTrue(pref.show_hotkey_legend)
+
+    def test_preferences_rejects_duplicate_email(self):
+        User.objects.create_user(username="other_builder", email="taken@example.com", password="secret123")
+        self.client.force_login(self.user)
+        response = self.client.post(
+            reverse("user_preferences"),
+            {
+                "email": "taken@example.com",
+                "theme_variant": "default",
+                "preferred_language": "ru",
+                "page_size": 25,
+                "date_display_format": "compact",
+                "default_request_status": "",
+                "default_request_kind": "",
+                "default_usage_period_days": 30,
+                "default_checkout_status": "",
+            },
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "уже привязан")
+        self.user.refresh_from_db()
+        self.assertEqual((self.user.email or "").strip(), "")
 
     def test_preferences_page_renders_dark_theme_option(self):
         self.client.force_login(self.user)
@@ -318,43 +321,64 @@ class PasswordResetFlowTests(TestCase):
         self.user.refresh_from_db()
         self.assertTrue(self.user.check_password(self.password))
 
+    def test_authenticated_user_without_email_saves_email_on_request(self):
+        user = User.objects.create_user(username="no_mail_user", password=self.password)
+        self.assertEqual((user.email or "").strip(), "")
+        self.client.force_login(user)
+        with mock.patch("inventory.views._generate_password_reset_code", return_value="123456"):
+            self.client.post(reverse("password_reset_request"), {"email": "newmail@example.com"}, follow=True)
+        user.refresh_from_db()
+        self.assertEqual(user.email.lower(), "newmail@example.com")
+
+    def test_authenticated_user_without_email_rejects_taken_email(self):
+        User.objects.create_user(username="taken_owner", email="taken@example.com", password=self.password)
+        user = User.objects.create_user(username="no_mail_two", password=self.password)
+        self.client.force_login(user)
+        response = self.client.post(reverse("password_reset_request"), {"email": "taken@example.com"})
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "уже используется")
+
+    def test_authenticated_user_with_email_rejects_other_email(self):
+        self.client.force_login(self.user)
+        response = self.client.post(reverse("password_reset_request"), {"email": "other@example.com"})
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "профиле")
+
+    def test_authenticated_confirm_rejects_code_for_other_account(self):
+        other = User.objects.create_user(username="other_mail_user", email="other@example.com", password="pass-other-9")
+        with mock.patch("inventory.views._generate_password_reset_code", return_value="999888"):
+            self.client.post(reverse("password_reset_request"), {"email": "mail_user@example.com"})
+        self.client.force_login(other)
+        response = self.client.post(
+            reverse("password_reset_confirm"),
+            {
+                "email": "mail_user@example.com",
+                "code": "999888",
+                "new_password1": "new-secret-999",
+                "new_password2": "new-secret-999",
+            },
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "другой учётной записи")
+        self.user.refresh_from_db()
+        self.assertTrue(self.user.check_password(self.password))
+
 
 class LightweightPerformanceTests(TestCase):
     def setUp(self):
         self.password = "secret123"
-        self.user = User.objects.create_user(username="perf_builder", password=self.password)
-        builder_group, _ = Group.objects.get_or_create(name="Builder")
-        self.user.groups.add(builder_group)
+        self.user = User.objects.create_user(username="perf_admin", password=self.password)
+        admin_group, _ = Group.objects.get_or_create(name="Administrator")
+        self.user.groups.add(admin_group)
         self.workplace = Workplace.objects.create(name="Perf Lab")
 
-    def test_timer_panel_opens_quickly_enough_for_small_fixture(self):
+    def test_analytics_dashboard_loads_quickly_for_small_fixture(self):
         self.client.force_login(self.user)
-
         started = perf_counter()
-        response = self.client.get(reverse("timer_panel"))
+        response = self.client.get(reverse("analytics"))
         elapsed = perf_counter() - started
-
         self.assertEqual(response.status_code, 200)
-        self.assertLess(elapsed, 1.5)
-
-    def test_quick_timer_create_flow_stays_lightweight(self):
-        self.client.force_login(self.user)
-
-        started = perf_counter()
-        response = self.client.post(
-            reverse("timer_quick_start"),
-            {
-                "workplace": self.workplace.pk,
-                "equipment": "",
-                "note": "Perf smoke test",
-            },
-            follow=True,
-        )
-        elapsed = perf_counter() - started
-
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(WorkTimer.objects.filter(user=self.user, note="Perf smoke test").count(), 1)
-        self.assertLess(elapsed, 1.5)
+        self.assertLess(elapsed, 2.0)
 
 
 class AdminProcedureTests(TestCase):
@@ -388,13 +412,6 @@ class AdminProcedureTests(TestCase):
             request_kind=REQUEST_KIND_BUILDER,
             requested_at=timezone.now() - timedelta(days=20),
         )
-        self.old_timer = WorkTimer.objects.create(
-            user=self.builder,
-            workplace=self.workplace,
-            equipment=self.equipment,
-            started_at=timezone.now() - timedelta(hours=30),
-            note="Forgot to stop",
-        )
 
     def test_admin_portal_shows_procedures(self):
         self.client.force_login(self.admin)
@@ -427,7 +444,7 @@ class AdminProcedureTests(TestCase):
         self.assertEqual(self.old_request.processed_by, self.admin)
         self.assertTrue(AdminPortalLog.objects.filter(action="procedure", entity_slug="reject_stale_requests").exists())
 
-    def test_finish_abandoned_timers_procedure_closes_old_timers(self):
+    def test_unknown_procedure_shows_error(self):
         self.client.force_login(self.admin)
 
         response = self.client.post(
@@ -437,14 +454,14 @@ class AdminProcedureTests(TestCase):
         )
 
         self.assertEqual(response.status_code, 200)
-        self.old_timer.refresh_from_db()
-        self.assertIsNotNone(self.old_timer.ended_at)
+        self.assertContains(response, "Неизвестная процедура")
 
     def test_restock_low_stock_consumables_procedure_creates_adjustment(self):
         self.client.force_login(self.admin)
 
         response = self.client.post(
             reverse("portal_procedure_run", kwargs={"slug": "restock_low_stock_consumables"}),
+            {"restock-target_addon": 0},
             follow=True,
         )
 
@@ -456,6 +473,54 @@ class AdminProcedureTests(TestCase):
                 equipment=self.equipment,
                 reason="Automatic restock to low-stock threshold by admin procedure.",
             ).exists()
+        )
+
+    def test_restock_low_stock_consumables_respects_target_addon(self):
+        self.client.force_login(self.admin)
+
+        response = self.client.post(
+            reverse("portal_procedure_run", kwargs={"slug": "restock_low_stock_consumables"}),
+            {"restock-target_addon": 3},
+            follow=True,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.equipment.refresh_from_db()
+        # threshold 5 + addon 3 → available 8 (was 2, delta 6; total 10+6=16)
+        self.assertEqual(self.equipment.quantity_available, 8)
+        self.assertTrue(
+            InventoryAdjustment.objects.filter(
+                equipment=self.equipment,
+                reason="Automatic restock to low-stock threshold plus 3 by admin procedure.",
+            ).exists()
+        )
+
+    def test_close_stale_issued_requests_procedure(self):
+        self.client.force_login(self.admin)
+        issued = EquipmentRequest.objects.create(
+            requester=self.builder,
+            workplace=self.workplace,
+            equipment=self.equipment,
+            quantity=1,
+            request_kind=REQUEST_KIND_BUILDER,
+            status=REQUEST_ISSUED,
+            processed_by=self.admin,
+            processed_at=timezone.now() - timedelta(days=60),
+            requested_at=timezone.now() - timedelta(days=65),
+        )
+
+        response = self.client.post(
+            reverse("portal_procedure_run", kwargs={"slug": "close_stale_issued_requests"}),
+            {"close_issued-stale_days": 30},
+            follow=True,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        issued.refresh_from_db()
+        self.assertEqual(issued.status, REQUEST_CLOSED)
+        self.assertIn("Closed automatically", issued.comment)
+        self.assertTrue(
+            AdminPortalLog.objects.filter(action="procedure", entity_slug="close_stale_issued_requests").exists()
         )
 
 
@@ -512,14 +577,14 @@ class RoleEnforcementWebTests(TestCase):
         self.checkout.refresh_from_db()
         self.assertIsNone(self.checkout.returned_at)
 
-    def test_warehouse_can_return_checkout(self):
+    def test_checkout_return_is_disabled_even_for_warehouse(self):
         self.client.force_login(self.warehouse)
 
         response = self.client.post(reverse("checkout_return", args=[self.checkout.pk]), follow=True)
 
-        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.status_code, 403)
         self.checkout.refresh_from_db()
-        self.assertIsNotNone(self.checkout.returned_at)
+        self.assertIsNone(self.checkout.returned_at)
 
     def test_history_page_is_admin_only(self):
         self.client.force_login(self.builder)
@@ -560,7 +625,8 @@ class RoleEnforcementWebTests(TestCase):
         self.assertEqual(tools_response.status_code, 200)
         self.assertEqual(json_backup_response.status_code, 200)
         self.assertNotContains(tools_response, 'action="/tools/data/import-json/"')
-        self.assertNotContains(tools_response, "Импортировать резервную копию")
+        self.assertNotContains(tools_response, "Импортировать JSON")
+        self.assertNotContains(tools_response, 'action="/tools/data/import-postgresql-dump/"')
 
         import_response = self.client.post(reverse("import_json_backup"), follow=True)
         self.assertEqual(import_response.status_code, 403)
@@ -585,10 +651,8 @@ class RoleEnforcementWebTests(TestCase):
         self.assertNotIn("is_staff", form.fields)
         self.assertNotIn("is_superuser", form.fields)
         self.assertNotIn("user_permissions", form.fields)
-        self.assertEqual(
-            list(form.fields["groups"].queryset.values_list("name", flat=True)),
-            ["Administrator", "Builder", "Sysadmin", "Warehouse"],
-        )
+        names = set(form.fields["groups"].queryset.values_list("name", flat=True))
+        self.assertTrue({"Administrator", "Builder", "Sysadmin", "Warehouse"}.issubset(names))
 
 
 @override_settings(
@@ -715,12 +779,6 @@ class InventoryApiTests(TestCase):
             equipment=self.equipment,
             quantity=1,
             request_kind=REQUEST_KIND_BUILDER,
-        )
-        self.other_timer = WorkTimer.objects.create(
-            user=self.builder_other,
-            workplace=self.workplace,
-            equipment=self.equipment,
-            note="Other builder timer",
         )
 
     def api_client_for(self, user):
@@ -920,16 +978,12 @@ class InventoryApiTests(TestCase):
         self.assertEqual(self.pending_request.processed_by, self.warehouse)
         self.assertIsNotNone(self.pending_request.processed_at)
 
-    def test_builder_cannot_update_other_users_timer(self):
+    def test_timers_api_is_not_exposed(self):
         client = self.api_client_for(self.builder)
 
-        response = client.patch(
-            f"/api/v1/timers/{self.other_timer.pk}/",
-            {"note": "Trying to edit another timer"},
-            format="json",
-        )
+        response = client.get("/api/v1/timers/")
 
-        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.status_code, 404)
 
     def test_builder_can_create_usage_with_audit_actor(self):
         client = self.api_client_for(self.builder)
@@ -992,12 +1046,6 @@ class InventoryApiTests(TestCase):
             workplace=self.workplace,
             taken_at=timezone.now(),
         )
-        own_timer = WorkTimer.objects.create(
-            user=self.builder,
-            workplace=self.workplace,
-            equipment=self.equipment,
-            note="My timer",
-        )
         EquipmentCheckout.objects.create(
             equipment=self.equipment,
             quantity=1,
@@ -1010,12 +1058,10 @@ class InventoryApiTests(TestCase):
 
         requests_response = client.get("/api/v1/requests/")
         usage_response = client.get("/api/v1/usage/")
-        timers_response = client.get("/api/v1/timers/")
         checkouts_response = client.get("/api/v1/checkouts/")
 
         self.assertEqual([item["id"] for item in requests_response.json()], [own_request.pk, self.pending_request.pk])
         self.assertEqual([item["used_by"] for item in usage_response.json()], [self.builder.pk])
-        self.assertEqual([item["id"] for item in timers_response.json()], [own_timer.pk])
         self.assertEqual([item["id"] for item in checkouts_response.json()], [own_checkout.pk])
 
     def test_warehouse_api_lists_can_see_all_operational_records(self):

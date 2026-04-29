@@ -85,6 +85,7 @@ class EquipmentRequestSerializer(AuditActorModelSerializer):
     requester_username = serializers.CharField(source="requester.username", read_only=True)
     equipment_name = serializers.CharField(source="equipment.name", read_only=True)
     workplace_name = serializers.CharField(source="workplace.name", read_only=True)
+    cabinet_name = serializers.CharField(source="cabinet.name", read_only=True)
 
     class Meta:
         model = EquipmentRequest
@@ -94,6 +95,8 @@ class EquipmentRequestSerializer(AuditActorModelSerializer):
             "requester_username",
             "workplace",
             "workplace_name",
+            "cabinet",
+            "cabinet_name",
             "equipment",
             "equipment_name",
             "quantity",

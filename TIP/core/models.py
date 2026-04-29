@@ -82,10 +82,10 @@ class Cabinet(SoftDeleteModel):
     description = models.TextField(blank=True)
 
     class Meta:
-        ordering = ["code"]
+        ordering = ["name"]
 
     def __str__(self) -> str:
-        return f"{self.code} - {self.name}"
+        return self.name
 
 
 class WorkplaceMember(SoftDeleteModel):

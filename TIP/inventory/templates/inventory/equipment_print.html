@@ -1,0 +1,79 @@
+{% extends "inventory/base.html" %}
+{% load i18n inventory_extras %}
+
+{% block content %}
+<style>
+    @media print {
+        header, footer, .hotkey-legend, .flash-stack, .reports-print-toolbar {
+            display: none !important;
+        }
+        body {
+            background: white !important;
+        }
+        .page main {
+            padding: 12px !important;
+        }
+        .card {
+            box-shadow: none !important;
+        }
+        table { font-size: 11px; }
+    }
+</style>
+
+<div class="card reports-print-toolbar">
+    <div class="actions" style="flex-wrap: wrap; align-items: center;">
+        <p class="muted" style="margin:0; flex: 1 1 220px;">{% ui_text "В диалоге печати браузера выберите «Сохранить как PDF»." "In the browser print dialog, choose “Save as PDF”." %}</p>
+        <button class="btn" type="button" onclick="window.print()">{% ui_text "Печать / PDF" "Print / PDF" %}</button>
+        <a class="secondary" href="{% url 'equipment_list' %}{% if export_query %}?{{ export_query }}{% endif %}">{% ui_text "Назад к списку" "Back to list" %}</a>
+    </div>
+</div>
+
+<div class="card">
+    <h2>{% trans "Equipment" %} — {% ui_text "печать" "print" %}</h2>
+    <p class="muted">
+        {% ui_text "Строк в файле:" "Rows in export:" %} {{ exported_count }} / {{ total_matching }}
+        {% if truncated %} — {% ui_text "лимит 8000, выборка обрезана" "limit 8000, results truncated" %}{% endif %}
+    </p>
+</div>
+
+<div class="card">
+    <table>
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>{% trans "Name" %}</th>
+                <th>{% ui_text "Инв. №" "Inv. #" %}</th>
+                <th>{% trans "Serial" %}</th>
+                <th>{% trans "Model" %}</th>
+                <th>{% trans "Category" %}</th>
+                <th>{% trans "Workplace" %}</th>
+                <th>{% ui_text "Кабинет" "Cabinet" %}</th>
+                <th>{% trans "Status" %}</th>
+                <th>{% ui_text "Расх." "Cons." %}</th>
+                <th>{% ui_text "Всего" "Total qty" %}</th>
+                <th>{% ui_text "Дост." "Avail." %}</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in equipment %}
+            <tr>
+                <td>{{ item.pk }}</td>
+                <td>{{ item.name }}</td>
+                <td>{{ item.inventory_number|default:"—" }}</td>
+                <td>{{ item.serial_number|default:"—" }}</td>
+                <td>{{ item.model|default:"—" }}</td>
+                <td>{{ item.category|default:"—" }}</td>
+                <td>{{ item.workplace|default:"—" }}</td>
+                <td>{{ item.cabinet|default:"—" }}</td>
+                <td>{{ item.get_status_display }}</td>
+                <td>{% if item.is_consumable %}{% ui_text "Да" "Yes" %}{% else %}{% ui_text "Нет" "No" %}{% endif %}</td>
+                <td>{{ item.quantity_total }}</td>
+                <td>{{ item.quantity_available }}</td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="12" class="muted">{% trans "No equipment found." %}</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

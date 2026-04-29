@@ -17,7 +17,7 @@ from operations.models import EquipmentRequest, MaterialUsage
 from audit.models import AdminPortalLog
 from audit.portal_log import log_portal_action
 
-from .admin_procedures import reject_stale_requests, restock_low_stock_consumables
+from .admin_procedures import close_stale_issued_requests, reject_stale_requests, restock_low_stock_consumables
 from .authz import is_portal_admin
 from .portal_forms import (
     PortalCabinetForm,
@@ -29,7 +29,9 @@ from .portal_forms import (
     PortalUserForm,
     PortalWorkplaceForm,
     PortalWorkplaceMemberForm,
+    CloseStaleIssuedRequestsProcedureForm,
     RejectStaleRequestsProcedureForm,
+    RestockLowStockConsumablesProcedureForm,
 )
 from .views import forbidden
 
@@ -44,12 +46,18 @@ class PortalEntity:
 
 
 PORTAL_ENTITIES: tuple[PortalEntity, ...] = (
-    PortalEntity("equipment", Equipment, PortalEquipmentForm, ("name", "inventory_number", "status", "quantity_total", "deleted_at"), "Оборудование"),
+    PortalEntity("equipment", Equipment, PortalEquipmentForm, ("name", "serial_number", "status", "quantity_total", "deleted_at"), "Оборудование"),
     PortalEntity("categories", EquipmentCategory, PortalEquipmentCategoryForm, ("name", "deleted_at"), "Категории"),
     PortalEntity("workplaces", Workplace, PortalWorkplaceForm, ("name", "location", "deleted_at"), "Рабочие места"),
-    PortalEntity("cabinets", Cabinet, PortalCabinetForm, ("code", "name", "workplace", "deleted_at"), "Кабинеты"),
+    PortalEntity("cabinets", Cabinet, PortalCabinetForm, ("name", "workplace", "deleted_at"), "Кабинеты"),
     PortalEntity("workplace-members", WorkplaceMember, PortalWorkplaceMemberForm, ("workplace", "user", "role", "deleted_at"), "Сотрудники"),
-    PortalEntity("requests", EquipmentRequest, PortalEquipmentRequestForm, ("requester", "equipment", "quantity", "status", "deleted_at"), "Заявки"),
+    PortalEntity(
+        "requests",
+        EquipmentRequest,
+        PortalEquipmentRequestForm,
+        ("requester", "equipment", "cabinet", "quantity", "status", "deleted_at"),
+        "Заявки",
+    ),
     PortalEntity("usage", MaterialUsage, PortalMaterialUsageForm, ("equipment", "quantity", "used_by", "used_at", "deleted_at"), "Выдача расходуемого"),
     PortalEntity("users", User, PortalUserForm, ("username", "email", "is_active", "is_staff", "is_superuser"), "Пользователи"),
     PortalEntity("groups", Group, PortalGroupForm, ("name",), "Группы и роли"),
@@ -79,8 +87,14 @@ def _procedure_cards():
         {
             "slug": "restock_low_stock_consumables",
             "title": _("Пополнить расходники с низким остатком"),
-            "description": _("Создаёт корректировки остатков для расходников, которые опустились ниже порога."),
-            "form": None,
+            "description": _("Создаёт корректировки остатков для расходников ниже порога; целевой остаток = порог + запас сверх порога."),
+            "form": RestockLowStockConsumablesProcedureForm(prefix="restock"),
+        },
+        {
+            "slug": "close_stale_issued_requests",
+            "title": _("Закрыть старые выданные заявки"),
+            "description": _("Переводит в «Закрыта» заявки в статусе «Выдана», у которых дата обработки (или подачи) старше указанного срока."),
+            "form": CloseStaleIssuedRequestsProcedureForm(prefix="close_issued"),
         },
     ]
 
@@ -115,8 +129,8 @@ def _list_headers(model: type[models.Model], fields: tuple[str, ...]):
 
 def _friendly_integrity_message(exc: Exception) -> str:
     text = str(exc)
-    if "inventory_number" in text:
-        return _("Такой инвентарный номер уже существует. Укажите другой.")
+    if "inventory_number" in text or "serial_number" in text:
+        return _("Такой серийный номер уже существует. Укажите другой.")
     return _("Не удалось сохранить запись из-за дублирующегося или некорректного уникального значения.")
 
 
@@ -156,6 +170,8 @@ def portal_list(request, entity: str):
     cfg = _get_entity_or_404(entity)
     if cfg.slug == "usage":
         return redirect("usage_history")
+    if cfg.slug == "equipment":
+        return redirect("equipment_list")
     show_deleted = bool(request.session.get("show_deleted_global", False))
     has_soft_delete = any(f.name == "deleted_at" for f in cfg.model._meta.fields)
     qs = _manager(cfg.model).all()
@@ -286,14 +302,29 @@ def portal_procedure_run(request, slug: str):
     if request.method != "POST":
         return redirect("portal_home")
 
+    extra_meta: dict = {}
+
     if slug == "reject_stale_requests":
         form = RejectStaleRequestsProcedureForm(request.POST, prefix="reject")
         if not form.is_valid():
             messages.error(request, _("Укажите корректный срок давности для заявок."))
             return redirect("portal_home")
+        extra_meta["stale_days"] = form.cleaned_data["stale_days"]
         result = reject_stale_requests(actor=request.user, stale_days=form.cleaned_data["stale_days"])
     elif slug == "restock_low_stock_consumables":
-        result = restock_low_stock_consumables(actor=request.user)
+        form = RestockLowStockConsumablesProcedureForm(request.POST, prefix="restock")
+        if not form.is_valid():
+            messages.error(request, _("Укажите неотрицательный запас сверх порога."))
+            return redirect("portal_home")
+        extra_meta["target_addon"] = form.cleaned_data["target_addon"]
+        result = restock_low_stock_consumables(actor=request.user, target_addon=form.cleaned_data["target_addon"])
+    elif slug == "close_stale_issued_requests":
+        form = CloseStaleIssuedRequestsProcedureForm(request.POST, prefix="close_issued")
+        if not form.is_valid():
+            messages.error(request, _("Укажите корректный срок для выданных заявок."))
+            return redirect("portal_home")
+        extra_meta["stale_days"] = form.cleaned_data["stale_days"]
+        result = close_stale_issued_requests(actor=request.user, stale_days=form.cleaned_data["stale_days"])
     else:
         messages.error(request, _("Неизвестная процедура."))
         return redirect("portal_home")
@@ -307,6 +338,7 @@ def portal_procedure_run(request, slug: str):
             "processed_count": result.processed_count,
             "detail": result.detail,
             "execution_mode": result.execution_mode,
+            **extra_meta,
         },
     )
     messages.success(request, result.detail)

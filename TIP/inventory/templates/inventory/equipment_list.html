@@ -14,7 +14,7 @@
     <form method="get" class="filters">
         <div>
             <label for="id_q">{% trans "Search" %}</label>
-            <input id="id_q" type="text" name="q" value="{{ filters.q }}" placeholder="{% trans 'Name, serial, inventory' %}" />
+            <input id="id_q" type="text" name="q" value="{{ filters.q }}" placeholder="{% trans 'Name, serial, model' %}" />
         </div>
         <div>
             <label for="id_status">{% trans "Status" %}</label>
@@ -44,15 +44,6 @@
             </select>
         </div>
         <div>
-            <label for="id_cabinet">{% trans "Cabinet" %}</label>
-            <select id="id_cabinet" name="cabinet">
-                <option value="">{% trans "All" %}</option>
-                {% for item in cabinets %}
-                <option value="{{ item.id }}" {% if filters.cabinet == item.id|stringformat:"s" %}selected{% endif %}>{{ item.code }}</option>
-                {% endfor %}
-            </select>
-        </div>
-        <div>
             <label for="id_consumable">{% trans "Consumable" %}</label>
             <select id="id_consumable" name="consumable">
                 <option value="">{% trans "All" %}</option>
@@ -70,9 +61,10 @@
     <div class="toolbar-spread">
         <div class="table-meta">{% trans "Showing" %}: {{ equipment|length }} / {{ total_rows }}</div>
         <div class="actions">
-            {% if user|has_group:"Administrator" %}
+            <a class="secondary" href="{% url 'equipment_export_csv' %}{% if export_query %}?{{ export_query }}{% endif %}">{% ui_text "CSV" "CSV" %}</a>
+            <a class="secondary" href="{% url 'equipment_print' %}{% if export_query %}?{{ export_query }}{% endif %}" target="_blank" rel="noopener noreferrer">{% ui_text "PDF (печать)" "PDF (print)" %}</a>
+            {% if can_manage_equipment %}
                 <a href="{% url 'portal_create' entity='equipment' %}">➕ {% trans "Add" %}</a>
-                <a class="secondary" href="{% url 'portal_list' entity='equipment' %}">🧰 {% trans "Manage equipment" %}</a>
             {% endif %}
         </div>
     </div>
@@ -85,14 +77,18 @@
                 {% else %}
                 <div class="equipment-card-empty">{% ui_text "Нет фото" "No photo" %}</div>
                 {% endif %}
-                <span class="badge equipment-card-badge">{{ item.inventory_number }}</span>
+                <span class="badge equipment-card-badge">{{ item.serial_number|default:"-" }}</span>
             </div>
             <div class="equipment-card-body">
-                <div>
-                    <h3 class="equipment-card-title">{{ item.name }}</h3>
+                <div class="catalog-card-head">
+                    <div class="catalog-card-topline">
+                        <span class="catalog-stock-pill">
+                            {% if item.status == "in_stock" %}In stock{% else %}{{ item.get_status_display }}{% endif %}
+                        </span>
+                    </div>
+                    <h3 class="equipment-card-title">{{ item.name|truncatechars:52 }}</h3>
                     <div class="equipment-card-subtitle">
-                        {{ item.category|default:"-" }}
-                        {% if item.model %} • {{ item.model }}{% endif %}
+                        {{ item.category|default:"-" }}{% if item.model %} • {{ item.model }}{% endif %}
                     </div>
                 </div>
 
@@ -116,13 +112,35 @@
                         <strong>{{ item.workplace|default:"-" }}</strong>
                     </div>
                     <div class="equipment-card-row">
-                        <span>{% ui_text "Кабинет" "Cabinet" %}</span>
-                        <strong>{{ item.cabinet|default:"-" }}</strong>
+                        <span>{% ui_text "Серийный номер" "Serial number" %}</span>
+                        <strong>{{ item.serial_number|default:"-" }}</strong>
+                    </div>
+                    <div class="equipment-card-row">
+                        <span>{% ui_text "Модель" "Model" %}</span>
+                        <strong>{{ item.model|default:"-" }}</strong>
+                    </div>
+                    <div class="equipment-card-row">
+                        <span>{% ui_text "Количество" "Quantity" %}</span>
+                        <strong>{{ item.quantity_total|default:1 }}</strong>
+                    </div>
+                    <div class="equipment-card-row">
+                        <span>{% ui_text "Дата покупки" "Purchase date" %}</span>
+                        <strong>{% if item.purchase_date %}{{ item.purchase_date|date:preferred_date_format }}{% else %}-{% endif %}</strong>
+                    </div>
+                    <div class="equipment-card-row">
+                        <span>{% ui_text "Гарантия до" "Warranty until" %}</span>
+                        <strong>{% if item.warranty_end %}{{ item.warranty_end|date:preferred_date_format }}{% else %}-{% endif %}</strong>
                     </div>
                     <div class="equipment-card-row">
                         <span>{% ui_text "Расходник" "Consumable" %}</span>
                         <strong>{% if item.is_consumable %}{% ui_text "Да" "Yes" %}{% else %}{% ui_text "Нет" "No" %}{% endif %}</strong>
                     </div>
+                    {% if item.notes %}
+                    <div class="equipment-card-row">
+                        <span>{% ui_text "Примечание" "Notes" %}</span>
+                        <strong>{{ item.notes|truncatechars:80 }}</strong>
+                    </div>
+                    {% endif %}
                 </div>
 
                 <div class="equipment-card-flags">
@@ -131,19 +149,37 @@
 
                 <div class="actions">
                     <a class="secondary qr-toggle-btn" href="{% url 'equipment_qr' equipment_id=item.pk %}" target="_blank" data-qr-id="{{ item.pk }}">QR</a>
-                    {% if user|has_group:"Administrator" %}
-                    <a href="{% url 'portal_edit' entity='equipment' pk=item.pk %}">✏️ {% ui_text "Изменить" "Edit" %}</a>
-                    {% if item.deleted_at %}
-                        <a class="secondary" href="{% url 'portal_restore' entity='equipment' pk=item.pk %}">↩ {% ui_text "Восстановить" "Restore" %}</a>
-                    {% else %}
-                        <a class="secondary" href="{% url 'portal_delete' entity='equipment' pk=item.pk %}">🗑 {% ui_text "Удалить" "Delete" %}</a>
-                    {% endif %}
+                    {% if can_manage_equipment %}
+                    <a href="{% url 'portal_edit' entity='equipment' pk=item.pk %}">✏️ {% ui_text "Редактировать" "Edit" %}</a>
+                    <form method="post" class="request-quick-action">
+                        {% csrf_token %}
+                        <input type="hidden" name="action" value="status">
+                        <input type="hidden" name="equipment_id" value="{{ item.pk }}">
+                        <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                        <select name="status" class="request-status-select">
+                            {% for value, label in status_choices %}
+                                <option value="{{ value }}" {% if item.status == value %}selected{% endif %}>{{ label }}</option>
+                            {% endfor %}
+                        </select>
+                        <button class="btn secondary request-quick-btn" type="submit">Изменить статус</button>
+                    </form>
+                    <form method="post" class="request-quick-action">
+                        {% csrf_token %}
+                        <input type="hidden" name="action" value="toggle_delete">
+                        <input type="hidden" name="equipment_id" value="{{ item.pk }}">
+                        <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                        {% if item.deleted_at %}
+                            <button class="btn secondary" type="submit">↩ {% ui_text "Восстановить" "Restore" %}</button>
+                        {% else %}
+                            <button class="btn secondary" type="submit">🗑 {% ui_text "Удалить" "Delete" %}</button>
+                        {% endif %}
+                    </form>
                     {% endif %}
                 </div>
                 <div class="qr-preview" id="qr-preview-{{ item.pk }}" style="display:none; text-align:center; margin-top:8px;">
-                    <img src="{% url 'equipment_qr' equipment_id=item.pk %}" alt="QR {{ item.inventory_number }}" style="max-width:160px;" loading="lazy" />
+                    <img src="{% url 'equipment_qr' equipment_id=item.pk %}" alt="QR {{ item.serial_number|default:item.name }}" style="max-width:160px;" loading="lazy" />
                     <div style="margin-top:4px;">
-                        <a class="secondary" href="{% url 'equipment_qr' equipment_id=item.pk %}" download="qr-{{ item.inventory_number }}.png" style="font-size:12px;">{% ui_text "Скачать" "Download" %}</a>
+                        <a class="secondary" href="{% url 'equipment_qr' equipment_id=item.pk %}" download="qr-{{ item.serial_number|default:item.pk }}.png" style="font-size:12px;">{% ui_text "Скачать" "Download" %}</a>
                     </div>
                 </div>
             </div>

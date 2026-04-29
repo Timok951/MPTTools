@@ -9,7 +9,8 @@
         <a class="secondary" href="{% url 'portal_list' entity='requests' %}">{% trans "Requests" %}</a>
         <a class="secondary" href="{% url 'portal_list' entity='usage' %}">{% trans "Usage" %}</a>
         <a class="secondary" href="{% url 'portal_list' entity='checkouts' %}">{% trans "Checkouts" %}</a>
-        <a class="secondary" href="{% url 'portal_list' entity='timers' %}">{% trans "Timers" %}</a>
+        <a class="secondary" href="{% url 'analytics_export_csv_zip' %}">{% ui_text "Таблицы CSV (ZIP)" "Tables CSV (ZIP)" %}</a>
+        <a class="secondary" href="{% url 'analytics_print' %}" target="_blank" rel="noopener noreferrer">{% ui_text "Таблицы PDF (печать)" "Tables PDF (print)" %}</a>
     </div>
     {% endif %}
     <h2>{% trans "Analytics" %}</h2>

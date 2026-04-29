@@ -1,0 +1,85 @@
+{% extends "inventory/base.html" %}
+{% load i18n inventory_extras %}
+
+{% block content %}
+<style>
+    @media print {
+        header, footer, .hotkey-legend, .flash-stack, .reports-print-toolbar {
+            display: none !important;
+        }
+        body {
+            background: white !important;
+        }
+        .page main {
+            padding: 12px !important;
+        }
+        .card {
+            box-shadow: none !important;
+        }
+        table { font-size: 11px; }
+    }
+</style>
+
+<div class="card reports-print-toolbar">
+    <div class="actions" style="flex-wrap: wrap; align-items: center;">
+        <p class="muted" style="margin:0; flex: 1 1 220px;">{% ui_text "В диалоге печати браузера выберите «Сохранить как PDF»." "In the browser print dialog, choose “Save as PDF”." %}</p>
+        <button class="btn" type="button" onclick="window.print()">{% ui_text "Печать / PDF" "Print / PDF" %}</button>
+        <a class="secondary" href="{% url 'request_history' %}{% if export_query %}?{{ export_query }}{% endif %}">{% ui_text "Назад к заявкам" "Back to requests" %}</a>
+    </div>
+</div>
+
+<div class="card">
+    <h2>{% ui_text "Заявки" "Requests" %} — {% ui_text "печать" "print" %}</h2>
+    <p class="muted">
+        {% if filters.view %}<span>{% ui_text "Вид:" "View:" %} {{ filters.view }}</span> · {% endif %}
+        {% if filters.status %}<span>{% ui_text "Статус:" "Status:" %} {{ filters.status }}</span> · {% endif %}
+        {% if filters.kind %}<span>{% ui_text "Тип:" "Kind:" %} {{ filters.kind }}</span> · {% endif %}
+        {% if filters.from or filters.to %}
+        {% ui_text "Период:" "Period:" %} {{ filters.from|default:"—" }} — {{ filters.to|default:"—" }}
+        {% endif %}
+    </p>
+    <p class="muted">
+        {% ui_text "Строк в файле:" "Rows in export:" %} {{ exported_count }} / {{ total_matching }}
+        {% if truncated %} — {% ui_text "лимит 8000, выборка обрезана" "limit 8000, results truncated" %}{% endif %}
+    </p>
+</div>
+
+<div class="card">
+    <table>
+        <thead>
+            <tr>
+                <th>{% trans "ID" %}</th>
+                <th>{% trans "Requester" %}</th>
+                <th>{% trans "Request type" %}</th>
+                <th>{% trans "Equipment" %}</th>
+                <th>{% ui_text "Кабинет" "Cabinet" %}</th>
+                <th>{% trans "Qty" %}</th>
+                <th>{% trans "Status" %}</th>
+                <th>{% ui_text "Обработчик" "Processor" %}</th>
+                <th>{% trans "Requested at" %}</th>
+                <th>{% trans "Needed by" %}</th>
+                <th>{% ui_text "Комментарий" "Comment" %}</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in requests %}
+            <tr>
+                <td>{{ item.pk }}</td>
+                <td>{{ item.requester }}</td>
+                <td>{{ item.get_request_kind_display }}</td>
+                <td>{{ item.equipment|default:"—" }}</td>
+                <td>{{ item.cabinet|default:"—" }}</td>
+                <td>{{ item.quantity }}</td>
+                <td>{{ item.get_status_display }}</td>
+                <td>{{ item.processed_by|default:"—" }}</td>
+                <td>{{ item.requested_at|date:"SHORT_DATETIME_FORMAT" }}</td>
+                <td>{% if item.needed_by %}{{ item.needed_by|date:preferred_date_format }}{% else %}—{% endif %}</td>
+                <td>{{ item.comment|default:""|truncatechars:120 }}</td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="11" class="muted">—</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

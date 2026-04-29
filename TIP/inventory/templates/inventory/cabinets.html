@@ -3,17 +3,16 @@
 
 {% block content %}
 <div class="card">
-    <h2>Шкафы</h2>
+    <h2>Кабинеты</h2>
     {% if user|has_group:"Administrator" %}
     <div class="actions" style="margin-bottom: 8px;">
         <a href="{% url 'portal_create' entity='cabinets' %}">➕ Добавить</a>
-        <a class="secondary" href="{% url 'portal_list' entity='cabinets' %}">🧰 Управление шкафами</a>
+        <a class="secondary" href="{% url 'portal_list' entity='cabinets' %}">🧰 Управление кабинетами</a>
     </div>
     {% endif %}
     <table>
         <thead>
             <tr>
-                <th>Код</th>
                 <th>Название</th>
                 <th>Рабочее место</th>
                 <th>Этаж</th>
@@ -26,7 +25,6 @@
         <tbody>
             {% for cabinet in cabinets %}
             <tr>
-                <td>{{ cabinet.code }}</td>
                 <td>{{ cabinet.name }}</td>
                 <td>{{ cabinet.workplace }}</td>
                 <td>{{ cabinet.floor }}</td>
@@ -43,7 +41,7 @@
                 {% endif %}
             </tr>
             {% empty %}
-            <tr><td colspan="{% if user|has_group:'Administrator' %}6{% else %}5{% endif %}" class="muted">Шкафов пока нет.</td></tr>
+            <tr><td colspan="{% if user|has_group:'Administrator' %}5{% else %}4{% endif %}" class="muted">Кабинетов пока нет.</td></tr>
             {% endfor %}
         </tbody>
     </table>

@@ -62,6 +62,8 @@
     <div class="toolbar-spread">
         <div class="table-meta">Показано: {{ requests|length }} / {{ total_rows }}</div>
         <div class="actions">
+            <a class="secondary" href="{% url 'request_export_csv' %}{% if export_query %}?{{ export_query }}{% endif %}">CSV</a>
+            <a class="secondary" href="{% url 'request_print' %}{% if export_query %}?{{ export_query }}{% endif %}" target="_blank" rel="noopener noreferrer">PDF (печать)</a>
             {% if can_create_request %}
             <a href="{% url 'request_create' %}">Новая заявка</a>
             {% endif %}
@@ -77,6 +79,7 @@
                 <th>{% trans "Requester" %}</th>
                 <th>{% trans "Request type" %}</th>
                 <th>{% trans "Equipment" %}</th>
+                <th>Кабинет</th>
                 <th>{% trans "Qty" %}</th>
                 <th>{% trans "Status" %}</th>
                 <th>Обработчик</th>
@@ -92,6 +95,7 @@
                 <td>{{ item.requester }}</td>
                 <td>{{ item.get_request_kind_display }}</td>
                 <td>{{ item.equipment }}</td>
+                <td>{{ item.cabinet|default:"—" }}</td>
                 <td>{{ item.quantity }}</td>
                 <td>
                     {% if can_quick_status %}

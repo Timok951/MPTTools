@@ -7,8 +7,9 @@ from operations.models import EquipmentRequest, MaterialUsage
 from .authz import ROLE_ALIASES
 
 
-def _model_fields(model, omit=("deleted_at",)):
-    return [f.name for f in model._meta.fields if f.editable and f.name not in omit]
+def _model_fields(model, omit=()):
+    blocked = {"deleted_at", *omit}
+    return [f.name for f in model._meta.fields if f.editable and f.name not in blocked]
 
 
 class PortalEquipmentForm(forms.ModelForm):
@@ -21,13 +22,13 @@ class PortalEquipmentForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields["status"].choices = self.VISIBLE_STATUS_CHOICES
+        self.fields["serial_number"].required = True
 
     class Meta:
         model = Equipment
-        fields = _model_fields(Equipment, omit=("deleted_at", "cabinet", "quantity_available"))
+        fields = _model_fields(Equipment, omit=("inventory_number", "cabinet", "quantity_available"))
         labels = {
             "name": "Название",
-            "inventory_number": "Инвентарный номер",
             "category": "Категория",
             "serial_number": "Серийный номер",
             "model": "Модель",
@@ -47,16 +48,27 @@ class PortalEquipmentForm(forms.ModelForm):
             "notes": forms.Textarea(attrs={"rows": 4}),
         }
 
-    def clean_inventory_number(self):
-        value = (self.cleaned_data.get("inventory_number") or "").strip()
+    def clean_serial_number(self):
+        value = (self.cleaned_data.get("serial_number") or "").strip()
         if not value:
-            return value
+            raise forms.ValidationError("Укажите серийный номер.")
         qs = Equipment.all_objects.filter(inventory_number=value)
         if self.instance and self.instance.pk:
             qs = qs.exclude(pk=self.instance.pk)
         if qs.exists():
-            raise forms.ValidationError("Такой инвентарный номер уже существует.")
+            raise forms.ValidationError("Такой серийный номер уже существует.")
         return value
+
+    def save(self, commit=True):
+        instance = super().save(commit=False)
+        serial_number = (self.cleaned_data.get("serial_number") or "").strip()
+        instance.serial_number = serial_number
+        # Keep legacy unique field in sync while UI uses serial number only.
+        instance.inventory_number = serial_number
+        if commit:
+            instance.save()
+            self.save_m2m()
+        return instance
 
 
 class PortalEquipmentCategoryForm(forms.ModelForm):
@@ -77,7 +89,7 @@ class PortalWorkplaceForm(forms.ModelForm):
 
     class Meta:
         model = Workplace
-        fields = _model_fields(Workplace, omit=("map_address",))
+        fields = _model_fields(Workplace, omit=("deleted_at", "map_address"))
         labels = {
             "name": "Название",
             "location": "Локация",
@@ -111,12 +123,32 @@ class PortalWorkplaceForm(forms.ModelForm):
 
 
 class PortalCabinetForm(forms.ModelForm):
+    def clean_name(self):
+        value = (self.cleaned_data.get("name") or "").strip()
+        if not value:
+            return value
+        qs = Cabinet.all_objects.filter(code=value)
+        if self.instance and self.instance.pk:
+            qs = qs.exclude(pk=self.instance.pk)
+        if qs.exists():
+            raise forms.ValidationError("Кабинет с таким названием уже существует.")
+        return value
+
+    def save(self, commit=True):
+        instance = super().save(commit=False)
+        normalized_name = (self.cleaned_data.get("name") or "").strip()
+        instance.name = normalized_name
+        instance.code = normalized_name
+        if commit:
+            instance.save()
+            self.save_m2m()
+        return instance
+
     class Meta:
         model = Cabinet
-        fields = _model_fields(Cabinet)
+        fields = _model_fields(Cabinet, omit=("code",))
         labels = {
             "workplace": "Рабочее место",
-            "code": "Код",
             "name": "Название",
             "floor": "Этаж",
             "description": "Описание",
@@ -176,6 +208,7 @@ class PortalEquipmentRequestForm(forms.ModelForm):
         labels = {
             "requester": "Заявитель",
             "workplace": "Рабочее место",
+            "cabinet": "Кабинет",
             "equipment": "Оборудование",
             "quantity": "Количество",
             "request_kind": "Тип заявки",
@@ -274,6 +307,19 @@ class PortalGroupForm(forms.ModelForm):
 
 class RejectStaleRequestsProcedureForm(forms.Form):
     stale_days = forms.IntegerField(label="Дней без обработки", min_value=1, initial=14)
+
+
+class RestockLowStockConsumablesProcedureForm(forms.Form):
+    target_addon = forms.IntegerField(
+        label="Запас сверх порога",
+        min_value=0,
+        initial=0,
+        help_text="После пополнения доступный остаток будет доведён до «порог + это число» для каждой позиции ниже порога.",
+    )
+
+
+class CloseStaleIssuedRequestsProcedureForm(forms.Form):
+    stale_days = forms.IntegerField(label="Дней в статусе «Выдана»", min_value=1, initial=30)
 
 
 class FinishAbandonedTimersProcedureForm(forms.Form):

@@ -7,7 +7,7 @@
         <div>
             <div class="kicker">Заявка #{{ item.pk }}</div>
             <h2>{{ item.equipment|default:"Без оборудования" }}</h2>
-            <p class="muted">Создал: {{ item.requester }} | Кол-во: {{ item.quantity }} | Статус: <span class="{{ item.badge_class }}">{{ item.get_status_display }}</span></p>
+            <p class="muted">Создал: {{ item.requester }} | Рабочее место: {{ item.workplace|default:"—" }} | Кабинет: {{ item.cabinet|default:"—" }} | Кол-во: {{ item.quantity }} | Статус: <span class="{{ item.badge_class }}">{{ item.get_status_display }}</span></p>
             <p class="muted">Обработчик: {{ item.processed_by|default:"-" }} | Сообщений: {{ messages_list|length }} | Фото: {{ photos|length }}</p>
         </div>
         <div class="actions">

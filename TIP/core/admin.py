@@ -18,8 +18,8 @@ class WorkplaceAdmin(SoftDeleteAdmin):
 
 @admin.register(Cabinet)
 class CabinetAdmin(SoftDeleteAdmin):
-    list_display = ("code", "name", "workplace", "floor", "deleted_at")
-    search_fields = ("code", "name", "workplace__name")
+    list_display = ("name", "workplace", "floor", "deleted_at")
+    search_fields = ("name", "workplace__name")
 
 
 @admin.register(WorkplaceMember)

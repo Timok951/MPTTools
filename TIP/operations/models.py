@@ -4,7 +4,7 @@ from django.db import models
 from django.utils import timezone
 
 from assets.models import Equipment
-from core.models import SoftDeleteModel, Workplace
+from core.models import Cabinet, SoftDeleteModel, Workplace
 
 REQUEST_PENDING = "pending"
 REQUEST_APPROVED = "approved"
@@ -34,6 +34,7 @@ class EquipmentRequest(SoftDeleteModel):
         settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="equipment_requests"
     )
     workplace = models.ForeignKey(Workplace, on_delete=models.SET_NULL, null=True, blank=True)
+    cabinet = models.ForeignKey(Cabinet, on_delete=models.SET_NULL, null=True, blank=True, related_name="equipment_requests")
     equipment = models.ForeignKey(Equipment, on_delete=models.SET_NULL, null=True, blank=True)
     quantity = models.PositiveIntegerField(default=1)
     request_kind = models.CharField(max_length=20, choices=REQUEST_KIND_CHOICES)

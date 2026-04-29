@@ -31,6 +31,8 @@
             </div>
             {% endif %}
             <div>{{ workplace.description }}</div>
+            {% with ws_members=members_by_workplace|get_item:workplace.id %}
+            {% if ws_members %}
             <table>
                 <thead>
                     <tr>
@@ -40,17 +42,17 @@
                     </tr>
                 </thead>
                 <tbody>
-                    {% for member in members_by_workplace|get_item:workplace.id %}
+                    {% for member in ws_members %}
                     <tr>
                         <td>{{ member.user }}</td>
                         <td>{{ member.get_role_display }}</td>
                         <td>{{ member.assigned_at }}</td>
                     </tr>
-                    {% empty %}
-                    <tr><td colspan="3" class="muted">Сотрудники не назначены.</td></tr>
                     {% endfor %}
                 </tbody>
             </table>
+            {% endif %}
+            {% endwith %}
         </div>
     {% empty %}
         <div class="muted">Рабочие места ещё не созданы.</div>

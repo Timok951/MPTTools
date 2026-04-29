@@ -1,0 +1,194 @@
+{% extends "inventory/base.html" %}
+{% load i18n inventory_extras %}
+
+{% block content %}
+<style>
+    @media print {
+        header, footer, .hotkey-legend, .flash-stack, .reports-print-toolbar {
+            display: none !important;
+        }
+        body {
+            background: white !important;
+        }
+        .page main {
+            padding: 12px !important;
+        }
+        .card {
+            box-shadow: none !important;
+            break-inside: avoid;
+            page-break-inside: avoid;
+        }
+    }
+</style>
+
+<div class="card reports-print-toolbar">
+    <div class="actions" style="flex-wrap: wrap; align-items: center;">
+        <p class="muted" style="margin:0; flex: 1 1 220px;">{% ui_text "В диалоге печати браузера выберите «Сохранить как PDF»." "In the browser print dialog, choose “Save as PDF”." %}</p>
+        <button class="btn" type="button" onclick="window.print()">{% ui_text "Печать / PDF" "Print / PDF" %}</button>
+        <a class="secondary" href="{% url 'analytics' %}">{% ui_text "Назад к аналитике" "Back to analytics" %}</a>
+    </div>
+</div>
+
+<div class="card">
+    <h2>{% trans "Analytics" %} — {% ui_text "таблицы" "tables" %}</h2>
+</div>
+
+<div class="card">
+    <h3>{% ui_text "Показатели" "KPIs" %}</h3>
+    <table>
+        <thead>
+            <tr>
+                <th>{% ui_text "Показатель" "Metric" %}</th>
+                <th>{% ui_text "Значение" "Value" %}</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr><td>{% trans "Total equipment units" %}</td><td>{{ equipment_total }}</td></tr>
+            <tr><td>{% trans "Consumables" %}</td><td>{{ consumables_total }}</td></tr>
+            <tr><td>{% trans "Low stock" %}</td><td>{{ low_stock_total }}</td></tr>
+            <tr><td>{% trans "Pending requests" %}</td><td>{{ requests_pending }}</td></tr>
+            <tr><td>{% trans "Active checkouts" %}</td><td>{{ active_checkouts }}</td></tr>
+        </tbody>
+    </table>
+</div>
+
+<div class="card">
+    <h3>{% trans "Equipment by status" %}</h3>
+    <table>
+        <thead>
+            <tr><th>{% trans "Status" %}</th><th>{% ui_text "Количество" "Count" %}</th></tr>
+        </thead>
+        <tbody>
+            {% for row in equipment_by_status %}
+            <tr><td>{{ row.status }}</td><td>{{ row.count }}</td></tr>
+            {% empty %}
+            <tr><td colspan="2" class="muted">—</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<div class="card">
+    <h3>{% trans "Requests by status" %}</h3>
+    <table>
+        <thead>
+            <tr><th>{% trans "Status" %}</th><th>{% ui_text "Количество" "Count" %}</th></tr>
+        </thead>
+        <tbody>
+            {% for row in requests_by_status %}
+            <tr><td>{{ row.status }}</td><td>{{ row.count }}</td></tr>
+            {% empty %}
+            <tr><td colspan="2" class="muted">—</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<div class="card">
+    <h3>{% trans "Stock by category" %}</h3>
+    <table>
+        <thead>
+            <tr>
+                <th>{% ui_text "Категория" "Category" %}</th>
+                <th>{% trans "Total" %}</th>
+                <th>{% trans "Available" %}</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for row in category_stock %}
+            <tr><td>{{ row.category }}</td><td>{{ row.total }}</td><td>{{ row.available }}</td></tr>
+            {% empty %}
+            <tr><td colspan="3" class="muted">—</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<div class="card">
+    <h3>{% trans "Activity last 30 days" %}</h3>
+    <table>
+        <thead>
+            <tr>
+                <th>{% ui_text "Дата" "Date" %}</th>
+                <th>{% trans "Requests" %}</th>
+                <th>{% trans "Usage" %}</th>
+                <th>{% trans "Checkouts" %}</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for row in activity_table_rows %}
+            <tr>
+                <td>{{ row.date }}</td>
+                <td>{{ row.requests }}</td>
+                <td>{{ row.usage }}</td>
+                <td>{{ row.checkouts }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<div class="card">
+    <h3>{% trans "Recent requests" %}</h3>
+    <table>
+        <thead>
+            <tr>
+                <th>{% trans "ID" %}</th>
+                <th>{% trans "Requester" %}</th>
+                <th>{% trans "Equipment" %}</th>
+                <th>{% trans "Qty" %}</th>
+                <th>{% trans "Status" %}</th>
+                <th>{% trans "Requested at" %}</th>
+                <th>{% trans "Workplace" %}</th>
+                <th>{% ui_text "Кабинет" "Cabinet" %}</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in recent_requests %}
+            <tr>
+                <td>{{ item.id }}</td>
+                <td>{{ item.requester }}</td>
+                <td>{{ item.equipment|default:"—" }}</td>
+                <td>{{ item.quantity }}</td>
+                <td>{{ item.get_status_display }}</td>
+                <td>{{ item.requested_at|date:"SHORT_DATETIME_FORMAT" }}</td>
+                <td>{{ item.workplace|default:"—" }}</td>
+                <td>{{ item.cabinet|default:"—" }}</td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="8" class="muted">{% trans "No requests yet." %}</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<div class="card">
+    <h3>{% trans "Recent material usage" %}</h3>
+    <table>
+        <thead>
+            <tr>
+                <th>{% trans "ID" %}</th>
+                <th>{% trans "Equipment" %}</th>
+                <th>{% trans "Qty" %}</th>
+                <th>{% trans "User" %}</th>
+                <th>{% trans "Workplace" %}</th>
+                <th>{% trans "Date" %}</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in recent_usage %}
+            <tr>
+                <td>{{ item.id }}</td>
+                <td>{{ item.equipment|default:"—" }}</td>
+                <td>{{ item.quantity }}</td>
+                <td>{{ item.used_by|default:"—" }}</td>
+                <td>{{ item.workplace|default:"—" }}</td>
+                <td>{{ item.used_at|date:"SHORT_DATETIME_FORMAT" }}</td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="6" class="muted">{% trans "No usage records yet." %}</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

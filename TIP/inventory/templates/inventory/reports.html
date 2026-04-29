@@ -22,6 +22,9 @@
         <div>
             <button class="btn" type="submit">Отбор</button>
         </div>
+        <div class="actions" style="align-self: end;">
+            <a class="secondary" href="{% url 'reports_print' %}?from={{ filters.from }}&to={{ filters.to }}" target="_blank" rel="noopener noreferrer">{% ui_text "Сводка PDF (печать)" "Summary PDF (print)" %}</a>
+        </div>
     </form>
 </div>
 

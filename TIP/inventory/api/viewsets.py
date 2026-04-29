@@ -149,7 +149,7 @@ class WorkplaceViewSet(InventoryModelViewSet):
 
 
 class CabinetViewSet(InventoryModelViewSet):
-    queryset = Cabinet.objects.select_related("workplace").order_by("code")
+    queryset = Cabinet.objects.select_related("workplace").order_by("name")
     serializer_class = CabinetSerializer
 
 
@@ -159,7 +159,9 @@ class EquipmentCategoryViewSet(InventoryModelViewSet):
 
 
 class EquipmentRequestViewSet(InventoryModelViewSet):
-    queryset = EquipmentRequest.objects.select_related("requester", "workplace", "equipment", "processed_by").order_by("-requested_at")
+    queryset = EquipmentRequest.objects.select_related(
+        "requester", "workplace", "cabinet", "equipment", "processed_by"
+    ).order_by("-requested_at")
     serializer_class = EquipmentRequestSerializer
     role_matrix = {
         "read": ALL_API_ROLES,

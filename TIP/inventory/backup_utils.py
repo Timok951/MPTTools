@@ -125,3 +125,43 @@ def create_postgresql_backup(
         removed_files=removed_files,
         command=command,
     )
+
+
+def restore_postgresql_custom_dump(
+    dump_path: Path,
+    config: PostgreSQLBackupConfig,
+    *,
+    pg_restore_path: str | None = None,
+) -> None:
+    """Restore a custom-format (-Fc) pg_dump file created by create_postgresql_backup."""
+    resolved = pg_restore_path or os.getenv("PG_RESTORE_PATH", "pg_restore")
+    command = (
+        resolved,
+        "-h",
+        config.db_host,
+        "-p",
+        config.db_port,
+        "-U",
+        config.db_user,
+        "-d",
+        config.db_name,
+        "--clean",
+        "--if-exists",
+        "--no-owner",
+        "--no-acl",
+        str(dump_path),
+    )
+    env = os.environ.copy()
+    if config.db_password:
+        env["PGPASSWORD"] = config.db_password
+    try:
+        subprocess.run(command, check=True, env=env, capture_output=True, text=True)
+    except FileNotFoundError as exc:
+        raise CommandError(
+            f"pg_restore was not found: {resolved}. Set PG_RESTORE_PATH in TIP/.env or install PostgreSQL client tools."
+        ) from exc
+    except subprocess.CalledProcessError as exc:
+        stderr = (exc.stderr or "").strip()
+        stdout = (exc.stdout or "").strip()
+        details = stderr or stdout or str(exc)
+        raise CommandError(f"PostgreSQL restore failed: {details}") from exc

@@ -3,23 +3,53 @@
 
 {% block content %}
 <div class="card">
-    <h2>Импорт JSON-резервной копии</h2>
-    <p class="muted">Автоматический серверный бэкап добавлен через Docker.</p>
+    <h2>{% ui_text "Резервные копии и импорт" "Backups and import" %}</h2>
+    <p class="muted">{% ui_text "Экспорт и загрузка данных. Дамп PostgreSQL в формате pg_dump -Fc (файл .dump)." "Export and upload data. PostgreSQL dumps use pg_dump custom format (-Fc, .dump file)." %}</p>
+</div>
+
+<div class="card">
+    <h3>{% ui_text "Скачать" "Download" %}</h3>
+    <div class="actions" style="flex-wrap: wrap;">
+        <a class="btn secondary" href="{% url 'download_json_backup' %}">{% ui_text "JSON (dumpdata)" "JSON (dumpdata)" %}</a>
+        {% if sqlite_available %}
+        <a class="btn secondary" href="{% url 'download_sqlite_backup' %}">{% ui_text "Файл SQLite" "SQLite file" %}</a>
+        {% endif %}
+        {% if postgresql_available %}
+        <a class="btn secondary" href="{% url 'download_postgresql_backup' %}">{% ui_text "PostgreSQL (.dump)" "PostgreSQL (.dump)" %}</a>
+        {% endif %}
+    </div>
 </div>
 
 {% if can_import_backup %}
 <div class="card">
-    <p class="muted">Загрузите файл, созданный экспортом JSON-резервной копии. Существующие записи с теми же идентификаторами будут обновлены.</p>
+    <h3>{% ui_text "Импорт JSON" "Import JSON" %}</h3>
+    <p class="muted">{% ui_text "Файл из экспорта JSON. Записи с совпадающими id будут обновлены." "File from JSON export. Rows with matching ids will be updated." %}</p>
     <form method="post" action="{% url 'import_json_backup' %}" enctype="multipart/form-data" class="grid" style="gap: 12px; max-width: 560px;">
         {% csrf_token %}
         <div>
-            <label for="{{ backup_import_form.backup_file.id_for_label }}">Файл резервной копии</label>
+            <label for="{{ backup_import_form.backup_file.id_for_label }}">{{ backup_import_form.backup_file.label }}</label>
             {{ backup_import_form.backup_file }}
         </div>
         <div class="actions">
-            <button class="btn" type="submit">Импортировать резервную копию</button>
+            <button class="btn" type="submit">{% ui_text "Импортировать JSON" "Import JSON" %}</button>
         </div>
     </form>
 </div>
+{% if postgresql_available %}
+<div class="card">
+    <h3>{% ui_text "Импорт дампа PostgreSQL" "Import PostgreSQL dump" %}</h3>
+    <p class="muted">{% ui_text "Только формат .dump (pg_dump -Fc). Выполняется pg_restore --clean в текущую базу. Сделайте резервную копию перед загрузкой." "Only .dump format (pg_dump -Fc). Runs pg_restore --clean into the current database. Back up before uploading." %}</p>
+    <form method="post" action="{% url 'import_postgresql_dump' %}" enctype="multipart/form-data" class="grid" style="gap: 12px; max-width: 560px;">
+        {% csrf_token %}
+        <div>
+            <label for="{{ postgresql_dump_import_form.dump_file.id_for_label }}">{{ postgresql_dump_import_form.dump_file.label }}</label>
+            {{ postgresql_dump_import_form.dump_file }}
+        </div>
+        <div class="actions">
+            <button class="btn" type="submit">{% ui_text "Восстановить из .dump" "Restore from .dump" %}</button>
+        </div>
+    </form>
+</div>
+{% endif %}
 {% endif %}
 {% endblock %}

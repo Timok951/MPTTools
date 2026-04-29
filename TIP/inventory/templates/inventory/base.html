@@ -1036,24 +1036,36 @@
         }
         .equipment-card-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-            gap: 12px;
+            grid-template-columns: repeat(auto-fill, minmax(250px, 290px));
+            gap: 14px;
             margin-top: 12px;
+            justify-content: flex-start;
         }
         .equipment-card {
             overflow: hidden;
             padding: 0;
+            border-radius: 14px;
+            display: flex;
+            flex-direction: column;
+            min-height: 0;
         }
         .equipment-card-media {
             position: relative;
-            aspect-ratio: 16 / 10;
+            width: 100%;
+            box-sizing: border-box;
             background: linear-gradient(135deg, var(--surface-strong), var(--panel-soft));
             border-bottom: 1px solid var(--border);
+            display: grid;
+            place-items: center;
+            height: 190px;
+            padding: 8px 12px;
         }
         .equipment-card-media img {
             width: 100%;
             height: 100%;
-            object-fit: cover;
+            margin: auto;
+            object-fit: contain;
+            object-position: center;
             display: block;
         }
         .equipment-card-empty {
@@ -1070,25 +1082,58 @@
         .equipment-card-badge {
             position: absolute;
             right: 10px;
-            bottom: 10px;
+            top: 10px;
         }
         .equipment-card-body {
-            padding: 10px;
+            padding: 12px 12px 12px;
             display: grid;
             gap: 8px;
         }
         .equipment-card-title {
             margin: 0;
             font-size: 14px;
+            line-height: 1.3;
         }
         .equipment-card-subtitle {
             font-size: 12px;
             color: var(--muted);
         }
+        .catalog-card-head {
+            display: grid;
+            gap: 4px;
+        }
+        .catalog-card-topline {
+            display: flex;
+            align-items: center;
+            justify-content: flex-start;
+            gap: 8px;
+        }
+        .catalog-stock-pill {
+            display: inline-flex;
+            align-items: center;
+            border-radius: 999px;
+            background: #18b15a;
+            color: #fff;
+            font-size: 10px;
+            font-weight: 700;
+            padding: 3px 9px;
+            text-transform: uppercase;
+            letter-spacing: 0.02em;
+        }
+        .catalog-secondary-info {
+            color: var(--muted);
+            font-size: 11px;
+            font-weight: 600;
+        }
+        body.theme-dark .catalog-stock-pill {
+            background: #2fcb73;
+            color: #0f2a1a;
+        }
         .equipment-card-meta {
             display: grid;
-            gap: 6px;
-            font-size: 12px;
+            gap: 7px;
+            font-size: 11px;
+            padding-top: 2px;
         }
         .equipment-card-row {
             display: flex;
@@ -1102,6 +1147,38 @@
             display: flex;
             flex-wrap: wrap;
             gap: 8px;
+        }
+        .equipment-card .actions {
+            gap: 6px;
+            align-items: center;
+            padding-top: 2px;
+        }
+        .equipment-card .request-quick-action {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .equipment-card .request-status-select {
+            min-width: 118px;
+            max-width: 118px;
+            padding: 6px 8px;
+            font-size: 12px;
+            border-radius: 9px;
+        }
+        .equipment-card .actions a,
+        .equipment-card .actions .btn {
+            padding: 6px 10px;
+            border-radius: 10px;
+            font-size: 12px;
+            font-weight: 600;
+            box-shadow: 0 5px 12px rgba(76, 103, 255, 0.2);
+        }
+        .equipment-card .actions a.secondary,
+        .equipment-card .actions .btn.secondary {
+            box-shadow: none;
+        }
+        .equipment-card .request-quick-btn {
+            white-space: nowrap;
         }
         .qr-toggle-btn {
             min-width: 42px;
@@ -1149,6 +1226,9 @@
         }
         @media (max-width: 960px) {
             .split-layout { grid-template-columns: 1fr; }
+            .equipment-card-grid {
+                grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            }
         }
         @media (max-width: 720px) {
             .topbar {
@@ -1233,7 +1313,7 @@
                         <a class="admin-quick admin-quick-muted" href="{% url 'role_assignment' %}">{% ui_text "Роли" "Roles" %}</a>
                         {% endif %}
                         <a class="admin-quick admin-quick-muted" href="{% url 'quality_report' %}">{% ui_text "Качество сайта" "Site quality" %}</a>
-                        <a class="admin-quick admin-quick-muted" href="{% url 'data_tools' %}">{% ui_text "Резервные копии / PDF" "Backups / PDF" %}</a>
+                        <a class="admin-quick admin-quick-muted" href="{% url 'data_tools' %}">{% ui_text "Резервные копии" "Backups" %}</a>
                         <a class="admin-quick admin-quick-muted" href="{% url 'api_docs' %}">{% ui_text "Документация API" "API docs" %}</a>
                     {% endif %}
 

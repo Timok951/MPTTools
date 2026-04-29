@@ -10,6 +10,8 @@ class EquipmentRequestAdmin(SoftDeleteAdmin):
         "id",
         "requester",
         "request_kind",
+        "workplace",
+        "cabinet",
         "equipment",
         "quantity",
         "status",

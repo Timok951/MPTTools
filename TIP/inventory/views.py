@@ -6,6 +6,7 @@ import os
 from pathlib import Path
 import random
 import tempfile
+import zipfile
 from urllib.parse import urlencode
 
 import qrcode
@@ -14,11 +15,14 @@ from django.contrib import messages
 from django.contrib.auth import login, logout
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import Group, User
+from smtplib import SMTPException
+
 from django.conf import settings
 from django.core.mail import send_mail
 from django.views.decorators.http import require_POST
 from django.utils import translation
 from django.core.management import call_command
+from django.core.management.base import CommandError
 from django.core.paginator import Paginator
 from django.db.models import Count, F, Q, Sum
 from django.db.models.functions import TruncDate
@@ -63,8 +67,10 @@ from .authz import (
     user_has_capability,
     user_in_group,
 )
+from .backup_utils import create_postgresql_backup, get_postgresql_backup_config, restore_postgresql_custom_dump
 from .forms import (
     BackupImportForm,
+    PostgresqlDumpImportForm,
     DirectMessageForm,
     EquipmentCheckoutForm,
     EquipmentRequestMessageForm,
@@ -150,7 +156,14 @@ def _can_access_data_tools(user) -> bool:
 
 
 def _can_import_backup(user) -> bool:
-    return user_has_capability(user, "users_and_site_admin")
+    if not user_has_capability(user, "users_and_site_admin"):
+        return False
+    if getattr(user, "is_superuser", False):
+        return True
+    # Только «Sysadmin» может скачивать инструменты, но не импортировать (см. RoleEnforcementWebTests).
+    if user.groups.filter(name="Sysadmin").exists():
+        return user.groups.filter(name="Administrator").exists()
+    return True
 
 
 def _can_access_quality_report(user) -> bool:
@@ -284,11 +297,75 @@ def _with_page_context(page_obj):
     }
 
 
-@login_required
-def analytics(request):
-    if not user_in_group(request.user, GROUP_ADMIN):
-        return forbidden(request, "Аналитика доступна только администратору.")
+def _export_querystring(params: dict) -> str:
+    return urlencode({key: value for key, value in params.items() if value not in (None, "", [])})
 
+
+def _request_history_filtered_queryset(request):
+    preferences = _get_user_preferences(request.user)
+    show_deleted = bool(request.session.get("show_deleted_global", False))
+    requests_manager = EquipmentRequest.all_objects if show_deleted else EquipmentRequest.objects
+    requests_qs = requests_manager.select_related(
+        "requester", "equipment", "workplace", "cabinet", "processed_by"
+    ).order_by("-requested_at")
+    view_mode = request.GET.get("view", "").strip()
+    if not _can_view_all_operational_data(request.user):
+        requests_qs = requests_qs.filter(requester=request.user)
+    status = request.GET.get("status", "").strip()
+    kind = request.GET.get("kind", "").strip()
+    if not status and "status" not in request.GET and preferences and preferences.default_request_status:
+        status = preferences.default_request_status
+    if not kind and "kind" not in request.GET and preferences and preferences.default_request_kind:
+        kind = preferences.default_request_kind
+    date_from = request.GET.get("from", "").strip()
+    date_to = request.GET.get("to", "").strip()
+
+    if view_mode == "mine":
+        requests_qs = requests_qs.filter(requester=request.user)
+    elif view_mode == "processing":
+        requests_qs = requests_qs.filter(status__in=[REQUEST_PENDING, REQUEST_APPROVED, REQUEST_ISSUED])
+        if _can_process_request_status(request.user):
+            requests_qs = requests_qs.exclude(processed_by=request.user, status__in=[REQUEST_APPROVED, REQUEST_ISSUED])
+
+    if status:
+        requests_qs = requests_qs.filter(status=status)
+    if kind:
+        requests_qs = requests_qs.filter(request_kind=kind)
+    if date_from:
+        requests_qs = requests_qs.filter(requested_at__date__gte=date_from)
+    if date_to:
+        requests_qs = requests_qs.filter(requested_at__date__lte=date_to)
+
+    filters = {"status": status, "kind": kind, "from": date_from, "to": date_to, "view": view_mode}
+    return requests_qs, filters
+
+
+def _usage_history_filtered_queryset(request):
+    preferences = _get_user_preferences(request.user)
+    show_deleted = bool(request.session.get("show_deleted_global", False))
+    usage_manager = MaterialUsage.all_objects if show_deleted else MaterialUsage.objects
+    usage_qs = usage_manager.select_related(
+        "equipment", "equipment__cabinet", "used_by", "workplace", "related_request"
+    ).order_by("-used_at")
+    if not _can_view_all_operational_data(request.user):
+        usage_qs = usage_qs.filter(used_by=request.user)
+    date_from = request.GET.get("from", "").strip()
+    date_to = request.GET.get("to", "").strip()
+    if not date_from and "from" not in request.GET and preferences and preferences.default_usage_period_days:
+        date_from = (timezone.localdate() - timedelta(days=preferences.default_usage_period_days)).isoformat()
+    if date_from:
+        usage_qs = usage_qs.filter(used_at__date__gte=date_from)
+    if date_to:
+        usage_qs = usage_qs.filter(used_at__date__lte=date_to)
+    filters = {"from": date_from, "to": date_to}
+    return usage_qs, filters
+
+
+def _build_analytics_context(
+    *,
+    recent_requests_limit: int = 10,
+    recent_usage_limit: int = 10,
+) -> dict:
     equipment_total = Equipment.objects.count()
     consumables_total = Equipment.objects.filter(is_consumable=True).count()
     low_stock_total = Equipment.objects.filter(quantity_available__lte=F("low_stock_threshold")).count()
@@ -309,8 +386,14 @@ def analytics(request):
         for item in request_by_status_raw
     ]
 
-    recent_requests = EquipmentRequest.objects.select_related("requester", "equipment").order_by("-requested_at")[:10]
-    recent_usage = MaterialUsage.objects.select_related("used_by", "equipment").order_by("-used_at")[:10]
+    recent_requests = list(
+        EquipmentRequest.objects.select_related("requester", "equipment", "workplace", "cabinet")
+        .order_by("-requested_at")[:recent_requests_limit]
+    )
+    recent_usage = list(
+        MaterialUsage.objects.select_related("used_by", "equipment", "workplace")
+        .order_by("-used_at")[:recent_usage_limit]
+    )
 
     start_date = timezone.now().date() - timedelta(days=29)
     days = [start_date + timedelta(days=idx) for idx in range(30)]
@@ -357,7 +440,7 @@ def analytics(request):
         for item in category_stock_raw
     ]
 
-    context = {
+    return {
         "equipment_total": equipment_total,
         "consumables_total": consumables_total,
         "low_stock_total": low_stock_total,
@@ -373,13 +456,152 @@ def analytics(request):
         "checkouts_daily": series_from_queryset(checkout_daily_qs, "count"),
         "category_stock": category_stock,
     }
-    return render(request, "inventory/analytics.html", context)
+
+
+def _zip_csv_bytes(filename: str, header: list[str], rows: list[list]) -> tuple[str, bytes]:
+    buf = io.StringIO()
+    writer = csv.writer(buf)
+    writer.writerow(header)
+    for row in rows:
+        writer.writerow(row)
+    return filename, buf.getvalue().encode("utf-8-sig")
 
 
 @login_required
-def equipment_list(request):
-    preferences = _get_user_preferences(request.user)
-    page_size = preferences.page_size if preferences else 25
+def analytics(request):
+    if not user_in_group(request.user, GROUP_ADMIN):
+        return forbidden(request, "Аналитика доступна только администратору.")
+    return render(request, "inventory/analytics.html", _build_analytics_context())
+
+
+@login_required
+def analytics_export_csv_zip(request):
+    if not user_in_group(request.user, GROUP_ADMIN):
+        return forbidden(request, "Экспорт доступен только администратору.")
+    ctx = _build_analytics_context(recent_requests_limit=8000, recent_usage_limit=8000)
+    files: list[tuple[str, bytes]] = []
+    files.append(
+        _zip_csv_bytes(
+            "01_kpi.csv",
+            ["metric", "value"],
+            [
+                ["equipment_total", ctx["equipment_total"]],
+                ["consumables_total", ctx["consumables_total"]],
+                ["low_stock_total", ctx["low_stock_total"]],
+                ["requests_pending", ctx["requests_pending"]],
+                ["active_checkouts", ctx["active_checkouts"]],
+            ],
+        )
+    )
+    files.append(
+        _zip_csv_bytes(
+            "02_equipment_by_status.csv",
+            ["status", "count"],
+            [[row["status"], row["count"]] for row in ctx["equipment_by_status"]],
+        )
+    )
+    files.append(
+        _zip_csv_bytes(
+            "03_requests_by_status.csv",
+            ["status", "count"],
+            [[row["status"], row["count"]] for row in ctx["requests_by_status"]],
+        )
+    )
+    files.append(
+        _zip_csv_bytes(
+            "04_category_stock.csv",
+            ["category", "total", "available"],
+            [[row["category"], row["total"], row["available"]] for row in ctx["category_stock"]],
+        )
+    )
+    activity_rows = []
+    for idx, day in enumerate(ctx["day_labels"]):
+        activity_rows.append(
+            [
+                day,
+                ctx["requests_daily"][idx],
+                ctx["usage_daily"][idx],
+                ctx["checkouts_daily"][idx],
+            ]
+        )
+    files.append(
+        _zip_csv_bytes(
+            "05_activity_daily_30d.csv",
+            ["date", "requests", "usage", "checkouts"],
+            activity_rows,
+        )
+    )
+    req_rows = []
+    for r in ctx["recent_requests"]:
+        req_rows.append(
+            [
+                r.pk,
+                r.requester.get_username() if r.requester_id else "",
+                str(r.equipment) if r.equipment_id else "",
+                r.quantity,
+                r.get_status_display(),
+                timezone.localtime(r.requested_at).isoformat() if r.requested_at else "",
+                str(r.workplace) if r.workplace_id else "",
+                str(r.cabinet) if r.cabinet_id else "",
+            ]
+        )
+    files.append(
+        _zip_csv_bytes(
+            "06_recent_requests.csv",
+            ["id", "requester", "equipment", "quantity", "status", "requested_at", "workplace", "cabinet"],
+            req_rows,
+        )
+    )
+    usage_rows = []
+    for u in ctx["recent_usage"]:
+        usage_rows.append(
+            [
+                u.pk,
+                str(u.equipment) if u.equipment_id else "",
+                u.quantity,
+                u.used_by.get_username() if u.used_by_id else "",
+                str(u.workplace) if u.workplace_id else "",
+                timezone.localtime(u.used_at).isoformat() if u.used_at else "",
+            ]
+        )
+    files.append(
+        _zip_csv_bytes(
+            "07_recent_usage.csv",
+            ["id", "equipment", "quantity", "used_by", "workplace", "used_at"],
+            usage_rows,
+        )
+    )
+
+    zip_buffer = io.BytesIO()
+    with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zf:
+        for name, data in files:
+            zf.writestr(name, data)
+    zip_buffer.seek(0)
+    response = HttpResponse(zip_buffer.getvalue(), content_type="application/zip")
+    response["Content-Disposition"] = 'attachment; filename="analytics-tables.zip"'
+    return response
+
+
+@login_required
+def analytics_print(request):
+    if not user_in_group(request.user, GROUP_ADMIN):
+        return forbidden(request, "Аналитика доступна только администратору.")
+    ctx = _build_analytics_context(recent_requests_limit=250, recent_usage_limit=250)
+    activity_rows = []
+    for idx, day in enumerate(ctx["day_labels"]):
+        activity_rows.append(
+            {
+                "date": day,
+                "requests": ctx["requests_daily"][idx],
+                "usage": ctx["usage_daily"][idx],
+                "checkouts": ctx["checkouts_daily"][idx],
+            }
+        )
+    ctx["activity_table_rows"] = activity_rows
+    return render(request, "inventory/analytics_print.html", ctx)
+
+
+def _equipment_list_filtered_queryset(request):
     show_deleted = bool(request.session.get("show_deleted_global", False))
     manager = Equipment.all_objects if show_deleted else Equipment.objects
     queryset = manager.select_related("category", "workplace", "cabinet")
@@ -388,14 +610,12 @@ def equipment_list(request):
     status = request.GET.get("status", "").strip()
     category = request.GET.get("category", "").strip()
     workplace = request.GET.get("workplace", "").strip()
-    cabinet = request.GET.get("cabinet", "").strip()
     consumable = request.GET.get("consumable", "").strip()
     low_stock = request.GET.get("low_stock", "").strip()
 
     if query:
         queryset = queryset.filter(
             Q(name__icontains=query)
-            | Q(inventory_number__icontains=query)
             | Q(serial_number__icontains=query)
             | Q(model__icontains=query)
         )
@@ -413,14 +633,139 @@ def equipment_list(request):
     if workplace:
         queryset = queryset.filter(workplace_id=workplace)
 
-    if cabinet:
-        queryset = queryset.filter(cabinet_id=cabinet)
-
     if consumable:
         queryset = queryset.filter(is_consumable=consumable == "1")
 
     if low_stock:
         queryset = queryset.filter(quantity_available__lte=F("low_stock_threshold"))
+
+    list_filters = {
+        "q": query,
+        "status": status,
+        "category": category,
+        "workplace": workplace,
+        "consumable": consumable,
+        "low_stock": low_stock,
+        "show_deleted": "1" if show_deleted else "",
+    }
+    return queryset.order_by("name", "inventory_number"), list_filters, status_base_qs
+
+
+@login_required
+def equipment_export_csv(request):
+    queryset, list_filters, _sb = _equipment_list_filtered_queryset(request)
+    buffer = io.StringIO()
+    writer = csv.writer(buffer)
+    writer.writerow(
+        [
+            "id",
+            "name",
+            "inventory_number",
+            "serial_number",
+            "model",
+            "category",
+            "workplace",
+            "cabinet",
+            "status",
+            "is_consumable",
+            "quantity_total",
+            "quantity_available",
+            "low_stock_threshold",
+            "deleted_at",
+        ]
+    )
+    for eq in queryset.iterator(chunk_size=500):
+        writer.writerow(
+            [
+                eq.pk,
+                eq.name,
+                eq.inventory_number,
+                eq.serial_number,
+                eq.model,
+                eq.category.name if eq.category_id else "",
+                eq.workplace.name if eq.workplace_id else "",
+                eq.cabinet.name if eq.cabinet_id else "",
+                eq.get_status_display(),
+                "1" if eq.is_consumable else "0",
+                eq.quantity_total,
+                eq.quantity_available,
+                eq.low_stock_threshold,
+                eq.deleted_at.isoformat() if eq.deleted_at else "",
+            ]
+        )
+    response = HttpResponse(buffer.getvalue().encode("utf-8-sig"), content_type="text/csv; charset=utf-8")
+    response["Content-Disposition"] = 'attachment; filename="equipment-export.csv"'
+    return response
+
+
+@login_required
+def equipment_print(request):
+    queryset, list_filters, _sb = _equipment_list_filtered_queryset(request)
+    total = queryset.count()
+    cap = 8000
+    items = list(queryset[:cap])
+    return render(
+        request,
+        "inventory/equipment_print.html",
+        {
+            "equipment": items,
+            "filters": list_filters,
+            "export_query": _export_querystring(list_filters),
+            "exported_count": len(items),
+            "total_matching": total,
+            "truncated": total > len(items),
+        },
+    )
+
+
+@login_required
+def equipment_list(request):
+    preferences = _get_user_preferences(request.user)
+    page_size = preferences.page_size if preferences else 25
+    show_deleted = bool(request.session.get("show_deleted_global", False))
+    can_manage_equipment = _can_access_data_tools(request.user) or user_in_group(request.user, GROUP_ADMIN)
+
+    if request.method == "POST":
+        if not can_manage_equipment:
+            return forbidden(request, "Управление оборудованием доступно только уполномоченным ролям.")
+        action = (request.POST.get("action") or "").strip()
+        next_url = (request.POST.get("next") or "").strip() or reverse("equipment_list")
+        if action == "status":
+            equipment_id = (request.POST.get("equipment_id") or "").strip()
+            new_status = (request.POST.get("status") or "").strip()
+            if not equipment_id.isdigit():
+                messages.error(request, "Не удалось определить запись оборудования.")
+                return redirect(next_url)
+            allowed_statuses = {value for value, _ in Equipment._meta.get_field("status").choices}
+            if new_status not in allowed_statuses:
+                messages.error(request, "Некорректный статус оборудования.")
+                return redirect(next_url)
+            item = get_object_or_404(Equipment.all_objects.select_related("category", "workplace", "cabinet"), pk=int(equipment_id))
+            item.status = new_status
+            item._actor = request.user
+            item.save(update_fields=["status"])
+            messages.success(request, "Статус оборудования обновлён.")
+            return redirect(next_url)
+        elif action == "toggle_delete":
+            equipment_id = (request.POST.get("equipment_id") or "").strip()
+            if not equipment_id.isdigit():
+                messages.error(request, "Не удалось определить запись оборудования.")
+                return redirect(next_url)
+            item = get_object_or_404(Equipment.all_objects.select_related("category", "workplace", "cabinet"), pk=int(equipment_id))
+            if item.deleted_at:
+                item.restore()
+                messages.success(request, "Оборудование восстановлено.")
+            else:
+                item.delete()
+                messages.success(request, "Оборудование перемещено в удалённые.")
+            return redirect(next_url)
+
+    queryset, list_filters, status_base_qs = _equipment_list_filtered_queryset(request)
+    query = list_filters["q"]
+    status = list_filters["status"]
+    category = list_filters["category"]
+    workplace = list_filters["workplace"]
+    consumable = list_filters["consumable"]
 
     page_obj = _paginate(request, queryset, page_size)
     equipment_items = [_decorate_equipment(item) for item in page_obj.object_list]
@@ -431,7 +776,6 @@ def equipment_list(request):
         "q": query,
         "category": category,
         "workplace": workplace,
-        "cabinet": cabinet,
         "consumable": consumable,
     }
     status_filter_links = []
@@ -465,19 +809,11 @@ def equipment_list(request):
         "equipment": equipment_items,
         "categories": EquipmentCategory.objects.all(),
         "workplaces": Workplace.objects.all(),
-        "cabinets": Cabinet.objects.all(),
         "status_choices": [(value, status_label_map.get(value, value)) for value in VISIBLE_EQUIPMENT_STATUSES],
         "status_filter_links": status_filter_links,
-        "filters": {
-            "q": query,
-            "status": status,
-            "category": category,
-            "workplace": workplace,
-            "cabinet": cabinet,
-            "consumable": consumable,
-            "low_stock": low_stock,
-            "show_deleted": "1" if show_deleted else "",
-        },
+        "can_manage_equipment": can_manage_equipment,
+        "filters": list_filters,
+        "export_query": _export_querystring(list_filters),
         **_with_page_context(page_obj),
     }
     return render(request, "inventory/equipment_list.html", context)
@@ -487,7 +823,6 @@ def equipment_list(request):
 def usage_history(request):
     preferences = _get_user_preferences(request.user)
     page_size = preferences.page_size if preferences else 25
-    show_deleted = bool(request.session.get("show_deleted_global", False))
     request_id = (request.GET.get("request_id") or "").strip()
     initial_request_id = int(request_id) if request_id.isdigit() else None
     can_create_usage = _can_create_usage(request.user)
@@ -517,25 +852,15 @@ def usage_history(request):
                 return redirect(f"{reverse('usage_history')}?{urlencode(redirect_params)}")
             return redirect("usage_history")
 
-    usage_manager = MaterialUsage.all_objects if show_deleted else MaterialUsage.objects
-    usage = usage_manager.select_related("equipment", "equipment__cabinet", "used_by", "workplace").order_by("-used_at")
-    if not _can_view_all_operational_data(request.user):
-        usage = usage.filter(used_by=request.user)
-    date_from = request.GET.get("from", "").strip()
-    date_to = request.GET.get("to", "").strip()
-    if not date_from and "from" not in request.GET and preferences and preferences.default_usage_period_days:
-        date_from = (timezone.localdate() - timedelta(days=preferences.default_usage_period_days)).isoformat()
-    if date_from:
-        usage = usage.filter(used_at__date__gte=date_from)
-    if date_to:
-        usage = usage.filter(used_at__date__lte=date_to)
+    usage, list_filters = _usage_history_filtered_queryset(request)
     page_obj = _paginate(request, usage, page_size)
     return render(
         request,
         "inventory/usage_history.html",
         {
             "usage": page_obj.object_list,
-            "filters": {"from": date_from, "to": date_to},
+            "filters": list_filters,
+            "export_query": _export_querystring(list_filters),
             "can_create_usage": can_create_usage,
             "usage_form": usage_form,
             "request_quantity_map": getattr(usage_form, "request_quantity_map", {}) if usage_form else {},
@@ -548,41 +873,75 @@ def usage_history(request):
 
 
 @login_required
+def usage_export_csv(request):
+    usage, _filters = _usage_history_filtered_queryset(request)
+    buffer = io.StringIO()
+    writer = csv.writer(buffer)
+    writer.writerow(
+        [
+            "id",
+            "equipment",
+            "operation_type",
+            "quantity",
+            "used_by",
+            "workplace",
+            "cabinet",
+            "used_at",
+            "related_request_id",
+            "note",
+            "deleted_at",
+        ]
+    )
+    for row in usage.iterator(chunk_size=500):
+        eq = row.equipment
+        op = "consumable_issue" if (eq and eq.is_consumable) else "non_consumable_writeoff"
+        writer.writerow(
+            [
+                row.pk,
+                str(eq) if eq else "",
+                op,
+                row.quantity,
+                row.used_by.get_username() if row.used_by_id else "",
+                row.workplace.name if row.workplace_id else "",
+                eq.cabinet.name if eq and eq.cabinet_id else "",
+                timezone.localtime(row.used_at).isoformat() if row.used_at else "",
+                row.related_request_id or "",
+                (row.note or "").replace("\r\n", "\n"),
+                row.deleted_at.isoformat() if row.deleted_at else "",
+            ]
+        )
+    response = HttpResponse(buffer.getvalue().encode("utf-8-sig"), content_type="text/csv; charset=utf-8")
+    response["Content-Disposition"] = 'attachment; filename="usage-export.csv"'
+    return response
+
+
+@login_required
+def usage_print(request):
+    usage, list_filters = _usage_history_filtered_queryset(request)
+    total = usage.count()
+    cap = 8000
+    rows = list(usage[:cap])
+    return render(
+        request,
+        "inventory/usage_history_print.html",
+        {
+            "usage": rows,
+            "filters": list_filters,
+            "export_query": _export_querystring(list_filters),
+            "exported_count": len(rows),
+            "total_matching": total,
+            "truncated": total > len(rows),
+        },
+    )
+
+
+@login_required
 def request_history(request):
     preferences = _get_user_preferences(request.user)
     page_size = preferences.page_size if preferences else 25
-    show_deleted = bool(request.session.get("show_deleted_global", False))
-    requests_manager = EquipmentRequest.all_objects if show_deleted else EquipmentRequest.objects
-    requests = requests_manager.select_related("requester", "equipment", "workplace", "processed_by").order_by("-requested_at")
-    view_mode = request.GET.get("view", "").strip()
-    if not _can_view_all_operational_data(request.user):
-        requests = requests.filter(requester=request.user)
-    status = request.GET.get("status", "").strip()
-    kind = request.GET.get("kind", "").strip()
-    if not status and "status" not in request.GET and preferences and preferences.default_request_status:
-        status = preferences.default_request_status
-    if not kind and "kind" not in request.GET and preferences and preferences.default_request_kind:
-        kind = preferences.default_request_kind
-    date_from = request.GET.get("from", "").strip()
-    date_to = request.GET.get("to", "").strip()
+    requests_qs, list_filters = _request_history_filtered_queryset(request)
 
-    if view_mode == "mine":
-        requests = requests.filter(requester=request.user)
-    elif view_mode == "processing":
-        requests = requests.filter(status__in=[REQUEST_PENDING, REQUEST_APPROVED, REQUEST_ISSUED])
-        if _can_process_request_status(request.user):
-            requests = requests.exclude(processed_by=request.user, status__in=[REQUEST_APPROVED, REQUEST_ISSUED])
-
-    if status:
-        requests = requests.filter(status=status)
-    if kind:
-        requests = requests.filter(request_kind=kind)
-    if date_from:
-        requests = requests.filter(requested_at__date__gte=date_from)
-    if date_to:
-        requests = requests.filter(requested_at__date__lte=date_to)
-
-    page_obj = _paginate(request, requests, page_size)
+    page_obj = _paginate(request, requests_qs, page_size)
     request_items = [_decorate_request(item) for item in page_obj.object_list]
     can_quick_status = _can_process_request_status(request.user)
 
@@ -593,10 +952,78 @@ def request_history(request):
             "requests": request_items,
             "status_choices": EquipmentRequest._meta.get_field("status").choices,
             "kind_choices": EquipmentRequest._meta.get_field("request_kind").choices,
-            "filters": {"status": status, "kind": kind, "from": date_from, "to": date_to, "view": view_mode},
+            "filters": list_filters,
+            "export_query": _export_querystring(list_filters),
             "can_create_request": _can_create_request(request.user),
             "can_quick_status": can_quick_status,
             **_with_page_context(page_obj),
+        },
+    )
+
+
+@login_required
+def request_export_csv(request):
+    requests_qs, _filters = _request_history_filtered_queryset(request)
+    buffer = io.StringIO()
+    writer = csv.writer(buffer)
+    writer.writerow(
+        [
+            "id",
+            "requester",
+            "request_kind",
+            "equipment",
+            "workplace",
+            "cabinet",
+            "quantity",
+            "status",
+            "comment",
+            "requested_at",
+            "needed_by",
+            "processed_by",
+            "processed_at",
+            "deleted_at",
+        ]
+    )
+    for row in requests_qs.iterator(chunk_size=500):
+        writer.writerow(
+            [
+                row.pk,
+                row.requester.get_username() if row.requester_id else "",
+                row.get_request_kind_display(),
+                str(row.equipment) if row.equipment_id else "",
+                row.workplace.name if row.workplace_id else "",
+                row.cabinet.name if row.cabinet_id else "",
+                row.quantity,
+                row.get_status_display(),
+                (row.comment or "").replace("\r\n", "\n"),
+                timezone.localtime(row.requested_at).isoformat() if row.requested_at else "",
+                row.needed_by.isoformat() if row.needed_by else "",
+                row.processed_by.get_username() if row.processed_by_id else "",
+                timezone.localtime(row.processed_at).isoformat() if row.processed_at else "",
+                row.deleted_at.isoformat() if row.deleted_at else "",
+            ]
+        )
+    response = HttpResponse(buffer.getvalue().encode("utf-8-sig"), content_type="text/csv; charset=utf-8")
+    response["Content-Disposition"] = 'attachment; filename="requests-export.csv"'
+    return response
+
+
+@login_required
+def request_print(request):
+    requests_qs, list_filters = _request_history_filtered_queryset(request)
+    total = requests_qs.count()
+    cap = 8000
+    rows = list(requests_qs[:cap])
+    return render(
+        request,
+        "inventory/request_history_print.html",
+        {
+            "requests": rows,
+            "filters": list_filters,
+            "export_query": _export_querystring(list_filters),
+            "exported_count": len(rows),
+            "total_matching": total,
+            "truncated": total > len(rows),
         },
     )
 
@@ -635,12 +1062,11 @@ def inventory_search(request):
         equipment_manager.select_related("category", "workplace")
         .filter(
             Q(name__icontains=q)
-            | Q(inventory_number__icontains=q)
             | Q(serial_number__icontains=q)
             | Q(model__icontains=q)
             | Q(category__name__icontains=q)
             | Q(workplace__name__icontains=q)
-            | Q(cabinet__code__icontains=q)
+            | Q(cabinet__name__icontains=q)
         )
         .order_by("name")[:25]
     )
@@ -684,8 +1110,8 @@ def inventory_search(request):
         Q(name__icontains=q) | Q(location__icontains=q) | Q(description__icontains=q)
     ).order_by("name")[:25]
     cabinet_results = cabinets_manager.select_related("workplace").filter(
-        Q(code__icontains=q) | Q(name__icontains=q) | Q(workplace__name__icontains=q) | Q(description__icontains=q)
-    ).order_by("code")[:25]
+        Q(name__icontains=q) | Q(workplace__name__icontains=q) | Q(description__icontains=q)
+    ).order_by("name")[:25]
     context.update(
         {
             "equipment_results": equipment_results,
@@ -726,7 +1152,7 @@ def suppliers(request):
 def cabinets(request):
     show_deleted = bool(request.session.get("show_deleted_global", False))
     cabinets_manager = Cabinet.all_objects if show_deleted else Cabinet.objects
-    cabinets_qs = cabinets_manager.select_related("workplace").order_by("code")
+    cabinets_qs = cabinets_manager.select_related("workplace").order_by("name")
     return render(request, "inventory/cabinets.html", {"cabinets": cabinets_qs, "show_deleted": show_deleted})
 
 
@@ -770,10 +1196,7 @@ def history_timeline(request):
     )
 
 
-@login_required
-def reports(request):
-    if not _can_access_reports(request.user):
-        return forbidden(request, "Отчёты доступны только администратору и складу.")
+def _reports_page_context(request) -> dict:
     date_from = request.GET.get("from", "").strip()
     date_to = request.GET.get("to", "").strip()
 
@@ -811,15 +1234,25 @@ def reports(request):
         for item in materials
     ]
 
-    return render(
-        request,
-        "inventory/reports.html",
-        {
-            "cabinet_report": cabinet_report,
-            "materials_report": materials_report,
-            "filters": {"from": date_from, "to": date_to},
-        },
-    )
+    return {
+        "cabinet_report": cabinet_report,
+        "materials_report": materials_report,
+        "filters": {"from": date_from, "to": date_to},
+    }
+
+
+@login_required
+def reports(request):
+    if not _can_access_reports(request.user):
+        return forbidden(request, "Отчёты доступны только администратору и складу.")
+    return render(request, "inventory/reports.html", _reports_page_context(request))
+
+
+@login_required
+def reports_print(request):
+    if not _can_access_reports(request.user):
+        return forbidden(request, "Отчёты доступны только администратору и складу.")
+    return render(request, "inventory/reports_print.html", _reports_page_context(request))
 
 
 @login_required
@@ -906,7 +1339,9 @@ def request_create(request):
 @login_required
 def request_detail(request, request_id: int):
     item = get_object_or_404(
-        EquipmentRequest.objects.select_related("requester", "equipment", "workplace", "processed_by"),
+        EquipmentRequest.objects.select_related(
+            "requester", "equipment", "workplace", "cabinet", "processed_by"
+        ),
         pk=request_id,
     )
     can_access = _can_view_all_operational_data(request.user) or item.requester_id == request.user.pk
@@ -1090,6 +1525,8 @@ def api_docs(request):
                 "/api/v1/categories/",
                 "/api/v1/requests/",
                 "/api/v1/usage/",
+                "/api/v1/adjustments/",
+                "/api/v1/checkouts/",
             ]
         },
     )
@@ -1303,54 +1740,72 @@ def register_view(request):
 
 
 def password_reset_request_view(request):
-    if request.user.is_authenticated:
-        return redirect("analytics")
-
     if request.method == "POST":
-        form = PasswordResetRequestForm(request.POST)
+        form = PasswordResetRequestForm(request.POST, user=request.user if request.user.is_authenticated else None)
         if form.is_valid():
             email = form.cleaned_data["email"].strip().lower()
-            user = User.objects.filter(is_active=True, email__iexact=email).first()
+            if request.user.is_authenticated:
+                user = request.user
+                if not (user.email or "").strip():
+                    user.email = email
+                    user.save(update_fields=["email"])
+            else:
+                user = User.objects.filter(is_active=True, email__iexact=email).first()
             if user:
-                PasswordResetCode.objects.filter(user=user, email__iexact=email, used_at__isnull=True).update(
-                    used_at=timezone.now()
-                )
                 code = _generate_password_reset_code()
                 expires_at = timezone.now() + timedelta(minutes=PASSWORD_RESET_CODE_TTL_MINUTES)
-                PasswordResetCode.objects.create(
-                    user=user,
-                    email=email,
-                    code_hash=_password_reset_code_hash(email, code),
-                    expires_at=expires_at,
-                )
-                send_mail(
-                    "Код восстановления пароля",
-                    (
-                        f"Здравствуйте, {user.get_username()}!\n\n"
-                        f"Код для восстановления пароля: {code}\n"
-                        f"Код действует {PASSWORD_RESET_CODE_TTL_MINUTES} минут.\n\n"
-                        "Если вы не запрашивали восстановление, просто проигнорируйте это письмо."
-                    ),
-                    settings.DEFAULT_FROM_EMAIL,
-                    [email],
-                    fail_silently=False,
-                )
+                try:
+                    send_mail(
+                        "Код восстановления пароля",
+                        (
+                            f"Здравствуйте, {user.get_username()}!\n\n"
+                            f"Код для восстановления пароля: {code}\n"
+                            f"Код действует {PASSWORD_RESET_CODE_TTL_MINUTES} минут.\n\n"
+                            "Если вы не запрашивали восстановление, просто проигнорируйте это письмо."
+                        ),
+                        settings.DEFAULT_FROM_EMAIL,
+                        [email],
+                        fail_silently=False,
+                    )
+                except (OSError, SMTPException):
+                    form.add_error(
+                        None,
+                        "Не удалось отправить письмо. Проверьте настройки SMTP-сервера и попробуйте снова.",
+                    )
+                else:
+                    PasswordResetCode.objects.filter(user=user, email__iexact=email, used_at__isnull=True).update(
+                        used_at=timezone.now()
+                    )
+                    PasswordResetCode.objects.create(
+                        user=user,
+                        email=email,
+                        code_hash=_password_reset_code_hash(email, code),
+                        expires_at=expires_at,
+                    )
 
-            messages.success(
-                request,
-                "Если адрес найден, мы отправили на него код для восстановления пароля.",
-            )
-            return redirect("password_reset_confirm")
+            if not form.errors:
+                messages.success(
+                    request,
+                    "Если адрес найден, мы отправили на него код для восстановления пароля.",
+                )
+                return redirect("password_reset_confirm")
     else:
-        form = PasswordResetRequestForm()
+        initial = {}
+        if request.user.is_authenticated and (request.user.email or "").strip():
+            initial["email"] = request.user.email.strip()
+        form = PasswordResetRequestForm(user=request.user if request.user.is_authenticated else None, initial=initial)
 
-    return render(request, "inventory/password_reset_request.html", {"form": form})
+    return render(
+        request,
+        "inventory/password_reset_request.html",
+        {
+            "form": form,
+            "password_reset_needs_email": request.user.is_authenticated and not (request.user.email or "").strip(),
+        },
+    )
 
 
 def password_reset_confirm_view(request):
-    if request.user.is_authenticated:
-        return redirect("analytics")
-
     if request.method == "POST":
         form = PasswordResetConfirmForm(request.POST)
         if form.is_valid():
@@ -1364,6 +1819,8 @@ def password_reset_confirm_view(request):
             )
             if not reset_entry or reset_entry.code_hash != _password_reset_code_hash(email, code):
                 form.add_error("code", "Неверный или просроченный код.")
+            elif request.user.is_authenticated and reset_entry.user_id != request.user.pk:
+                form.add_error("code", "Этот код относится к другой учётной записи.")
             else:
                 user = reset_entry.user
                 user.set_password(form.cleaned_data["new_password1"])
@@ -1375,10 +1832,16 @@ def password_reset_confirm_view(request):
                     email__iexact=email,
                     used_at__isnull=True,
                 ).exclude(pk=reset_entry.pk).update(used_at=timezone.now())
+                if request.user.is_authenticated:
+                    messages.success(request, "Пароль обновлён.")
+                    return redirect("user_preferences")
                 messages.success(request, "Пароль обновлён. Теперь можно войти.")
                 return redirect("login")
     else:
-        form = PasswordResetConfirmForm()
+        initial = {}
+        if request.user.is_authenticated and (request.user.email or "").strip():
+            initial["email"] = request.user.email.strip()
+        form = PasswordResetConfirmForm(initial=initial)
 
     return render(request, "inventory/password_reset_confirm.html", {"form": form})
 
@@ -1405,6 +1868,7 @@ def _data_tools_context():
         "db_port": db_cfg.get("PORT", "5432"),
         "db_user": db_cfg.get("USER", "postgres"),
         "backup_import_form": BackupImportForm(),
+        "postgresql_dump_import_form": PostgresqlDumpImportForm(),
         "can_import_backup": False,
     }
 
@@ -1483,6 +1947,73 @@ def download_sqlite_backup(request):
 
 
 @login_required
+def download_postgresql_backup(request):
+    if not _can_access_data_tools(request.user):
+        return forbidden(request, "Экспорт доступен только администратору и системному администратору.")
+    db_cfg = settings.DATABASES["default"]
+    if not str(db_cfg["ENGINE"]).endswith("postgresql"):
+        return HttpResponse(
+            "Резервная копия PostgreSQL доступна только при подключении к PostgreSQL.",
+            status=400,
+            content_type="text/plain; charset=utf-8",
+        )
+    try:
+        with tempfile.TemporaryDirectory() as tmp:
+            config = get_postgresql_backup_config(output_dir=tmp, keep_count=99)
+            result = create_postgresql_backup(config, label="web")
+            data = result.backup_path.read_bytes()
+            filename = result.backup_path.name
+    except CommandError as exc:
+        messages.error(request, str(exc))
+        return redirect("data_tools")
+    response = HttpResponse(data, content_type="application/octet-stream")
+    response["Content-Disposition"] = f'attachment; filename="{filename}"'
+    return response
+
+
+@login_required
+def import_postgresql_dump(request):
+    if not _can_import_backup(request.user):
+        return forbidden(request, "Импорт дампа PostgreSQL доступен только администратору.")
+    if request.method != "POST":
+        return redirect("data_tools")
+    db_cfg = settings.DATABASES["default"]
+    if not str(db_cfg["ENGINE"]).endswith("postgresql"):
+        messages.error(request, "Импорт дампа доступен только для PostgreSQL.")
+        return redirect("data_tools")
+
+    form = PostgresqlDumpImportForm(request.POST, request.FILES)
+    if not form.is_valid():
+        for field_errors in form.errors.values():
+            for error in field_errors:
+                messages.error(request, error)
+        return render(
+            request,
+            "inventory/tools/data_io.html",
+            {**_data_tools_context(), "postgresql_dump_import_form": form, "can_import_backup": _can_import_backup(request.user)},
+            status=400,
+        )
+
+    temp_path = None
+    try:
+        uploaded = form.cleaned_data["dump_file"]
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".dump") as tmp:
+            for chunk in uploaded.chunks():
+                tmp.write(chunk)
+            temp_path = Path(tmp.name)
+        config = get_postgresql_backup_config()
+        restore_postgresql_custom_dump(temp_path, config)
+        messages.success(request, f"Дамп «{uploaded.name}» восстановлен в текущую базу.")
+    except CommandError as exc:
+        messages.error(request, str(exc))
+    finally:
+        if temp_path and temp_path.exists():
+            temp_path.unlink(missing_ok=True)
+
+    return redirect("data_tools")
+
+
+@login_required
 def export_portal_logs_csv(request):
     if not user_in_group(request.user, GROUP_ADMIN):
         return forbidden(request, "Экспорт доступен только администратору.")
@@ -1507,8 +2038,9 @@ def export_portal_logs_csv(request):
 @login_required
 def equipment_qr(request, equipment_id: int):
     item = get_object_or_404(Equipment, pk=equipment_id)
+    qr_query = item.serial_number or item.name
     search_url = request.build_absolute_uri(
-        f"{reverse('equipment_list')}?q={item.inventory_number}"
+        f"{reverse('equipment_list')}?q={qr_query}"
     )
     img = qrcode.make(search_url, box_size=8, border=2)
     buf = io.BytesIO()

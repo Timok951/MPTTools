@@ -54,11 +54,38 @@ class BackupImportForm(forms.Form):
         return backup_file
 
 
+class PostgresqlDumpImportForm(forms.Form):
+    dump_file = forms.FileField(label=_("PostgreSQL dump (.dump, custom format)"))
+
+    def clean_dump_file(self):
+        f = self.cleaned_data["dump_file"]
+        name = (f.name or "").lower()
+        if not name.endswith(".dump"):
+            raise ValidationError(_("Upload a .dump file (pg_dump -Fc)."))
+        return f
+
+
 class PasswordResetRequestForm(forms.Form):
     email = forms.EmailField(
         label="Email",
         widget=forms.EmailInput(attrs={"autocomplete": "email", "placeholder": "user@example.com"}),
     )
+
+    def __init__(self, *args, user=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._request_user = user
+
+    def clean_email(self):
+        email = (self.cleaned_data.get("email") or "").strip().lower()
+        user = self._request_user
+        if user and getattr(user, "is_authenticated", False):
+            profile_email = (getattr(user, "email", None) or "").strip().lower()
+            if profile_email:
+                if email != profile_email:
+                    raise ValidationError("Введите email, указанный в вашем профиле.")
+            elif User.objects.filter(email__iexact=email).exclude(pk=user.pk).exists():
+                raise ValidationError("Этот email уже используется другой учётной записью.")
+        return email
 
 
 class PasswordResetConfirmForm(forms.Form):
@@ -126,6 +153,19 @@ class UserPreferenceForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
         t = lambda ru_text, en_text: _lang_label(ru_text, en_text, language_code)
 
+        pref_user = getattr(self.instance, "user", None)
+        self.fields["email"] = forms.EmailField(
+            label=t("Электронная почта", "Email"),
+            required=False,
+            help_text=t(
+                "Нужна для восстановления пароля по коду и связи с учётной записью.",
+                "Used for password recovery by code and account contact.",
+            ),
+            widget=forms.EmailInput(attrs={"autocomplete": "email", "placeholder": "user@example.com"}),
+        )
+        if pref_user:
+            self.fields["email"].initial = (pref_user.email or "").strip()
+
         self.fields["theme_variant"].label = t("Тема", "Theme")
         self.fields["theme_variant"].help_text = t(
             "Светлая, контрастная или тёмная тема интерфейса.",
@@ -192,6 +232,26 @@ class UserPreferenceForm(forms.ModelForm):
             "Show hotkey hints in the interface.",
         )
 
+    def clean_email(self):
+        raw = (self.cleaned_data.get("email") or "").strip()
+        if not raw:
+            return ""
+        email = raw.lower()
+        user = getattr(self.instance, "user", None)
+        if user and User.objects.filter(email__iexact=email).exclude(pk=user.pk).exists():
+            raise ValidationError("Этот адрес уже привязан к другому пользователю.")
+        return email
+
+    def save(self, commit=True):
+        instance = super().save(commit=commit)
+        if commit and "email" in self.cleaned_data:
+            email = self.cleaned_data["email"]
+            u = instance.user
+            if (u.email or "").strip().lower() != (email or ""):
+                u.email = email
+                u.save(update_fields=["email"])
+        return instance
+
     class Meta:
         model = UserPreference
         fields = [
@@ -211,7 +271,7 @@ class UserPreferenceForm(forms.ModelForm):
 class EquipmentRequestForm(forms.ModelForm):
     class Meta:
         model = EquipmentRequest
-        fields = ["workplace", "equipment", "quantity", "request_kind", "needed_by", "comment"]
+        fields = ["workplace", "cabinet", "equipment", "quantity", "request_kind", "needed_by", "comment"]
         widgets = {
             "needed_by": forms.DateInput(attrs={"type": "date"}),
             "comment": forms.Textarea(attrs={"rows": 4, "placeholder": "Опишите, что требуется и почему."}),
@@ -221,6 +281,8 @@ class EquipmentRequestForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
         self.fields["workplace"].label = "Рабочее место"
         self.fields["workplace"].empty_label = "Выберите рабочее место"
+        self.fields["cabinet"].label = "Кабинет"
+        self.fields["cabinet"].empty_label = "Выберите кабинет (необязательно)"
         self.fields["request_kind"].label = "Тип заявки"
         self.fields["equipment"].label = "Оборудование"
         self.fields["equipment"].empty_label = "Выберите оборудование"

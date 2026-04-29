@@ -11,9 +11,6 @@
         <button class="btn" type="submit">{% ui_text "Войти" "Sign in" %}</button>
     </form>
     <div class="inline-links">
-        <a href="{% url 'password_reset_request' %}">{% ui_text "Забыли пароль?" "Forgot password?" %}</a>
-    </div>
-    <div class="inline-links">
         <span>{% ui_text "Нет аккаунта?" "No account yet?" %}</span>
         <a href="{% url 'register' %}">{% ui_text "Создать" "Create account" %}</a>
     </div>

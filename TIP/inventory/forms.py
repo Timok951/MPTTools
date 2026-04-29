@@ -287,7 +287,7 @@ class EquipmentRequestForm(forms.ModelForm):
         self.fields["equipment"].label = "Оборудование"
         self.fields["equipment"].empty_label = "Выберите оборудование"
         self.fields["quantity"].label = "Количество"
-        self.fields["quantity"].help_text = "Запрошенное количество не может превышать доступный остаток."
+        self.fields["quantity"].help_text = "Укажите нужное количество для склада."
         self.fields["needed_by"].label = "Нужно до"
         self.fields["needed_by"].help_text = "Необязательная плановая дата, когда оборудование должно понадобиться."
         self.fields["comment"].label = "Комментарий"
@@ -303,8 +303,6 @@ class EquipmentRequestForm(forms.ModelForm):
         cleaned = super().clean()
         equipment = cleaned.get("equipment")
         quantity = cleaned.get("quantity") or 0
-        if equipment and quantity > equipment.quantity_available:
-            self.add_error("quantity", "Запрошенное количество превышает доступный остаток.")
         return cleaned
 
 
@@ -376,24 +374,32 @@ class MaterialUsageForm(forms.ModelForm):
 
     def clean(self):
         cleaned = super().clean()
-        equipment = cleaned.get("equipment")
         related_request = cleaned.get("related_request")
+        equipment = cleaned.get("equipment")
+        workplace = cleaned.get("workplace")
         quantity = cleaned.get("quantity") or 0
         if related_request:
+            if related_request.status in {"pending", "rejected"}:
+                self.add_error("related_request", "Операция доступна только для обработанных заявок.")
+                return cleaned
+            if related_request.equipment_id:
+                cleaned["equipment"] = related_request.equipment
+                equipment = related_request.equipment
+            if related_request.workplace_id:
+                cleaned["workplace"] = related_request.workplace
+                workplace = related_request.workplace
             quantity = related_request.quantity
             cleaned["quantity"] = quantity
-        if equipment and quantity > equipment.quantity_available:
-            self.add_error("quantity", "Недостаточно доступного остатка.")
         if equipment and not equipment.is_consumable:
             note = (cleaned.get("note") or "").strip()
             if not note:
                 self.add_error("note", "Для нерасходуемого оборудования укажите причину списания (например, сломано).")
             if quantity != 1:
                 self.add_error("quantity", "Нерасходуемое оборудование списывается поштучно (количество = 1).")
-        if related_request and equipment and related_request.equipment_id != equipment.id:
+        if related_request and equipment and related_request.equipment_id and related_request.equipment_id != equipment.id:
             self.add_error("equipment", "Оборудование должно совпадать с выбранной заявкой.")
-        if related_request and related_request.status in {"pending", "rejected"}:
-            self.add_error("related_request", "Операция доступна только для обработанных заявок.")
+        if related_request and workplace and related_request.workplace_id and related_request.workplace_id != workplace.id:
+            self.add_error("workplace", "Рабочее место должно совпадать с выбранной заявкой.")
         return cleaned
 
 
@@ -454,7 +460,7 @@ class EquipmentCheckoutForm(forms.ModelForm):
         self.fields["due_at"].input_formats = ["%Y-%m-%dT%H:%M"]
         self.fields["related_request"].help_text = "Здесь доступны только одобренные заявки."
         self.fields["equipment"].help_text = "Должно совпадать с оборудованием в выбранной одобренной заявке."
-        self.fields["quantity"].help_text = "Не может превышать ни количество в заявке, ни доступный остаток."
+        self.fields["quantity"].help_text = "Количество задаётся по заявке и правилам выдачи."
 
     def clean_quantity(self):
         quantity = self.cleaned_data.get("quantity") or 0
@@ -467,8 +473,6 @@ class EquipmentCheckoutForm(forms.ModelForm):
         related_request = cleaned.get("related_request")
         equipment = cleaned.get("equipment")
         quantity = cleaned.get("quantity") or 0
-        if equipment and quantity > equipment.quantity_available:
-            self.add_error("quantity", "Недостаточно доступного остатка для выдачи.")
         if related_request:
             if related_request.status != "approved":
                 self.add_error("related_request", "Заявка должна быть одобрена.")

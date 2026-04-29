@@ -1,4 +1,5 @@
-﻿from django.db.models import F
+from django.db.models import F, Value
+from django.db.models.functions import Greatest
 from django.db.models.signals import post_save, pre_save
 from django.dispatch import receiver
 
@@ -30,7 +31,7 @@ def apply_checkout_effect(sender, instance, created, **kwargs):
     if created and not instance.returned_at:
         sender_equipment = instance.equipment.__class__
         sender_equipment.objects.filter(pk=instance.equipment_id).update(
-            quantity_available=F("quantity_available") - instance.quantity,
+            quantity_available=Greatest(F("quantity_available") - instance.quantity, Value(0)),
         )
         if instance.related_request_id:
             from operations.models import REQUEST_ISSUED, EquipmentRequest

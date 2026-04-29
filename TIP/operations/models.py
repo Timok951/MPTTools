@@ -58,8 +58,8 @@ class EquipmentRequest(SoftDeleteModel):
         return f"Request #{self.pk} by {self.requester}"
 
     def clean(self) -> None:
-        if self.equipment and self.quantity > self.equipment.quantity_available:
-            raise ValidationError("Requested quantity exceeds available stock.")
+        if self.quantity <= 0:
+            raise ValidationError("Количество должно быть положительным.")
 
 
 class EquipmentRequestMessage(models.Model):
@@ -118,7 +118,7 @@ class MaterialUsage(SoftDeleteModel):
         return f"Usage #{self.pk}"
 
     def clean(self) -> None:
-        if self.equipment and self.quantity > self.equipment.quantity_available:
-            raise ValidationError("Usage quantity exceeds available stock.")
+        if self.quantity <= 0:
+            raise ValidationError("Количество должно быть положительным.")
 
 

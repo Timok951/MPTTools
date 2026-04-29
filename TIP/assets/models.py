@@ -103,15 +103,12 @@ class EquipmentCheckout(SoftDeleteModel):
 
     def clean(self) -> None:
         if self.returned_at and self.returned_at < self.taken_at:
-            raise ValidationError("Return time cannot be earlier than taken time.")
+            raise ValidationError("Время возврата не может быть раньше времени выдачи.")
         if not self.related_request:
-            raise ValidationError("Approved request is required for checkout.")
+            raise ValidationError("Для выдачи требуется одобренная заявка.")
         if self.related_request and self.related_request.status != "approved":
-            raise ValidationError("Checkout requires an approved request.")
+            raise ValidationError("Выдача возможна только по одобренной заявке.")
         if self.related_request and self.equipment and self.related_request.equipment_id != self.equipment_id:
-            raise ValidationError("Checkout equipment must match the request.")
+            raise ValidationError("Оборудование должно совпадать с заявкой.")
         if self.related_request and self.quantity > self.related_request.quantity:
-            raise ValidationError("Checkout quantity exceeds the request quantity.")
-        if self.equipment and not self.is_returned and not self.pk:
-            if self.quantity > self.equipment.quantity_available:
-                raise ValidationError("Not enough available stock for checkout.")
+            raise ValidationError("Количество выдачи превышает количество в заявке.")

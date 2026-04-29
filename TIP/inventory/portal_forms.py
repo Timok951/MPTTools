@@ -23,6 +23,15 @@ class PortalEquipmentForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
         self.fields["status"].choices = self.VISIBLE_STATUS_CHOICES
         self.fields["serial_number"].required = True
+        self.fields["purchase_date"].input_formats = ["%Y-%m-%d"]
+        self.fields["warranty_end"].input_formats = ["%Y-%m-%d"]
+        self.fields["purchase_date"].localize = False
+        self.fields["warranty_end"].localize = False
+        if self.instance and self.instance.pk:
+            if self.instance.purchase_date:
+                self.initial["purchase_date"] = self.instance.purchase_date.isoformat()
+            if self.instance.warranty_end:
+                self.initial["warranty_end"] = self.instance.warranty_end.isoformat()
 
     class Meta:
         model = Equipment
@@ -43,9 +52,11 @@ class PortalEquipmentForm(forms.ModelForm):
             "photo": "Фото",
         }
         widgets = {
-            "purchase_date": forms.DateInput(attrs={"type": "date"}),
-            "warranty_end": forms.DateInput(attrs={"type": "date"}),
+            "purchase_date": forms.DateInput(attrs={"type": "date"}, format="%Y-%m-%d"),
+            "warranty_end": forms.DateInput(attrs={"type": "date"}, format="%Y-%m-%d"),
             "notes": forms.Textarea(attrs={"rows": 4}),
+            # Disable ClearableFileInput "current/clear" checkbox block in portal edit form.
+            "photo": forms.FileInput(),
         }
 
     def clean_serial_number(self):

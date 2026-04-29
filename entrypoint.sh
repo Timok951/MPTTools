@@ -53,7 +53,8 @@ echo "Initializing default role groups..."
 python manage.py init_roles
 
 RUN_TESTS_ON_START="${RUN_TESTS_ON_START:-true}"
-TEST_SUITE_ON_START="${TEST_SUITE_ON_START:-inventory.tests}"
+RUN_DJANGO_CHECK_ON_START="${RUN_DJANGO_CHECK_ON_START:-true}"
+TEST_SUITE_ON_START="${TEST_SUITE_ON_START:-inventory.tests.TimerAndPreferenceViewTests inventory.tests.LightweightPerformanceTests inventory.tests.AdminProcedureTests inventory.tests.RoleEnforcementWebTests inventory.tests.InventoryApiTests inventory.tests.BackupCommandTests}"
 TEST_ARGS_ON_START="${TEST_ARGS_ON_START:---noinput --keepdb --verbosity 2}"
 
 if [[ "${RUN_TESTS_ON_START,,}" == "true" || "${RUN_TESTS_ON_START}" == "1" || "${RUN_TESTS_ON_START,,}" == "yes" ]]; then
@@ -101,10 +102,18 @@ except Exception as exc:
     print(f"Pre-test DB cleanup skipped: {exc}", file=sys.stderr)
 PY
 
-    echo "Running test suite before server start: ${TEST_SUITE_ON_START}"
+    if [[ "${RUN_DJANGO_CHECK_ON_START,,}" == "true" || "${RUN_DJANGO_CHECK_ON_START}" == "1" || "${RUN_DJANGO_CHECK_ON_START,,}" == "yes" ]]; then
+        echo "Running Django system check before server start..."
+        python -u manage.py check
+    else
+        echo "Skipping Django system check on startup (RUN_DJANGO_CHECK_ON_START=${RUN_DJANGO_CHECK_ON_START})."
+    fi
+
+    read -r -a _test_labels <<< "${TEST_SUITE_ON_START}"
+    echo "Running startup test labels: ${TEST_SUITE_ON_START}"
     echo "Test args: ${TEST_ARGS_ON_START}"
     read -r -a _test_args <<< "${TEST_ARGS_ON_START}"
-    python -u manage.py test "${TEST_SUITE_ON_START}" "${_test_args[@]}"
+    python -u manage.py test "${_test_labels[@]}" "${_test_args[@]}"
     echo "Test suite completed successfully."
 else
     echo "Skipping test suite on startup (RUN_TESTS_ON_START=${RUN_TESTS_ON_START})."

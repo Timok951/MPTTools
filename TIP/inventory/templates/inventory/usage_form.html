@@ -52,6 +52,28 @@
 {{ request_quantity_map|json_script:"request-quantity-map" }}
 {{ request_equipment_map|json_script:"request-equipment-map" }}
 {{ request_workplace_map|json_script:"request-workplace-map" }}
+<style>
+.request-locked-field {
+    background: #eef3ff;
+    border-color: #8ca1ff;
+    color: #1f2a44;
+    cursor: not-allowed;
+}
+.request-locked-field:disabled,
+.request-locked-field[disabled] {
+    background: #eef3ff !important;
+    border-color: #8ca1ff !important;
+    color: #1f2a44 !important;
+    opacity: 1 !important;
+    -webkit-text-fill-color: #1f2a44;
+}
+.request-lock-hint {
+    margin-top: 6px;
+    color: #3c4ea8;
+    font-size: 12px;
+    font-weight: 600;
+}
+</style>
 <script>
 (() => {
     const requestField = document.getElementById("id_related_request");
@@ -84,33 +106,73 @@
         workplaceMap = {};
     }
 
+    for (const option of requestField.options) {
+        const key = option.value ? String(option.value) : "";
+        if (key && Object.prototype.hasOwnProperty.call(quantityMap, key)) {
+            option.dataset.requestQuantity = String(quantityMap[key]);
+        }
+    }
+
+    const resolveRequestQuantity = (requestId) => {
+        const key = requestId ? String(requestId) : "";
+        if (!key) return null;
+        if (Object.prototype.hasOwnProperty.call(quantityMap, key)) {
+            return quantityMap[key];
+        }
+        const selected = requestField.selectedOptions && requestField.selectedOptions[0];
+        if (selected && selected.dataset && selected.dataset.requestQuantity) {
+            return selected.dataset.requestQuantity;
+        }
+        return null;
+    };
+
+    const quantityFieldContainer = quantityField.closest(".form-field");
+    let lockHint = quantityFieldContainer ? quantityFieldContainer.querySelector(".request-lock-hint") : null;
+    if (!lockHint && quantityFieldContainer) {
+        lockHint = document.createElement("div");
+        lockHint.className = "request-lock-hint";
+        lockHint.textContent = "Количество берётся из выбранной заявки.";
+        lockHint.hidden = true;
+        quantityFieldContainer.appendChild(lockHint);
+    }
+
+    const setRequestLockedUi = (locked) => {
+        quantityField.readOnly = false;
+        quantityField.disabled = locked;
+        quantityField.classList.toggle("request-locked-field", locked);
+        quantityField.title = locked ? "Количество подставлено из выбранной заявки" : "";
+        quantityField.setAttribute("aria-readonly", "false");
+        quantityField.setAttribute("aria-disabled", locked ? "true" : "false");
+        if (lockHint) {
+            lockHint.hidden = !locked;
+        }
+        equipmentField.disabled = locked;
+        equipmentField.classList.toggle("request-locked-field", locked);
+        workplaceField.disabled = locked;
+        workplaceField.classList.toggle("request-locked-field", locked);
+    };
+
     const syncQuantity = () => {
         const requestId = requestField.value;
-        if (requestId && Object.prototype.hasOwnProperty.call(quantityMap, requestId)) {
-            quantityField.value = quantityMap[requestId];
-            quantityField.readOnly = true;
+        const requestQuantity = resolveRequestQuantity(requestId);
+        if (requestId && requestQuantity !== null) {
+            quantityField.value = String(requestQuantity);
             if (Object.prototype.hasOwnProperty.call(equipmentMap, requestId) && equipmentMap[requestId]) {
                 equipmentField.value = String(equipmentMap[requestId]);
-                equipmentField.readOnly = true;
-                equipmentField.disabled = true;
             }
             if (Object.prototype.hasOwnProperty.call(workplaceMap, requestId) && workplaceMap[requestId]) {
                 workplaceField.value = String(workplaceMap[requestId]);
-                workplaceField.readOnly = true;
-                workplaceField.disabled = true;
             }
+            setRequestLockedUi(true);
         } else {
-            quantityField.readOnly = false;
-            equipmentField.readOnly = false;
-            workplaceField.readOnly = false;
-            equipmentField.disabled = false;
-            workplaceField.disabled = false;
+            setRequestLockedUi(false);
         }
     };
 
     const form = requestField.closest("form");
     if (form) {
         form.addEventListener("submit", () => {
+            quantityField.disabled = false;
             equipmentField.disabled = false;
             workplaceField.disabled = false;
         });

@@ -54,6 +54,7 @@ python manage.py init_roles
 
 RUN_TESTS_ON_START="${RUN_TESTS_ON_START:-true}"
 TEST_SUITE_ON_START="${TEST_SUITE_ON_START:-inventory.tests}"
+TEST_ARGS_ON_START="${TEST_ARGS_ON_START:---noinput --keepdb --verbosity 2}"
 
 if [[ "${RUN_TESTS_ON_START,,}" == "true" || "${RUN_TESTS_ON_START}" == "1" || "${RUN_TESTS_ON_START,,}" == "yes" ]]; then
     echo "Ensuring stale Django test database is removed before test run..."
@@ -101,7 +102,9 @@ except Exception as exc:
 PY
 
     echo "Running test suite before server start: ${TEST_SUITE_ON_START}"
-    python manage.py test "${TEST_SUITE_ON_START}" --noinput
+    echo "Test args: ${TEST_ARGS_ON_START}"
+    read -r -a _test_args <<< "${TEST_ARGS_ON_START}"
+    python -u manage.py test "${TEST_SUITE_ON_START}" "${_test_args[@]}"
     echo "Test suite completed successfully."
 else
     echo "Skipping test suite on startup (RUN_TESTS_ON_START=${RUN_TESTS_ON_START})."

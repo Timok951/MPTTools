@@ -15,6 +15,8 @@ services:
       context: .
       dockerfile: Dockerfile
     restart: unless-stopped
+    env_file:
+      - ./TIP/.env
     volumes:
       - .:/app
     working_dir: /app/TIP
@@ -22,25 +24,17 @@ services:
       DATABASE_ENGINE: postgresql
       DATABASE_HOST: postgres_db
       DATABASE_PORT: "5432"
-      DATABASE_NAME: ${DATABASE_NAME:-mpt_tools}
+      DATABASE_NAME: mpttools
       DATABASE_USERNAME: postgres
-      DATABASE_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      DATABASE_PASSWORD: ${DATABASE_PASSWORD:-1}
       ALLOWED_HOSTS: "${ALLOWED_HOSTS:-localhost,127.0.0.1,web,djangoapp,*}"
       CSRF_TRUSTED_ORIGINS: ${CSRF_TRUSTED_ORIGINS:-http://localhost:18080,http://127.0.0.1:18080}
       DEBUG: ${DEBUG:-true}
       DJANGO_SUPERUSER_USERNAME: ${DJANGO_SUPERUSER_USERNAME:-admin}
       DJANGO_SUPERUSER_EMAIL: ${DJANGO_SUPERUSER_EMAIL:-admin@example.com}
       DJANGO_SUPERUSER_PASSWORD: ${DJANGO_SUPERUSER_PASSWORD:-admin123}
-      EMAIL_BACKEND: ${EMAIL_BACKEND:-django.core.mail.backends.smtp.EmailBackend}
-      EMAIL_HOST: ${EMAIL_HOST:-mailpit}
-      EMAIL_PORT: ${EMAIL_PORT:-1025}
-      EMAIL_HOST_USER: ${EMAIL_HOST_USER:-}
-      EMAIL_HOST_PASSWORD: ${EMAIL_HOST_PASSWORD:-}
-      EMAIL_USE_TLS: ${EMAIL_USE_TLS:-false}
-      EMAIL_USE_SSL: ${EMAIL_USE_SSL:-false}
-      DEFAULT_FROM_EMAIL: ${DEFAULT_FROM_EMAIL:-noreply@mpt-tools.local}
-      RUN_TESTS_ON_START: ${RUN_TESTS_ON_START:-true}
-      TEST_SUITE_ON_START: ${TEST_SUITE_ON_START:-inventory.tests}
+      EMAIL_HOST: mailpit
+      EMAIL_PORT: "1025"
     ports:
       - "${MPTTOOLS_WEB_PORT:-18080}:8000"
     depends_on:
@@ -57,12 +51,12 @@ services:
     restart: unless-stopped
     environment:
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
-      POSTGRES_DB: ${POSTGRES_DB:-mpt_tools}
+      POSTGRES_PASSWORD: ${DATABASE_PASSWORD:-1}
+      POSTGRES_DB: mpttools
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d ${POSTGRES_DB:-mpt_tools}"]
+      test: ["CMD-SHELL", "pg_isready -U postgres -d mpttools"]
       interval: 3s
       timeout: 5s
       retries: 20
@@ -103,7 +97,7 @@ services:
     image: quay.io/prometheuscommunity/postgres-exporter:latest
     restart: unless-stopped
     environment:
-      DATA_SOURCE_NAME: postgresql://postgres:${POSTGRES_PASSWORD:-postgres}@postgres_db:5432/${POSTGRES_DB:-mpt_tools}?sslmode=disable
+      DATA_SOURCE_NAME: postgresql://postgres:${DATABASE_PASSWORD:-1}@postgres_db:5432/mpttools?sslmode=disable
     depends_on:
       postgres_db:
         condition: service_healthy
@@ -133,12 +127,14 @@ services:
   backup:
     image: postgres:17
     restart: unless-stopped
+    env_file:
+      - ./TIP/.env
     environment:
       DATABASE_HOST: postgres_db
       DATABASE_PORT: "5432"
-      DATABASE_NAME: ${DATABASE_NAME:-mpt_tools}
+      DATABASE_NAME: mpttools
       DATABASE_USERNAME: postgres
-      DATABASE_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      DATABASE_PASSWORD: ${DATABASE_PASSWORD:-1}
       BACKUP_DIR: /backups
       BACKUP_KEEP_COUNT: ${BACKUP_KEEP_COUNT:-14}
       BACKUP_LABEL: ${BACKUP_LABEL:-docker}

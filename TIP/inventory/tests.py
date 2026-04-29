@@ -652,7 +652,7 @@ class RoleEnforcementWebTests(TestCase):
         self.assertNotIn("is_superuser", form.fields)
         self.assertNotIn("user_permissions", form.fields)
         names = set(form.fields["groups"].queryset.values_list("name", flat=True))
-        self.assertTrue({"Administrator", "Builder", "Sysadmin", "Warehouse"}.issubset(names))
+        self.assertTrue({"Administrator", "Builder", "Sysadmin", "Warehouse", "Администратор"}.issubset(names))
 
 
 @override_settings(

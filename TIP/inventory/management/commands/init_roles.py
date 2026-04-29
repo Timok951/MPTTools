@@ -2,6 +2,7 @@ from django.contrib.auth.models import Group, Permission
 from django.core.management.base import BaseCommand
 
 from inventory.authz import (
+    GROUP_ROLE_ADMIN,
     GROUP_FIRST_LINE_SUPPORT,
     GROUP_SENIOR_TECHNICIAN,
     GROUP_SYSADMIN,
@@ -15,6 +16,7 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         groups = {
+            GROUP_ROLE_ADMIN: list(ROLE_SPECS[GROUP_ROLE_ADMIN].permissions),
             GROUP_SYSADMIN: None,
             GROUP_SENIOR_TECHNICIAN: list(ROLE_SPECS[GROUP_SENIOR_TECHNICIAN].permissions),
             GROUP_TECHNICIAN: list(ROLE_SPECS[GROUP_TECHNICIAN].permissions),

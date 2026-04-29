@@ -1307,14 +1307,18 @@
                 </div>
 
                 <div class="header-tools">
-                    {% if user|has_group:"Administrator" or user|has_group:"Sysadmin" %}
+                    {% if user|has_group:"Administrator" or user|has_group:"Sysadmin" or user|has_group:"Администратор" %}
                         {% if user|has_group:"Administrator" %}
                         <a class="admin-quick" href="{% url 'portal_home' %}">{% ui_text "Портал администратора" "Administrator portal" %}</a>
+                        {% endif %}
+                        {% if user|has_group:"Administrator" or user|has_group:"Администратор" %}
                         <a class="admin-quick admin-quick-muted" href="{% url 'role_assignment' %}">{% ui_text "Роли" "Roles" %}</a>
                         {% endif %}
+                        {% if user|has_group:"Administrator" or user|has_group:"Sysadmin" %}
                         <a class="admin-quick admin-quick-muted" href="{% url 'quality_report' %}">{% ui_text "Качество сайта" "Site quality" %}</a>
                         <a class="admin-quick admin-quick-muted" href="{% url 'data_tools' %}">{% ui_text "Резервные копии" "Backups" %}</a>
                         <a class="admin-quick admin-quick-muted" href="{% url 'api_docs' %}">{% ui_text "Документация API" "API docs" %}</a>
+                        {% endif %}
                     {% endif %}
 
                     <div class="user-chip">

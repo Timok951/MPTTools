@@ -179,7 +179,7 @@ def _can_process_request_status(user) -> bool:
 
 
 def _can_create_checkout(user) -> bool:
-    return False
+    return user_has_capability(user, "checkout_operations")
 
 
 def _can_create_usage(user) -> bool:
@@ -1624,7 +1624,7 @@ def direct_messages_view(request):
 
 @login_required
 def role_assignment(request):
-    if not user_in_group(request.user, GROUP_ADMIN):
+    if not user_has_capability(request.user, "users_and_site_admin"):
         return forbidden(request, "Выдача ролей доступна только администратору.")
 
     groups = {name: Group.objects.get_or_create(name=name)[0] for name in ROLE_DESCRIPTIONS}

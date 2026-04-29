@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 
 
+GROUP_ROLE_ADMIN = "Администратор"
 GROUP_SENIOR_TECHNICIAN = "Старший техник"
 GROUP_TECHNICIAN = "Техник"
 GROUP_SYSADMIN = "Системный администратор"
@@ -8,9 +9,10 @@ GROUP_FIRST_LINE_SUPPORT = "Поддержка первой линии"
 
 # Backward-compatible aliases for previous role names.
 ROLE_ALIASES = {
+    GROUP_ROLE_ADMIN: set(),
     GROUP_SENIOR_TECHNICIAN: {"Warehouse"},
     GROUP_TECHNICIAN: {"Builder"},
-    GROUP_SYSADMIN: {"Administrator", "Sysadmin"},
+    GROUP_SYSADMIN: {"Sysadmin"},
     GROUP_FIRST_LINE_SUPPORT: set(),
 }
 
@@ -37,6 +39,15 @@ ROLE_CAPABILITY_LABELS = {
 }
 
 ROLE_SPECS: dict[str, RoleSpec] = {
+    GROUP_ROLE_ADMIN: RoleSpec(
+        slug="administrator",
+        title=GROUP_ROLE_ADMIN,
+        description="Администрирование ролей пользователей без складских и операционных действий.",
+        permissions=(),
+        capabilities=(
+            "users_and_site_admin",
+        ),
+    ),
     GROUP_SYSADMIN: RoleSpec(
         slug="sysadmin",
         title=GROUP_SYSADMIN,
@@ -57,12 +68,14 @@ ROLE_SPECS: dict[str, RoleSpec] = {
     GROUP_SENIOR_TECHNICIAN: RoleSpec(
         slug="senior_technician",
         title=GROUP_SENIOR_TECHNICIAN,
-        description="Работа со складом, движением оборудования и операционной отчётностью.",
+        description="Работа со складом, выдачей оборудования и операционной отчётностью.",
         permissions=(
             "view_equipment",
             "change_equipment",
             "view_equipmentrequest",
             "change_equipmentrequest",
+            "add_equipmentcheckout",
+            "view_equipmentcheckout",
             "add_inventoryadjustment",
             "view_inventoryadjustment",
             "add_materialusage",
@@ -73,6 +86,7 @@ ROLE_SPECS: dict[str, RoleSpec] = {
         capabilities=(
             "warehouse_operations",
             "request_processing",
+            "checkout_operations",
             "usage_writeoff",
             "report_access",
         ),
@@ -80,19 +94,16 @@ ROLE_SPECS: dict[str, RoleSpec] = {
     GROUP_TECHNICIAN: RoleSpec(
         slug="technician",
         title=GROUP_TECHNICIAN,
-        description="Создание заявок и базовые операции с выдачей оборудования.",
+        description="Создание заявок без прав на обработку и выдачу оборудования.",
         permissions=(
             "view_equipment",
             "view_equipmentrequest",
             "add_equipmentrequest",
-            "add_equipmentcheckout",
-            "view_equipmentcheckout",
             "view_workplace",
             "view_cabinet",
         ),
         capabilities=(
             "request_creation",
-            "checkout_operations",
         ),
     ),
     GROUP_FIRST_LINE_SUPPORT: RoleSpec(
@@ -105,7 +116,6 @@ ROLE_SPECS: dict[str, RoleSpec] = {
             "view_equipment",
         ),
         capabilities=(
-            "request_creation",
             "request_processing",
         ),
     ),

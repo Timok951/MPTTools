@@ -1,8 +1,8 @@
 from rest_framework.permissions import BasePermission, SAFE_METHODS
 
-from inventory.authz import GROUP_ADMIN, GROUP_BUILDER, GROUP_SYSADMIN, GROUP_WAREHOUSE, user_in_group
+from inventory.authz import GROUP_ADMIN, GROUP_BUILDER, GROUP_FIRST_LINE_SUPPORT, GROUP_SYSADMIN, GROUP_WAREHOUSE, user_in_group
 
-ALL_API_ROLES = (GROUP_ADMIN, GROUP_WAREHOUSE, GROUP_SYSADMIN, GROUP_BUILDER)
+ALL_API_ROLES = (GROUP_ADMIN, GROUP_WAREHOUSE, GROUP_SYSADMIN, GROUP_BUILDER, GROUP_FIRST_LINE_SUPPORT)
 
 
 def user_has_api_role(user, role_names) -> bool:

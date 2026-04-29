@@ -5,6 +5,7 @@ from django.urls import reverse
 from core.models import Workplace
 from inventory.authz import (
     GROUP_FIRST_LINE_SUPPORT,
+    GROUP_ROLE_ADMIN,
     GROUP_SYSADMIN,
     GROUP_TECHNICIAN,
 )
@@ -20,6 +21,7 @@ class RoleAssignmentUiTests(TestCase):
     def setUp(self):
         self.password = "secret123"
         self.admin = User.objects.create_user(username="admin_roles", password=self.password)
+        self.sysadmin = User.objects.create_user(username="sysadmin_roles", password=self.password)
         self.tech = User.objects.create_user(
             username="tech_user",
             email="tech@example.com",
@@ -30,11 +32,13 @@ class RoleAssignmentUiTests(TestCase):
         self.support = User.objects.create_user(username="support_user", password=self.password)
         self.no_role = User.objects.create_user(username="new_user", password=self.password)
 
-        admin_group, _ = Group.objects.get_or_create(name=GROUP_SYSADMIN)
+        admin_group, _ = Group.objects.get_or_create(name=GROUP_ROLE_ADMIN)
+        sysadmin_group, _ = Group.objects.get_or_create(name=GROUP_SYSADMIN)
         technician_group, _ = Group.objects.get_or_create(name=GROUP_TECHNICIAN)
         support_group, _ = Group.objects.get_or_create(name=GROUP_FIRST_LINE_SUPPORT)
 
         self.admin.groups.add(admin_group)
+        self.sysadmin.groups.add(sysadmin_group)
         self.tech.groups.add(technician_group)
         self.support.groups.add(support_group)
 
@@ -65,6 +69,13 @@ class RoleAssignmentUiTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.tech.refresh_from_db()
         self.assertFalse(self.tech.groups.exists())
+
+    def test_sysadmin_can_still_open_role_assignment(self):
+        self.client.force_login(self.sysadmin)
+
+        response = self.client.get(reverse("role_assignment"))
+
+        self.assertEqual(response.status_code, 200)
 
 
 class RequestStatusUxTests(TestCase):

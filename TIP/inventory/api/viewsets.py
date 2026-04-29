@@ -7,7 +7,7 @@ from rest_framework.response import Response
 
 from assets.models import Equipment, EquipmentCheckout, InventoryAdjustment
 from core.models import Cabinet, EquipmentCategory, Workplace
-from inventory.authz import GROUP_ADMIN, GROUP_BUILDER, GROUP_SYSADMIN, GROUP_WAREHOUSE, user_in_group
+from inventory.authz import GROUP_ADMIN, GROUP_BUILDER, GROUP_FIRST_LINE_SUPPORT, GROUP_SYSADMIN, GROUP_WAREHOUSE, user_in_group
 from operations.models import (
     REQUEST_APPROVED,
     REQUEST_KIND_BUILDER,
@@ -166,11 +166,11 @@ class EquipmentRequestViewSet(InventoryModelViewSet):
     role_matrix = {
         "read": ALL_API_ROLES,
         "create": (GROUP_ADMIN, GROUP_SYSADMIN, GROUP_BUILDER),
-        "update": (GROUP_ADMIN, GROUP_WAREHOUSE, GROUP_SYSADMIN, GROUP_BUILDER),
+        "update": (GROUP_ADMIN, GROUP_WAREHOUSE, GROUP_SYSADMIN, GROUP_BUILDER, GROUP_FIRST_LINE_SUPPORT),
         "delete": (GROUP_ADMIN,),
     }
-    privileged_read_roles = (GROUP_WAREHOUSE,)
-    privileged_update_roles = (GROUP_ADMIN, GROUP_WAREHOUSE)
+    privileged_read_roles = (GROUP_WAREHOUSE, GROUP_FIRST_LINE_SUPPORT)
+    privileged_update_roles = (GROUP_ADMIN, GROUP_WAREHOUSE, GROUP_FIRST_LINE_SUPPORT)
     owner_field = "requester"
     owner_read_roles = (GROUP_SYSADMIN, GROUP_BUILDER)
     owner_update_roles = (GROUP_SYSADMIN, GROUP_BUILDER)
@@ -225,8 +225,8 @@ class MaterialUsageViewSet(InventoryModelViewSet):
     serializer_class = MaterialUsageSerializer
     role_matrix = {
         "read": ALL_API_ROLES,
-        "create": ALL_API_ROLES,
-        "update": ALL_API_ROLES,
+        "create": (GROUP_ADMIN, GROUP_WAREHOUSE, GROUP_SYSADMIN),
+        "update": (GROUP_ADMIN, GROUP_WAREHOUSE, GROUP_SYSADMIN),
         "delete": (GROUP_ADMIN,),
     }
     privileged_read_roles = (GROUP_WAREHOUSE,)
@@ -300,15 +300,15 @@ class EquipmentCheckoutViewSet(InventoryModelViewSet):
     serializer_class = EquipmentCheckoutSerializer
     role_matrix = {
         "read": ALL_API_ROLES,
-        "create": (GROUP_ADMIN, GROUP_SYSADMIN, GROUP_BUILDER),
-        "update": (GROUP_ADMIN, GROUP_SYSADMIN, GROUP_BUILDER),
+        "create": (GROUP_ADMIN, GROUP_SYSADMIN, GROUP_WAREHOUSE),
+        "update": (GROUP_ADMIN, GROUP_SYSADMIN, GROUP_WAREHOUSE),
         "delete": (GROUP_ADMIN,),
     }
     privileged_read_roles = (GROUP_WAREHOUSE,)
-    privileged_update_roles = (GROUP_ADMIN,)
+    privileged_update_roles = (GROUP_ADMIN, GROUP_WAREHOUSE)
     owner_field = "taken_by"
-    owner_read_roles = (GROUP_SYSADMIN, GROUP_BUILDER)
-    owner_update_roles = (GROUP_SYSADMIN, GROUP_BUILDER)
+    owner_read_roles = (GROUP_SYSADMIN,)
+    owner_update_roles = (GROUP_SYSADMIN,)
     editable_fields = {"workplace", "cabinet", "due_at", "returned_at", "note"}
 
     def scope_queryset_for_user(self, queryset):

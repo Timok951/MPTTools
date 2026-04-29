@@ -56,6 +56,50 @@ RUN_TESTS_ON_START="${RUN_TESTS_ON_START:-true}"
 TEST_SUITE_ON_START="${TEST_SUITE_ON_START:-inventory.tests}"
 
 if [[ "${RUN_TESTS_ON_START,,}" == "true" || "${RUN_TESTS_ON_START}" == "1" || "${RUN_TESTS_ON_START,,}" == "yes" ]]; then
+    echo "Ensuring stale Django test database is removed before test run..."
+    python - <<'PY'
+import os
+import sys
+
+try:
+    import psycopg2
+except ImportError:
+    print("psycopg2 is required for test DB cleanup", file=sys.stderr)
+    sys.exit(1)
+
+host = os.getenv("DATABASE_HOST", "localhost")
+port = int(os.getenv("DATABASE_PORT", "5432") or "5432")
+user = os.getenv("DATABASE_USERNAME", "postgres")
+password = os.getenv("DATABASE_PASSWORD", "")
+db_name = os.getenv("DATABASE_NAME", "mpt_tools")
+test_db_name = f"test_{db_name}"
+
+try:
+    conn = psycopg2.connect(
+        host=host,
+        port=port,
+        user=user,
+        password=password,
+        dbname="postgres",
+        connect_timeout=5,
+    )
+    conn.autocommit = True
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            SELECT pg_terminate_backend(pid)
+            FROM pg_stat_activity
+            WHERE datname = %s AND pid <> pg_backend_pid()
+            """,
+            (test_db_name,),
+        )
+        cur.execute(f'DROP DATABASE IF EXISTS "{test_db_name}"')
+    conn.close()
+    print(f"Pre-test cleanup complete: {test_db_name}")
+except Exception as exc:
+    print(f"Pre-test DB cleanup skipped: {exc}", file=sys.stderr)
+PY
+
     echo "Running test suite before server start: ${TEST_SUITE_ON_START}"
     python manage.py test "${TEST_SUITE_ON_START}" --noinput
     echo "Test suite completed successfully."

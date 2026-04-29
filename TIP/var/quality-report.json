@@ -1,6 +1,6 @@
 {
-  "generated_at": "2026-04-28T23:17:04.986666+00:00",
-  "started_at": "2026-04-28T23:13:52.508905+00:00",
+  "generated_at": "2026-04-29T06:25:50.220158+00:00",
+  "started_at": "2026-04-29T06:22:55.576042+00:00",
   "python_executable": "G:\\Programming\\Django\\MPTTools\\.venv\\Scripts\\python.exe",
   "report_path": "G:\\Programming\\Django\\MPTTools\\TIP\\var\\quality-report.json",
   "summary": {
@@ -17,7 +17,7 @@
       "command": "G:\\Programming\\Django\\MPTTools\\.venv\\Scripts\\python.exe G:\\Programming\\Django\\MPTTools\\TIP\\manage.py check",
       "status": "passed",
       "returncode": 0,
-      "duration_seconds": 1.241,
+      "duration_seconds": 2.838,
       "tests_ran": 0,
       "output_tail": [
         "System check identified no issues (0 silenced)."
@@ -29,17 +29,15 @@
       "command": "G:\\Programming\\Django\\MPTTools\\.venv\\Scripts\\python.exe G:\\Programming\\Django\\MPTTools\\TIP\\manage.py test inventory.tests.TimerAndPreferenceViewTests --noinput",
       "status": "passed",
       "returncode": 0,
-      "duration_seconds": 9.32,
+      "duration_seconds": 10.284,
       "tests_ran": 4,
       "output_tail": [
         "Found 4 test(s).",
         "System check identified no issues (0 silenced).",
         "Creating test database for alias 'default'...",
-        "Got an error creating the test database: database \"test_mpttools\" already exists",
-        "Destroying old test database for alias 'default'...",
         "....",
         "----------------------------------------------------------------------",
-        "Ran 4 tests in 5.100s",
+        "Ran 4 tests in 4.930s",
         "OK",
         "Destroying test database for alias 'default'..."
       ]
@@ -50,7 +48,7 @@
       "command": "G:\\Programming\\Django\\MPTTools\\.venv\\Scripts\\python.exe G:\\Programming\\Django\\MPTTools\\TIP\\manage.py test inventory.tests.LightweightPerformanceTests --noinput",
       "status": "passed",
       "returncode": 0,
-      "duration_seconds": 4.836,
+      "duration_seconds": 5.422,
       "tests_ran": 1,
       "output_tail": [
         "Found 1 test(s).",
@@ -58,7 +56,7 @@
         "Creating test database for alias 'default'...",
         ".",
         "----------------------------------------------------------------------",
-        "Ran 1 test in 1.060s",
+        "Ran 1 test in 0.940s",
         "OK",
         "Destroying test database for alias 'default'..."
       ]
@@ -69,7 +67,7 @@
       "command": "G:\\Programming\\Django\\MPTTools\\.venv\\Scripts\\python.exe G:\\Programming\\Django\\MPTTools\\TIP\\manage.py test inventory.tests.AdminProcedureTests --noinput",
       "status": "passed",
       "returncode": 0,
-      "duration_seconds": 17.15,
+      "duration_seconds": 15.254,
       "tests_ran": 7,
       "output_tail": [
         "Found 7 test(s).",
@@ -77,7 +75,7 @@
         "Creating test database for alias 'default'...",
         ".......",
         "----------------------------------------------------------------------",
-        "Ran 7 tests in 13.114s",
+        "Ran 7 tests in 11.754s",
         "OK",
         "Destroying test database for alias 'default'..."
       ]
@@ -88,7 +86,7 @@
       "command": "G:\\Programming\\Django\\MPTTools\\.venv\\Scripts\\python.exe G:\\Programming\\Django\\MPTTools\\TIP\\manage.py test inventory.tests.RoleEnforcementWebTests --noinput",
       "status": "passed",
       "returncode": 0,
-      "duration_seconds": 46.648,
+      "duration_seconds": 38.563,
       "tests_ran": 8,
       "output_tail": [
         "Found 8 test(s).",
@@ -96,7 +94,7 @@
         "Creating test database for alias 'default'...",
         "........",
         "----------------------------------------------------------------------",
-        "Ran 8 tests in 42.709s",
+        "Ran 8 tests in 35.128s",
         "OK",
         "Destroying test database for alias 'default'..."
       ]
@@ -107,7 +105,7 @@
       "command": "G:\\Programming\\Django\\MPTTools\\.venv\\Scripts\\python.exe G:\\Programming\\Django\\MPTTools\\TIP\\manage.py test inventory.tests.InventoryApiTests --noinput",
       "status": "passed",
       "returncode": 0,
-      "duration_seconds": 108.102,
+      "duration_seconds": 98.772,
       "tests_ran": 19,
       "output_tail": [
         "Found 19 test(s).",
@@ -115,7 +113,7 @@
         "Creating test database for alias 'default'...",
         "...................",
         "----------------------------------------------------------------------",
-        "Ran 19 tests in 103.842s",
+        "Ran 19 tests in 95.115s",
         "OK",
         "Destroying test database for alias 'default'..."
       ]
@@ -126,19 +124,19 @@
       "command": "G:\\Programming\\Django\\MPTTools\\.venv\\Scripts\\python.exe G:\\Programming\\Django\\MPTTools\\TIP\\manage.py test inventory.tests.BackupCommandTests --noinput",
       "status": "passed",
       "returncode": 0,
-      "duration_seconds": 5.181,
+      "duration_seconds": 3.51,
       "tests_ran": 3,
       "output_tail": [
         "Found 3 test(s).",
         "System check identified no issues (0 silenced).",
-        "Backup created: C:\\Users\\timof\\AppData\\Local\\Temp\\tmpszi6vz3y\\mpt_tools_20260428_231703_server.dump",
+        "Backup created: C:\\Users\\timof\\AppData\\Local\\Temp\\tmpdxcothhu\\mpt_tools_20260429_062549_server.dump",
         "No old backups were removed.",
         "Creating test database for alias 'default'...",
         "C:\\Program Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\unittest\\case.py:115: UserWarning: Overriding setting DATABASES can lead to unexpected behavior.",
         "  result = enter(cm)",
         "...",
         "----------------------------------------------------------------------",
-        "Ran 3 tests in 0.065s",
+        "Ran 3 tests in 0.087s",
         "OK",
         "Destroying test database for alias 'default'..."
       ]

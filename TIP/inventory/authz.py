@@ -154,4 +154,4 @@ def user_has_capability(user, capability: str) -> bool:
 
 
 def is_portal_admin(user) -> bool:
-    return bool(user and user.is_authenticated and user_in_group(user, GROUP_ADMIN))
+    return bool(user and user.is_authenticated and user_has_capability(user, "users_and_site_admin"))

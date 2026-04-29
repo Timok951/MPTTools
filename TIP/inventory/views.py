@@ -723,7 +723,10 @@ def equipment_list(request):
     preferences = _get_user_preferences(request.user)
     page_size = preferences.page_size if preferences else 25
     show_deleted = bool(request.session.get("show_deleted_global", False))
-    can_manage_equipment = _can_access_data_tools(request.user) or user_in_group(request.user, GROUP_ADMIN)
+    can_manage_equipment = (
+        user_has_capability(request.user, "warehouse_operations")
+        or user_has_capability(request.user, "users_and_site_admin")
+    )
 
     if request.method == "POST":
         if not can_manage_equipment:
@@ -862,6 +865,7 @@ def usage_history(request):
             "filters": list_filters,
             "export_query": _export_querystring(list_filters),
             "can_create_usage": can_create_usage,
+            "can_manage_usage_records": can_create_usage or user_has_capability(request.user, "users_and_site_admin"),
             "usage_form": usage_form,
             "request_quantity_map": getattr(usage_form, "request_quantity_map", {}) if usage_form else {},
             "request_equipment_map": getattr(usage_form, "request_equipment_map", {}) if usage_form else {},
@@ -956,6 +960,7 @@ def request_history(request):
             "export_query": _export_querystring(list_filters),
             "can_create_request": _can_create_request(request.user),
             "can_quick_status": can_quick_status,
+            "can_manage_requests": can_quick_status or user_has_capability(request.user, "users_and_site_admin"),
             **_with_page_context(page_obj),
         },
     )
@@ -1139,7 +1144,15 @@ def workplaces(request):
     return render(
         request,
         "inventory/workplaces.html",
-        {"workplaces": workplaces_qs, "members_by_workplace": members_by_workplace, "show_deleted": show_deleted},
+        {
+            "workplaces": workplaces_qs,
+            "members_by_workplace": members_by_workplace,
+            "show_deleted": show_deleted,
+            "can_manage_workplaces": (
+                user_has_capability(request.user, "warehouse_operations")
+                or user_has_capability(request.user, "users_and_site_admin")
+            ),
+        },
     )
 
 
@@ -1153,7 +1166,18 @@ def cabinets(request):
     show_deleted = bool(request.session.get("show_deleted_global", False))
     cabinets_manager = Cabinet.all_objects if show_deleted else Cabinet.objects
     cabinets_qs = cabinets_manager.select_related("workplace").order_by("name")
-    return render(request, "inventory/cabinets.html", {"cabinets": cabinets_qs, "show_deleted": show_deleted})
+    return render(
+        request,
+        "inventory/cabinets.html",
+        {
+            "cabinets": cabinets_qs,
+            "show_deleted": show_deleted,
+            "can_manage_cabinets": (
+                user_has_capability(request.user, "warehouse_operations")
+                or user_has_capability(request.user, "users_and_site_admin")
+            ),
+        },
+    )
 
 
 @login_required

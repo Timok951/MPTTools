@@ -18,7 +18,7 @@ from audit.models import AdminPortalLog
 from audit.portal_log import log_portal_action
 
 from .admin_procedures import close_stale_issued_requests, reject_stale_requests, restock_low_stock_consumables
-from .authz import is_portal_admin
+from .authz import user_has_capability
 from .portal_forms import (
     PortalCabinetForm,
     PortalEquipmentCategoryForm,
@@ -64,14 +64,35 @@ PORTAL_ENTITIES: tuple[PortalEntity, ...] = (
 )
 PORTAL_BY_SLUG = {e.slug: e for e in PORTAL_ENTITIES}
 
+PORTAL_ENTITY_CAPABILITIES: dict[str, tuple[str, ...]] = {
+    "equipment": ("warehouse_operations", "users_and_site_admin"),
+    "categories": ("warehouse_operations", "users_and_site_admin"),
+    "workplaces": ("warehouse_operations", "users_and_site_admin"),
+    "cabinets": ("warehouse_operations", "users_and_site_admin"),
+    "workplace-members": ("users_and_site_admin",),
+    "requests": ("request_processing", "users_and_site_admin"),
+    "usage": ("usage_writeoff", "users_and_site_admin"),
+    "users": ("users_and_site_admin",),
+    "groups": ("users_and_site_admin",),
+}
 
-def _portal_nav_context(current_slug: str | None = None):
-    return {"entities": PORTAL_ENTITIES, "current_entity_slug": current_slug}
+
+def _can_access_portal_entity(user, slug: str) -> bool:
+    capabilities = PORTAL_ENTITY_CAPABILITIES.get(slug, ())
+    return any(user_has_capability(user, capability) for capability in capabilities)
 
 
-def _portal_common_context(current_slug: str | None = None):
+def _visible_portal_entities(user):
+    return tuple(entity for entity in PORTAL_ENTITIES if _can_access_portal_entity(user, entity.slug))
+
+
+def _portal_nav_context(user, current_slug: str | None = None):
+    return {"entities": _visible_portal_entities(user), "current_entity_slug": current_slug}
+
+
+def _portal_common_context(user, current_slug: str | None = None):
     return {
-        **_portal_nav_context(current_slug),
+        **_portal_nav_context(user, current_slug),
         "yandex_maps_api_key": getattr(settings, "YANDEX_MAPS_API_KEY", ""),
     }
 
@@ -103,8 +124,12 @@ def _manager(model):
     return getattr(model, "all_objects", model.objects)
 
 
-def _portal_guard(request):
-    if not is_portal_admin(request.user):
+def _portal_guard(request, entity_slug: str | None = None):
+    if entity_slug:
+        if not _can_access_portal_entity(request.user, entity_slug):
+            return forbidden(request, "Этот раздел портала вам недоступен.")
+        return None
+    if not _visible_portal_entities(request.user):
         return forbidden(request, "Портал доступен только администраторам.")
     return None
 
@@ -142,8 +167,8 @@ def portal_dashboard(request):
         request,
         "inventory/portal/dashboard.html",
         {
-            **_portal_nav_context("__home"),
-            "procedure_cards": _procedure_cards(),
+            **_portal_nav_context(request.user, "__home"),
+            "procedure_cards": _procedure_cards() if user_has_capability(request.user, "users_and_site_admin") else [],
         },
     )
 
@@ -157,7 +182,7 @@ def portal_logs(request):
         request,
         "inventory/portal/logs.html",
         {
-            **_portal_nav_context("__logs"),
+            **_portal_nav_context(request.user, "__logs"),
             "logs": logs,
         },
     )
@@ -165,9 +190,9 @@ def portal_logs(request):
 
 @login_required
 def portal_list(request, entity: str):
-    if resp := _portal_guard(request):
-        return resp
     cfg = _get_entity_or_404(entity)
+    if resp := _portal_guard(request, cfg.slug):
+        return resp
     if cfg.slug == "usage":
         return redirect("usage_history")
     if cfg.slug == "equipment":
@@ -183,7 +208,7 @@ def portal_list(request, entity: str):
         request,
         "inventory/portal/object_list.html",
         {
-            **_portal_nav_context(cfg.slug),
+            **_portal_nav_context(request.user, cfg.slug),
             "cfg": cfg,
             "objects": qs,
             "show_deleted": show_deleted,
@@ -195,9 +220,9 @@ def portal_list(request, entity: str):
 
 @login_required
 def portal_create(request, entity: str):
-    if resp := _portal_guard(request):
-        return resp
     cfg = _get_entity_or_404(entity)
+    if resp := _portal_guard(request, cfg.slug):
+        return resp
     if cfg.slug == "usage":
         return redirect("usage_history")
     Form = cfg.form_class
@@ -220,15 +245,15 @@ def portal_create(request, entity: str):
     return render(
         request,
         "inventory/portal/object_form.html",
-        {**_portal_common_context(cfg.slug), "cfg": cfg, "form": form, "is_edit": False},
+        {**_portal_common_context(request.user, cfg.slug), "cfg": cfg, "form": form, "is_edit": False},
     )
 
 
 @login_required
 def portal_edit(request, entity: str, pk: int):
-    if resp := _portal_guard(request):
-        return resp
     cfg = _get_entity_or_404(entity)
+    if resp := _portal_guard(request, cfg.slug):
+        return resp
     obj = get_object_or_404(_manager(cfg.model), pk=pk)
     Form = cfg.form_class
     if request.method == "POST":
@@ -250,15 +275,15 @@ def portal_edit(request, entity: str, pk: int):
     return render(
         request,
         "inventory/portal/object_form.html",
-        {**_portal_common_context(cfg.slug), "cfg": cfg, "form": form, "is_edit": True, "object": obj},
+        {**_portal_common_context(request.user, cfg.slug), "cfg": cfg, "form": form, "is_edit": True, "object": obj},
     )
 
 
 @login_required
 def portal_delete(request, entity: str, pk: int):
-    if resp := _portal_guard(request):
-        return resp
     cfg = _get_entity_or_404(entity)
+    if resp := _portal_guard(request, cfg.slug):
+        return resp
     obj = get_object_or_404(_manager(cfg.model), pk=pk)
     if cfg.model is User and obj.pk == request.user.pk:
         messages.error(request, "Нельзя удалить собственную учётную запись.")
@@ -275,14 +300,14 @@ def portal_delete(request, entity: str, pk: int):
         except ProtectedError:
             messages.error(request, _("Эту запись нельзя удалить, потому что она используется связанными данными."))
             return redirect("portal_list", entity=cfg.slug)
-    return render(request, "inventory/portal/object_confirm_delete.html", {**_portal_nav_context(cfg.slug), "cfg": cfg, "object": obj})
+    return render(request, "inventory/portal/object_confirm_delete.html", {**_portal_nav_context(request.user, cfg.slug), "cfg": cfg, "object": obj})
 
 
 @login_required
 def portal_restore(request, entity: str, pk: int):
-    if resp := _portal_guard(request):
-        return resp
     cfg = _get_entity_or_404(entity)
+    if resp := _portal_guard(request, cfg.slug):
+        return resp
     if not hasattr(cfg.model, "restore"):
         from django.http import Http404
 
@@ -292,13 +317,15 @@ def portal_restore(request, entity: str, pk: int):
         obj.restore()
         log_portal_action(request, "restore", cfg.slug, obj=obj, meta={"pk": obj.pk})
         return redirect("portal_list", entity=cfg.slug)
-    return render(request, "inventory/portal/object_confirm_restore.html", {**_portal_nav_context(cfg.slug), "cfg": cfg, "object": obj})
+    return render(request, "inventory/portal/object_confirm_restore.html", {**_portal_nav_context(request.user, cfg.slug), "cfg": cfg, "object": obj})
 
 
 @login_required
 def portal_procedure_run(request, slug: str):
     if resp := _portal_guard(request):
         return resp
+    if not user_has_capability(request.user, "users_and_site_admin"):
+        return forbidden(request, "Запуск процедур доступен только администратору.")
     if request.method != "POST":
         return redirect("portal_home")
 

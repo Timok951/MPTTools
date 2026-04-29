@@ -81,7 +81,7 @@
                 <th>Кабинет</th>
                 <th>Дата</th>
                 <th>Заявка</th>
-                {% if user|has_group:"Administrator" %}<th>Действия</th>{% endif %}
+                {% if can_manage_usage_records %}<th>Действия</th>{% endif %}
             </tr>
         </thead>
         <tbody>
@@ -102,15 +102,17 @@
                 <td>{{ item.equipment.cabinet|default:"-" }}</td>
                 <td>{{ item.used_at|date:preferred_datetime_format }}</td>
                 <td>{{ item.related_request }}</td>
-                {% if user|has_group:"Administrator" %}
+                {% if can_manage_usage_records %}
                 <td class="actions">
                     <a href="{% url 'portal_edit' entity='usage' pk=item.pk %}">✏️</a>
+                    {% if user|has_capability:"users_and_site_admin" %}
                     <a class="secondary" href="{% url 'portal_delete' entity='usage' pk=item.pk %}">🗑</a>
+                    {% endif %}
                 </td>
                 {% endif %}
             </tr>
             {% empty %}
-            <tr><td colspan="{% if user|has_group:'Administrator' %}10{% else %}9{% endif %}" class="muted">История операций пока пуста.</td></tr>
+            <tr><td colspan="{% if can_manage_usage_records %}10{% else %}9{% endif %}" class="muted">История операций пока пуста.</td></tr>
             {% endfor %}
         </tbody>
     </table>

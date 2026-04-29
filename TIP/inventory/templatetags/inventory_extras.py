@@ -1,5 +1,5 @@
 from django import template
-from inventory.authz import ROLE_ALIASES
+from inventory.authz import ROLE_ALIASES, user_has_capability
 
 register = template.Library()
 
@@ -23,6 +23,13 @@ def has_group(user, group_name: str) -> bool:
             allowed_names.add(canonical_name)
             allowed_names.update(aliases)
     return user.groups.filter(name__in=allowed_names).exists()
+
+
+@register.filter
+def has_capability(user, capability: str) -> bool:
+    if not user or not user.is_authenticated:
+        return False
+    return user_has_capability(user, capability)
 
 
 @register.filter

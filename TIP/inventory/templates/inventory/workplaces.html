@@ -4,17 +4,19 @@
 {% block content %}
 <div class="card">
     <h2>Рабочие места</h2>
-    {% if user|has_group:"Administrator" %}
+    {% if can_manage_workplaces %}
     <div class="actions" style="margin-bottom: 8px;">
         <a href="{% url 'portal_create' entity='workplaces' %}">➕ Добавить</a>
         <a class="secondary" href="{% url 'portal_list' entity='workplaces' %}">🧰 Управление рабочими местами</a>
+        {% if user|has_capability:"users_and_site_admin" %}
         <a class="secondary" href="{% url 'portal_list' entity='workplace-members' %}">Назначения сотрудников</a>
+        {% endif %}
     </div>
     {% endif %}
     {% for workplace in workplaces %}
         <div class="card">
             <strong>{{ workplace.name }}</strong>
-            {% if user|has_group:"Administrator" %}
+            {% if can_manage_workplaces %}
                 <span class="actions" style="display:inline-flex;margin-left:8px;">
                     <a href="{% url 'portal_edit' entity='workplaces' pk=workplace.pk %}">✏️</a>
                     {% if workplace.deleted_at %}

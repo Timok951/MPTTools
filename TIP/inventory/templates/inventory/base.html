@@ -1308,10 +1308,23 @@
 
                 <div class="header-tools">
                     {% if user|has_group:"Administrator" or user|has_group:"Sysadmin" or user|has_group:"Администратор" %}
-                        {% if user|has_group:"Administrator" %}
+                        {% if user|has_group:"Administrator" or user|has_group:"Администратор" %}
                         <a class="admin-quick" href="{% url 'portal_home' %}">{% ui_text "Портал администратора" "Administrator portal" %}</a>
                         {% endif %}
+                        {% if user|has_group:"Warehouse" %}
+                        <a class="admin-quick admin-quick-muted" href="{% url 'portal_create' entity='equipment' %}">{% ui_text "Добавить оборудование" "Add equipment" %}</a>
+                        <a class="admin-quick admin-quick-muted" href="{% url 'portal_create' entity='workplaces' %}">{% ui_text "Добавить рабочее место" "Add workplace" %}</a>
+                        <a class="admin-quick admin-quick-muted" href="{% url 'portal_create' entity='cabinets' %}">{% ui_text "Добавить кабинет" "Add cabinet" %}</a>
+                        {% endif %}
+                        {% if user|has_group:"Поддержка первой линии" %}
+                        <a class="admin-quick admin-quick-muted" href="{% url 'request_history' %}?view=processing">{% ui_text "Обработка заявок" "Process requests" %}</a>
+                        {% endif %}
+                        {% if user|has_group:"Builder" or user|has_group:"Техник" %}
+                        <a class="admin-quick admin-quick-muted" href="{% url 'request_create' %}">{% ui_text "Новая заявка" "New request" %}</a>
+                        {% endif %}
                         {% if user|has_group:"Administrator" or user|has_group:"Администратор" %}
+                        <a class="admin-quick admin-quick-muted" href="{% url 'portal_list' entity='users' %}">{% ui_text "Пользователи" "Users" %}</a>
+                        <a class="admin-quick admin-quick-muted" href="{% url 'portal_list' entity='groups' %}">{% ui_text "Группы и роли" "Groups and roles" %}</a>
                         <a class="admin-quick admin-quick-muted" href="{% url 'role_assignment' %}">{% ui_text "Роли" "Roles" %}</a>
                         {% endif %}
                         {% if user|has_group:"Administrator" or user|has_group:"Sysadmin" %}

@@ -67,7 +67,7 @@
             {% if can_create_request %}
             <a href="{% url 'request_create' %}">Новая заявка</a>
             {% endif %}
-            {% if user|has_group:"Administrator" %}
+            {% if can_manage_requests %}
             <a class="secondary" href="{% url 'portal_list' entity='requests' %}">🧰 Управление заявками</a>
             {% endif %}
         </div>
@@ -127,9 +127,11 @@
                     </form>
                     {% endfor %}
                     {% endif %}
-                    {% if user|has_group:"Administrator" %}
+                    {% if can_manage_requests %}
                     <a href="{% url 'portal_edit' entity='requests' pk=item.pk %}">✏️</a>
+                    {% if user|has_capability:"users_and_site_admin" %}
                     <a class="secondary" href="{% url 'portal_delete' entity='requests' pk=item.pk %}">🗑</a>
+                    {% endif %}
                     {% endif %}
                 </td>
             </tr>

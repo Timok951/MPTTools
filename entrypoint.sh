@@ -52,8 +52,8 @@ python manage.py migrate --noinput
 echo "Initializing default role groups..."
 python manage.py init_roles
 
-RUN_TESTS_ON_START="${RUN_TESTS_ON_START:-true}"
-RUN_DJANGO_CHECK_ON_START="${RUN_DJANGO_CHECK_ON_START:-true}"
+RUN_TESTS_ON_START="${RUN_TESTS_ON_START:-false}"
+RUN_DJANGO_CHECK_ON_START="${RUN_DJANGO_CHECK_ON_START:-false}"
 TEST_SUITE_ON_START="${TEST_SUITE_ON_START:-inventory.tests.TimerAndPreferenceViewTests inventory.tests.LightweightPerformanceTests inventory.tests.AdminProcedureTests inventory.tests.RoleEnforcementWebTests inventory.tests.InventoryApiTests inventory.tests.BackupCommandTests}"
 TEST_ARGS_ON_START="${TEST_ARGS_ON_START:---noinput --keepdb --verbosity 2}"
 

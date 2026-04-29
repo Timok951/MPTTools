@@ -18,7 +18,7 @@ class InventoryConfig(AppConfig):
         # Run only when the web server starts (avoid recursion during test commands).
         if len(sys.argv) < 2 or sys.argv[1] != "runserver":
             return False
-        enabled = os.environ.get("AUTO_REFRESH_QUALITY_REPORT_ON_START", "true").strip().lower()
+        enabled = os.environ.get("AUTO_REFRESH_QUALITY_REPORT_ON_START", "false").strip().lower()
         if enabled not in {"1", "true", "yes", "on"}:
             return False
         # With Django autoreload, execute only in the main serving process.

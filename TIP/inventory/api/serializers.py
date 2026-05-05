@@ -2,7 +2,7 @@ from rest_framework import serializers
 
 from assets.models import Equipment, EquipmentCheckout, InventoryAdjustment
 from core.models import Cabinet, EquipmentCategory, Workplace
-from operations.models import EquipmentRequest, MaterialUsage
+from operations.models import REQUEST_PENDING, EquipmentRequest, MaterialUsage
 
 
 class AuditActorModelSerializer(serializers.ModelSerializer):
@@ -87,6 +87,10 @@ class EquipmentRequestSerializer(AuditActorModelSerializer):
     workplace_name = serializers.CharField(source="workplace.name", read_only=True)
     cabinet_name = serializers.CharField(source="cabinet.name", read_only=True)
 
+    def create(self, validated_data):
+        validated_data.setdefault("status", REQUEST_PENDING)
+        return super().create(validated_data)
+
     class Meta:
         model = EquipmentRequest
         fields = [
@@ -112,6 +116,7 @@ class EquipmentRequestSerializer(AuditActorModelSerializer):
         read_only_fields = ["requester", "processed_by", "processed_at", "deleted_at"]
         extra_kwargs = {
             "request_kind": {"required": False},
+            "status": {"required": False},
         }
 
 

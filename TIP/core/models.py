@@ -141,7 +141,7 @@ class UserPreference(models.Model):
     page_size = models.PositiveSmallIntegerField(choices=PAGE_SIZE_CHOICES, default=25)
     preferred_language = models.CharField(max_length=10, default="ru")
     date_display_format = models.CharField(max_length=20, choices=DATE_FORMAT_CHOICES, default=DATE_FORMAT_COMPACT)
-    default_request_status = models.CharField(max_length=20, blank=True, default="")
+    default_request_status = models.CharField(max_length=20, blank=True, default="pending")
     default_request_kind = models.CharField(max_length=20, blank=True, default="")
     default_usage_period_days = models.PositiveSmallIntegerField(default=30)
     default_checkout_status = models.CharField(max_length=20, choices=CHECKOUT_FILTER_CHOICES, blank=True, default=CHECKOUT_FILTER_ALL)

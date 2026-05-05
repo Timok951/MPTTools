@@ -84,57 +84,187 @@
         header {
             position: sticky;
             top: 0;
-            z-index: 10;
+            z-index: 40;
             background: color-mix(in srgb, var(--bg) 92%, white 8%);
             backdrop-filter: blur(10px);
             border-bottom: 1px solid var(--border);
         }
-        .topbar {
+        .shell-header-inner {
             max-width: 1200px;
             margin: 0 auto;
-            padding: 6px 12px;
+            padding: 8px 12px 10px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        .header-brand-row {
             display: flex;
             flex-wrap: wrap;
-            gap: 8px;
             align-items: center;
             justify-content: space-between;
+            gap: 10px;
         }
-        .header-main {
+        .header-nav-row {
             display: flex;
             flex-wrap: wrap;
-            gap: 6px;
-            align-items: center;
-            flex: 1 1 760px;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 10px;
+            padding-top: 8px;
+            border-top: 1px solid var(--border);
         }
-        .header-tools {
+        .primary-nav {
             display: flex;
             flex-wrap: wrap;
-            gap: 6px;
             align-items: center;
-            justify-content: flex-end;
-            flex: 1 1 260px;
+            gap: 6px;
+            flex: 1 1 280px;
         }
-        .header-tools a.admin-quick {
+        .nav-mega {
+            position: relative;
+        }
+        .nav-mega > summary {
+            list-style: none;
+            cursor: pointer;
+            user-select: none;
             text-decoration: none;
-            padding: 4px 9px;
-            border-radius: 999px;
-            border: 1px solid var(--accent);
-            background: linear-gradient(180deg, var(--accent), #db4444);
-            color: #fff;
+            color: var(--ink);
+            padding: 5px 12px;
+            border-radius: 10px;
+            border: 1px solid var(--border);
+            background: var(--surface);
             font-size: 12px;
-            font-weight: 700;
-            box-shadow: 0 8px 18px rgba(244, 80, 80, 0.22);
+            font-weight: 600;
+            transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
         }
-        .header-tools a.admin-quick-muted {
+        .nav-mega > summary::-webkit-details-marker {
+            display: none;
+        }
+        .nav-mega > summary::after {
+            content: "";
+            display: inline-block;
+            width: 0.32em;
+            height: 0.32em;
+            margin-left: 0.15em;
+            border-right: 2px solid currentColor;
+            border-bottom: 2px solid currentColor;
+            transform: rotate(45deg);
+            opacity: 0.65;
+            transition: transform 0.15s ease;
+        }
+        .nav-mega[open] > summary {
+            border-color: var(--accent);
+            color: var(--accent-2);
+            background: var(--panel-soft);
+        }
+        .nav-mega[open] > summary::after {
+            transform: rotate(-135deg);
+            margin-top: 0.12em;
+        }
+        body.theme-dark .nav-mega > summary {
+            color: #eaf0ff;
+            background: rgba(26, 38, 68, 0.96);
+        }
+        body.theme-dark .nav-mega[open] > summary {
+            background: rgba(38, 56, 98, 0.96);
+            color: #ffffff;
+        }
+        .nav-panel {
+            position: absolute;
+            top: calc(100% + 5px);
+            left: 0;
+            min-width: 260px;
+            max-width: min(380px, 92vw);
+            padding: 8px;
+            background: var(--panel);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            box-shadow: var(--shadow);
+            z-index: 50;
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+        body.theme-dark .nav-panel {
+            background: var(--surface-strong);
+        }
+        .nav-panel a {
+            display: block;
+            padding: 8px 12px;
+            border-radius: 8px;
+            text-decoration: none;
+            color: var(--ink);
+            font-size: 13px;
+            font-weight: 600;
+            transition: background 0.15s ease;
+        }
+        .nav-panel a:hover {
+            background: var(--panel-soft);
+        }
+        body.theme-dark .nav-panel a:hover {
+            background: rgba(125, 150, 255, 0.14);
+        }
+        .nav-panel a.nav-emphasis {
+            border: 1px solid var(--accent);
+            background: linear-gradient(180deg, var(--accent), #3d52d4);
+            color: #fff;
+            box-shadow: 0 6px 16px rgba(76, 103, 255, 0.25);
+        }
+        .nav-panel a.nav-emphasis:hover {
+            filter: brightness(1.05);
+        }
+        body.theme-contrast .nav-panel a.nav-emphasis {
+            background: linear-gradient(180deg, var(--accent), #b83232);
+        }
+        .nav-panel-hint {
+            font-size: 11px;
+            font-weight: 500;
+            color: var(--muted);
+            padding: 4px 12px 6px;
+            line-height: 1.35;
+        }
+        .nav-panel .switch-form {
+            margin: 6px 0 2px;
+        }
+        .nav-panel .switch-btn {
+            width: 100%;
+            justify-content: flex-start;
+        }
+        .user-strip .nav-mega {
+            position: relative;
+        }
+        .user-strip .nav-mega > .nav-panel {
+            left: auto;
+            right: 0;
+        }
+        .user-strip {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 8px;
+            justify-content: flex-end;
+        }
+        .user-strip .user-chip {
+            max-width: 100%;
+        }
+        .user-strip a.plain-link {
+            text-decoration: none;
+            color: var(--accent-2);
+            font-size: 12px;
+            font-weight: 600;
+            padding: 4px 8px;
+            border-radius: 8px;
+            border: 1px solid transparent;
+        }
+        .user-strip a.plain-link:hover {
             border-color: var(--border);
             background: var(--surface);
-            color: var(--accent-2);
-            box-shadow: none;
         }
-        body.theme-dark .header-tools a.admin-quick-muted {
-            color: var(--ink);
-            border-color: var(--border);
-            background: var(--surface-strong);
+        body.theme-dark .user-strip a.plain-link {
+            color: var(--accent-3);
         }
         .brand {
             display: grid;
@@ -149,35 +279,6 @@
         .brand span {
             color: var(--muted);
             font-size: 10px;
-        }
-        nav {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 4px;
-        }
-        nav a {
-            text-decoration: none;
-            color: var(--ink);
-            padding: 3px 8px;
-            border-radius: 10px;
-            border: 1px solid var(--border);
-            background: var(--surface);
-            font-size: 12px;
-            font-weight: 600;
-            transition: all 0.2s ease;
-        }
-        nav a:hover {
-            border-color: var(--accent-2);
-            color: var(--accent-2);
-            transform: translateY(-1px);
-        }
-        body.theme-dark nav a {
-            color: #eaf0ff;
-            background: rgba(26, 38, 68, 0.96);
-        }
-        body.theme-dark nav a:hover {
-            background: rgba(38, 56, 98, 0.96);
-            color: #ffffff;
         }
         .user-chip {
             background: rgba(249, 217, 73, 0.2);
@@ -1053,17 +1154,22 @@
             position: relative;
             width: 100%;
             box-sizing: border-box;
-            background: linear-gradient(135deg, var(--surface-strong), var(--panel-soft));
+            background: linear-gradient(145deg, var(--surface-strong), var(--panel-soft));
             border-bottom: 1px solid var(--border);
-            display: grid;
-            place-items: center;
-            height: 190px;
-            padding: 8px 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 188px;
+            height: 200px;
+            max-height: 220px;
+            padding: 12px;
+            flex-shrink: 0;
         }
         .equipment-card-media img {
-            width: 100%;
-            height: 100%;
-            margin: auto;
+            max-width: 100%;
+            max-height: 100%;
+            width: auto;
+            height: auto;
             object-fit: contain;
             object-position: center;
             display: block;
@@ -1079,10 +1185,87 @@
             text-align: center;
             font-weight: 600;
         }
+        .equipment-card-status-ribbon {
+            position: absolute;
+            left: 10px;
+            top: 10px;
+            z-index: 2;
+            padding: 6px 11px;
+            border-radius: 6px;
+            font-size: 11px;
+            font-weight: 700;
+            line-height: 1.25;
+            letter-spacing: 0.02em;
+            color: #fff;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.18);
+            max-width: calc(100% - 24px);
+            text-align: left;
+            word-break: break-word;
+        }
+        .equipment-card-status--in_stock {
+            background: #16a34a;
+        }
+        .equipment-card-status--assigned {
+            background: #2563eb;
+        }
+        .equipment-card-status--checked_out {
+            background: #ca8a04;
+        }
+        .equipment-card-status--repair {
+            background: #dc2626;
+        }
+        .equipment-card-status--retired {
+            background: #64748b;
+        }
+        body.theme-dark .equipment-card-status-ribbon {
+            box-shadow: 0 2px 12px rgba(0, 0, 0, 0.45);
+        }
+        body.theme-dark .equipment-card-status--in_stock {
+            background: #22c55e;
+            color: #052e14;
+        }
+        body.theme-dark .equipment-card-status--assigned {
+            background: #60a5fa;
+            color: #0f172a;
+        }
+        body.theme-dark .equipment-card-status--checked_out {
+            background: #eab308;
+            color: #1a1503;
+        }
+        body.theme-dark .equipment-card-status--repair {
+            background: #f87171;
+            color: #1f0a0a;
+        }
+        body.theme-dark .equipment-card-status--retired {
+            background: #94a3b8;
+            color: #0f172a;
+        }
+        body.theme-contrast .equipment-card-status--in_stock {
+            background: #15803d;
+        }
         .equipment-card-badge {
             position: absolute;
-            right: 10px;
-            top: 10px;
+            right: 8px;
+            bottom: 8px;
+            top: auto;
+            left: auto;
+            z-index: 2;
+            font-size: 10px;
+            font-weight: 600;
+            padding: 4px 8px;
+            border-radius: 6px;
+            background: rgba(15, 23, 42, 0.72);
+            color: #f8fafc;
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            max-width: 70%;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        body.theme-dark .equipment-card-badge {
+            background: rgba(0, 0, 0, 0.55);
+            border-color: rgba(255, 255, 255, 0.14);
+            color: #f1f5f9;
         }
         .equipment-card-body {
             padding: 12px 12px 12px;
@@ -1100,34 +1283,12 @@
         }
         .catalog-card-head {
             display: grid;
-            gap: 4px;
-        }
-        .catalog-card-topline {
-            display: flex;
-            align-items: center;
-            justify-content: flex-start;
-            gap: 8px;
-        }
-        .catalog-stock-pill {
-            display: inline-flex;
-            align-items: center;
-            border-radius: 999px;
-            background: #18b15a;
-            color: #fff;
-            font-size: 10px;
-            font-weight: 700;
-            padding: 3px 9px;
-            text-transform: uppercase;
-            letter-spacing: 0.02em;
+            gap: 6px;
         }
         .catalog-secondary-info {
             color: var(--muted);
             font-size: 11px;
             font-weight: 600;
-        }
-        body.theme-dark .catalog-stock-pill {
-            background: #2fcb73;
-            color: #0f2a1a;
         }
         .equipment-card-meta {
             display: grid;
@@ -1214,13 +1375,14 @@
             text-align: center;
         }
         @media (max-width: 1080px) {
-            .topbar {
-                padding: 18px 18px;
+            .shell-header-inner {
+                padding: 12px 14px 12px;
             }
             main {
                 padding: 18px;
             }
-            .header-tools {
+            .header-brand-row,
+            .user-strip {
                 justify-content: flex-start;
             }
         }
@@ -1231,20 +1393,37 @@
             }
         }
         @media (max-width: 720px) {
-            .topbar {
-                padding: 14px;
+            .shell-header-inner {
+                padding: 12px;
             }
-            nav {
-                gap: 6px;
+            .primary-nav {
+                flex-direction: column;
+                align-items: stretch;
             }
-            nav a,
-            .header-tools a.admin-quick,
+            .nav-mega {
+                width: 100%;
+            }
+            .nav-mega > summary {
+                width: 100%;
+                justify-content: space-between;
+            }
+            .nav-panel {
+                position: static;
+                max-width: none;
+                margin-top: 4px;
+                box-shadow: none;
+            }
+            .header-nav-row {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            .user-strip {
+                width: 100%;
+                justify-content: flex-start;
+            }
             .switch-btn {
                 width: 100%;
-                justify-content: center;
-            }
-            .header-tools {
-                width: 100%;
+                justify-content: flex-start;
             }
             .toolbar-spread,
             .pagination {
@@ -1279,101 +1458,162 @@
 <body class="theme-{% if ui_preferences %}{{ ui_preferences.theme_variant }}{% else %}default{% endif %}">
     <div class="page">
         <header>
-            <div class="topbar">
-                <div class="header-main">
+            <div class="shell-header-inner">
+                <div class="header-brand-row">
                     <div class="brand">
                         <h1>{% ui_text "МПТ Инструменты" "MPT Tools" %}</h1>
                         <span>{% ui_text "Учёт оборудования и материалов для колледжа" "Equipment and materials tracking for the college" %}</span>
                     </div>
-                    <nav>
-                        {% if user|has_group:"Administrator" %}
-                        <a href="{% url 'analytics' %}">{% ui_text "Аналитика" "Analytics" %}</a>
+                    <div class="user-strip">
+                        <div class="user-chip">
+                            {% if user.is_authenticated %}
+                                {% ui_text "Пользователь" "User" %}: {{ user.username }}
+                            {% else %}
+                                {% ui_text "Вход не выполнен" "Not signed in" %}
+                            {% endif %}
+                        </div>
+                        {% if user.is_authenticated %}
+                        <details class="nav-mega nav-account-mega">
+                            <summary>{% ui_text "Аккаунт" "Account" %}</summary>
+                            <div class="nav-panel">
+                                <a href="{% url 'user_preferences' %}">{% ui_text "Настройки" "Preferences" %}</a>
+                                <a href="{% url 'password_reset_request' %}">{% ui_text "Сменить пароль (код на почту)" "Change password (email code)" %}</a>
+                                <a href="{% url 'logout' %}">{% ui_text "Выйти" "Logout" %}</a>
+                            </div>
+                        </details>
+                        {% else %}
+                        <a class="plain-link" href="{% url 'login' %}">{% ui_text "Войти" "Login" %}</a>
+                        <a class="plain-link" href="{% url 'register' %}">{% ui_text "Регистрация" "Register" %}</a>
                         {% endif %}
-                        <a href="{% url 'equipment_list' %}">{% ui_text "Оборудование" "Equipment" %}</a>
-                        <a href="{% url 'inventory_search' %}">{% ui_text "Поиск" "Search" %}</a>
-                        <a href="{% url 'about_site' %}">{% ui_text "О сайте" "About" %}</a>
-                        <a href="{% url 'request_history' %}">{% ui_text "Заявки" "Requests" %}</a>
-                        <a href="{% url 'usage_history' %}">{% ui_text "Выдача расходуемого" "Consumable usage" %}</a>
-                        <a href="{% url 'direct_messages' %}">{% ui_text "Сообщения" "Messages" %}</a>
-                        <a href="{% url 'workplaces' %}">{% ui_text "Рабочие места" "Workplaces" %}</a>
-                        <a href="{% url 'cabinets' %}">{% ui_text "Кабинеты" "Cabinets" %}</a>
-                        {% if user|has_group:"Administrator" %}
-                        <a href="{% url 'history' %}">{% ui_text "История" "History" %}</a>
+                    </div>
+                </div>
+
+                <div class="header-nav-row">
+                    <nav class="primary-nav" aria-label='{% ui_text "Основное меню" "Main menu" %}'>
+                        <details class="nav-mega">
+                            <summary>{% ui_text "Активы" "Assets" %}</summary>
+                            <div class="nav-panel">
+                                <a href="{% url 'equipment_list' %}">{% ui_text "Оборудование" "Equipment" %}</a>
+                                <a href="{% url 'inventory_search' %}">{% ui_text "Поиск" "Search" %}</a>
+                                <a href="{% url 'workplaces' %}">{% ui_text "Рабочие места" "Workplaces" %}</a>
+                                <a href="{% url 'cabinets' %}">{% ui_text "Кабинеты" "Cabinets" %}</a>
+                                <a href="{% url 'usage_history' %}">{% ui_text "Выдача расходуемого" "Consumable usage" %}</a>
+                            </div>
+                        </details>
+
+                        {% if user.is_authenticated %}
+                        <details class="nav-mega">
+                            <summary>{% ui_text "Заявки и связь" "Requests & messages" %}</summary>
+                            <div class="nav-panel">
+                                <a href="{% url 'request_history' %}">{% ui_text "Заявки" "Requests" %}</a>
+                                <a href="{% url 'direct_messages' %}">{% ui_text "Сообщения" "Messages" %}</a>
+                                {% if user|has_capability:"request_processing" %}
+                                <a href="{% url 'portal_list' entity='requests' %}">{% ui_text "Заявки в портале" "Requests in portal" %}</a>
+                                {% endif %}
+                                {% if user|has_capability:"request_creation" %}
+                                <a href="{% url 'request_create' %}">{% ui_text "Новая заявка" "New request" %}</a>
+                                <a href="{% url 'portal_list' entity='periodic-usage' %}">{% ui_text "Периодические заявки" "Periodic requests" %}</a>
+                                <a href="{% url 'portal_create' entity='periodic-usage' %}">{% ui_text "Новая периодическая заявка" "New periodic request" %}</a>
+                                {% endif %}
+                            </div>
+                        </details>
                         {% endif %}
-                        {% if user|has_group:"Administrator" or user|has_group:"Warehouse" or user|has_group:"Sysadmin" %}
-                        <a href="{% url 'reports' %}">{% ui_text "Отчёты" "Reports" %}</a>
+
+                        <details class="nav-mega">
+                            <summary>{% ui_text "Отчёты и сводки" "Reports & analytics" %}</summary>
+                            <div class="nav-panel">
+                                <a href="{% url 'about_site' %}">{% ui_text "О сайте" "About" %}</a>
+                                {% if user|has_group:"Sysadmin" %}
+                                <a href="{% url 'analytics' %}">{% ui_text "Аналитика" "Analytics" %}</a>
+                                {% endif %}
+                                {% if user|has_capability:"report_access" %}
+                                <a href="{% url 'reports' %}">{% ui_text "Отчёты" "Reports" %}</a>
+                                {% endif %}
+                                {% if user|has_capability:"users_and_site_admin" %}
+                                <a href="{% url 'history' %}">{% ui_text "История" "History" %}</a>
+                                {% endif %}
+                            </div>
+                        </details>
+
+                        {% if user|has_capability:"warehouse_operations" or user|has_capability:"users_and_site_admin" or user|has_capability:"usage_writeoff" %}
+                        <details class="nav-mega">
+                            <summary>{% ui_text "Управление" "Management" %}</summary>
+                            <div class="nav-panel">
+                                <p class="nav-panel-hint">{% ui_text "Портал, пользователи и складские действия" "Portal, users, and warehouse actions" %}</p>
+                                {% if user|has_capability:"users_and_site_admin" %}
+                                <a class="nav-emphasis" href="{% url 'portal_home' %}">{% ui_text "Портал администратора" "Administrator portal" %}</a>
+                                {% endif %}
+                                {% if user|has_capability:"warehouse_operations" %}
+                                <a href="{% url 'portal_create' entity='equipment' %}">{% ui_text "Добавить оборудование" "Add equipment" %}</a>
+                                <a href="{% url 'portal_create' entity='workplaces' %}">{% ui_text "Добавить рабочее место" "Add workplace" %}</a>
+                                <a href="{% url 'portal_create' entity='cabinets' %}">{% ui_text "Добавить кабинет" "Add cabinet" %}</a>
+                                {% endif %}
+                                {% if user|has_capability:"usage_writeoff" %}
+                                <a href="{% url 'portal_list' entity='periodic-usage' %}">{% ui_text "Периодические заявки" "Periodic requests" %}</a>
+                                {% endif %}
+                                {% if user|has_capability:"users_and_site_admin" %}
+                                <a href="{% url 'portal_list' entity='users' %}">{% ui_text "Пользователи" "Users" %}</a>
+                                <a href="{% url 'portal_list' entity='groups' %}">{% ui_text "Группы и роли" "Groups and roles" %}</a>
+                                <a href="{% url 'portal_create' entity='groups' %}">{% ui_text "Добавить роль" "Add role" %}</a>
+                                <a href="{% url 'role_assignment' %}">{% ui_text "Роли" "Roles" %}</a>
+                                <a href="{% url 'api_token' %}">{% ui_text "API токен" "API token" %}</a>
+                                {% endif %}
+                                {% if user|has_capability:"data_tools_access" %}
+                                <a href="{% url 'quality_report' %}">{% ui_text "Качество сайта" "Site quality" %}</a>
+                                <a href="{% url 'data_tools' %}">{% ui_text "Резервные копии" "Backups" %}</a>
+                                <a href="{% url 'api_docs' %}">{% ui_text "Документация API" "API docs" %}</a>
+                                {% endif %}
+                                {% if user|has_capability:"users_and_site_admin" %}
+                                <form method="post" action="{% url 'toggle_show_deleted' %}" class="switch-form">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="show_deleted_global" value="{% if request.session.show_deleted_global %}0{% else %}1{% endif %}">
+                                    <button type="submit" class="switch-btn {% if request.session.show_deleted_global %}is-on{% endif %}" aria-pressed="{% if request.session.show_deleted_global %}true{% else %}false{% endif %}">
+                                        <span class="switch-track"><span class="switch-dot"></span></span>
+                                        <span class="switch-copy">
+                                            <span class="switch-title">{% ui_text "Показать удалённые" "Show deleted" %}</span>
+                                            <span class="switch-state">
+                                                {% if request.session.show_deleted_global %}{% ui_text "Включено" "Enabled" %}{% else %}{% ui_text "Выключено" "Disabled" %}{% endif %}
+                                            </span>
+                                        </span>
+                                    </button>
+                                </form>
+                                {% endif %}
+                            </div>
+                        </details>
                         {% endif %}
                     </nav>
                 </div>
-
-                <div class="header-tools">
-                    {% if user|has_group:"Administrator" or user|has_group:"Sysadmin" or user|has_group:"Администратор" %}
-                        {% if user|has_group:"Administrator" or user|has_group:"Администратор" %}
-                        <a class="admin-quick" href="{% url 'portal_home' %}">{% ui_text "Портал администратора" "Administrator portal" %}</a>
-                        {% endif %}
-                        {% if user|has_group:"Warehouse" %}
-                        <a class="admin-quick admin-quick-muted" href="{% url 'portal_create' entity='equipment' %}">{% ui_text "Добавить оборудование" "Add equipment" %}</a>
-                        <a class="admin-quick admin-quick-muted" href="{% url 'portal_create' entity='workplaces' %}">{% ui_text "Добавить рабочее место" "Add workplace" %}</a>
-                        <a class="admin-quick admin-quick-muted" href="{% url 'portal_create' entity='cabinets' %}">{% ui_text "Добавить кабинет" "Add cabinet" %}</a>
-                        {% endif %}
-                        {% if user|has_group:"Поддержка первой линии" %}
-                        <a class="admin-quick admin-quick-muted" href="{% url 'request_history' %}?view=processing">{% ui_text "Обработка заявок" "Process requests" %}</a>
-                        {% endif %}
-                        {% if user|has_group:"Builder" or user|has_group:"Техник" %}
-                        <a class="admin-quick admin-quick-muted" href="{% url 'request_create' %}">{% ui_text "Новая заявка" "New request" %}</a>
-                        {% endif %}
-                        {% if user|has_group:"Administrator" or user|has_group:"Администратор" %}
-                        <a class="admin-quick admin-quick-muted" href="{% url 'portal_list' entity='users' %}">{% ui_text "Пользователи" "Users" %}</a>
-                        <a class="admin-quick admin-quick-muted" href="{% url 'portal_list' entity='groups' %}">{% ui_text "Группы и роли" "Groups and roles" %}</a>
-                        <a class="admin-quick admin-quick-muted" href="{% url 'role_assignment' %}">{% ui_text "Роли" "Roles" %}</a>
-                        {% endif %}
-                        {% if user|has_group:"Administrator" or user|has_group:"Sysadmin" %}
-                        <a class="admin-quick admin-quick-muted" href="{% url 'quality_report' %}">{% ui_text "Качество сайта" "Site quality" %}</a>
-                        <a class="admin-quick admin-quick-muted" href="{% url 'data_tools' %}">{% ui_text "Резервные копии" "Backups" %}</a>
-                        <a class="admin-quick admin-quick-muted" href="{% url 'api_docs' %}">{% ui_text "Документация API" "API docs" %}</a>
-                        {% endif %}
-                    {% endif %}
-
-                    <div class="user-chip">
-                        {% if user.is_authenticated %}
-                            {% ui_text "Пользователь" "User" %}: {{ user.username }}
-                        {% else %}
-                            {% ui_text "Вход не выполнен" "Not signed in" %}
-                        {% endif %}
-                    </div>
-
-                    {% if user|has_group:"Administrator" %}
-                    <form method="post" action="{% url 'toggle_show_deleted' %}" class="switch-form">
-                        {% csrf_token %}
-                        <input type="hidden" name="show_deleted_global" value="{% if request.session.show_deleted_global %}0{% else %}1{% endif %}">
-                        <button type="submit" class="switch-btn {% if request.session.show_deleted_global %}is-on{% endif %}" aria-pressed="{% if request.session.show_deleted_global %}true{% else %}false{% endif %}">
-                            <span class="switch-track">
-                                <span class="switch-dot"></span>
-                            </span>
-                            <span class="switch-copy">
-                                <span class="switch-title">{% ui_text "Показать удалённые" "Show deleted" %}</span>
-                                <span class="switch-state">
-                                    {% if request.session.show_deleted_global %}
-                                        {% ui_text "Включено" "Enabled" %}
-                                    {% else %}
-                                        {% ui_text "Выключено" "Disabled" %}
-                                    {% endif %}
-                                </span>
-                            </span>
-                        </button>
-                    </form>
-                    {% endif %}
-
-                    {% if user.is_authenticated %}
-                        <a class="admin-quick admin-quick-muted" href="{% url 'user_preferences' %}">{% ui_text "Настройки" "Preferences" %}</a>
-                        <a class="admin-quick admin-quick-muted" href="{% url 'logout' %}">{% ui_text "Выйти" "Logout" %}</a>
-                    {% else %}
-                        <a class="admin-quick admin-quick-muted" href="{% url 'login' %}">{% ui_text "Войти" "Login" %}</a>
-                        <a class="admin-quick admin-quick-muted" href="{% url 'register' %}">{% ui_text "Регистрация" "Register" %}</a>
-                    {% endif %}
-                </div>
             </div>
         </header>
+        <script>
+            (() => {
+                const headerEl = document.querySelector("header");
+                if (!headerEl) return;
+                const megaMenus = headerEl.querySelectorAll("details.nav-mega");
+                megaMenus.forEach((det) => {
+                    det.addEventListener("toggle", () => {
+                        if (!det.open) return;
+                        megaMenus.forEach((other) => {
+                            if (other !== det) other.open = false;
+                        });
+                    });
+                });
+                document.addEventListener("click", (e) => {
+                    if (!headerEl.contains(e.target)) {
+                        megaMenus.forEach((d) => {
+                            d.open = false;
+                        });
+                    }
+                });
+                document.addEventListener("keydown", (e) => {
+                    if (e.key === "Escape") {
+                        megaMenus.forEach((d) => {
+                            d.open = false;
+                        });
+                    }
+                });
+            })();
+        </script>
         <main>
             {% if messages %}
                 <div class="flash-stack">
@@ -1391,6 +1631,9 @@
                         <div class="hotkey-item"><code>G</code><code>U</code> {% ui_text "Выдача расходуемого" "Consumable usage" %}</div>
                         <div class="hotkey-item"><code>G</code><code>S</code> {% ui_text "Поиск" "Search" %}</div>
                         <div class="hotkey-item"><code>N</code><code>R</code> {% ui_text "Новая заявка" "New request" %}</div>
+                        {% if user|has_capability:"request_creation" %}
+                        <div class="hotkey-item"><code>N</code><code>P</code> {% ui_text "Новая периодическая заявка" "New periodic request" %}</div>
+                        {% endif %}
                         <div class="hotkey-item"><code>?</code> {% ui_text "Показать или скрыть подсказку" "Show or hide help" %}</div>
                     </div>
                 </div>
@@ -1410,6 +1653,9 @@
                 "gu": "{% url 'usage_history' %}",
                 "gs": "{% url 'inventory_search' %}",
                 "nr": "{% url 'request_create' %}",
+                {% if user|has_capability:"request_creation" %}
+                "np": "{% url 'portal_create' entity='periodic-usage' %}",
+                {% endif %}
             };
             const leaderCodes = {
                 KeyG: "g",
@@ -1420,6 +1666,9 @@
                 KeyR: "r",
                 KeyU: "u",
                 KeyS: "s",
+                {% if user|has_capability:"request_creation" %}
+                KeyP: "p",
+                {% endif %}
             };
 
             const resetLeader = () => {

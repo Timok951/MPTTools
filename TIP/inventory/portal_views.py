@@ -3,6 +3,7 @@ from typing import Any
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.core.exceptions import ValidationError
 from django.contrib.auth.models import Group, User
 from django.conf import settings
 from django.db import models
@@ -13,7 +14,7 @@ from django.utils.translation import gettext_lazy as _
 
 from assets.models import Equipment
 from core.models import Cabinet, EquipmentCategory, Workplace, WorkplaceMember
-from operations.models import EquipmentRequest, MaterialUsage
+from operations.models import EquipmentRequest, MaterialUsage, PeriodicMaterialUsageSchedule
 from audit.models import AdminPortalLog
 from audit.portal_log import log_portal_action
 
@@ -26,6 +27,7 @@ from .portal_forms import (
     PortalEquipmentRequestForm,
     PortalGroupForm,
     PortalMaterialUsageForm,
+    PortalPeriodicMaterialUsageScheduleForm,
     PortalUserForm,
     PortalWorkplaceForm,
     PortalWorkplaceMemberForm,
@@ -59,6 +61,13 @@ PORTAL_ENTITIES: tuple[PortalEntity, ...] = (
         "Заявки",
     ),
     PortalEntity("usage", MaterialUsage, PortalMaterialUsageForm, ("equipment", "quantity", "used_by", "used_at", "deleted_at"), "Выдача расходуемого"),
+    PortalEntity(
+        "periodic-usage",
+        PeriodicMaterialUsageSchedule,
+        PortalPeriodicMaterialUsageScheduleForm,
+        ("title", "equipment", "quantity", "next_run_on", "is_active", "deleted_at"),
+        "Периодические заявки",
+    ),
     PortalEntity("users", User, PortalUserForm, ("username", "email", "is_active", "is_staff", "is_superuser"), "Пользователи"),
     PortalEntity("groups", Group, PortalGroupForm, ("name",), "Группы и роли"),
 )
@@ -72,6 +81,7 @@ PORTAL_ENTITY_CAPABILITIES: dict[str, tuple[str, ...]] = {
     "workplace-members": ("users_and_site_admin",),
     "requests": ("request_processing", "users_and_site_admin"),
     "usage": ("usage_writeoff", "users_and_site_admin"),
+    "periodic-usage": ("usage_writeoff", "users_and_site_admin", "request_creation"),
     "users": ("users_and_site_admin",),
     "groups": ("users_and_site_admin",),
 }
@@ -233,11 +243,16 @@ def portal_create(request, entity: str):
                 obj = form.save(commit=False)
                 if hasattr(obj, "_actor"):
                     obj._actor = request.user
+                if isinstance(obj, PeriodicMaterialUsageSchedule) and obj.pk is None:
+                    obj.created_by = request.user
                 obj.save()
                 if hasattr(form, "save_m2m"):
                     form.save_m2m()
                 log_portal_action(request, "create", cfg.slug, obj=obj, meta={"pk": obj.pk})
+                messages.success(request, f"Запись добавлена: {cfg.title}.")
                 return redirect("portal_list", entity=cfg.slug)
+            except ValidationError as exc:
+                form.add_error(None, "; ".join(exc.messages))
             except IntegrityError as exc:
                 form.add_error(None, _friendly_integrity_message(exc))
     else:
@@ -267,7 +282,10 @@ def portal_edit(request, entity: str, pk: int):
                 if hasattr(form, "save_m2m"):
                     form.save_m2m()
                 log_portal_action(request, "update", cfg.slug, obj=saved, meta={"pk": saved.pk})
+                messages.success(request, f"Запись обновлена: {cfg.title}.")
                 return redirect("portal_list", entity=cfg.slug)
+            except ValidationError as exc:
+                form.add_error(None, "; ".join(exc.messages))
             except IntegrityError as exc:
                 form.add_error(None, _friendly_integrity_message(exc))
     else:
@@ -296,6 +314,7 @@ def portal_delete(request, entity: str, pk: int):
         try:
             obj.delete()
             log_portal_action(request, "delete", cfg.slug, obj=obj_repr, meta={"pk": obj_pk})
+            messages.success(request, f"Запись удалена: {cfg.title}.")
             return redirect("portal_list", entity=cfg.slug)
         except ProtectedError:
             messages.error(request, _("Эту запись нельзя удалить, потому что она используется связанными данными."))
@@ -316,6 +335,7 @@ def portal_restore(request, entity: str, pk: int):
     if request.method == "POST":
         obj.restore()
         log_portal_action(request, "restore", cfg.slug, obj=obj, meta={"pk": obj.pk})
+        messages.success(request, f"Запись восстановлена: {cfg.title}.")
         return redirect("portal_list", entity=cfg.slug)
     return render(request, "inventory/portal/object_confirm_restore.html", {**_portal_nav_context(request.user, cfg.slug), "cfg": cfg, "object": obj})
 

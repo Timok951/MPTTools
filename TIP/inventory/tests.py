@@ -13,7 +13,7 @@ from django.utils import timezone
 from rest_framework.authtoken.models import Token
 from rest_framework.test import APIClient
 
-from assets.models import Equipment, EquipmentCheckout, InventoryAdjustment
+from assets.models import Equipment, EquipmentCheckout, InventoryAdjustment, STATUS_IN_STOCK, STATUS_RETIRED
 from audit.models import AuditLog
 from audit.models import AdminPortalLog
 from core.models import DirectMessage, EquipmentCategory, PasswordResetCode, UserPreference, Workplace
@@ -24,6 +24,7 @@ from operations.models import (
     REQUEST_CLOSED,
     REQUEST_ISSUED,
     REQUEST_KIND_BUILDER,
+    REQUEST_PENDING,
     EquipmentRequest,
     MaterialUsage,
 )
@@ -280,6 +281,20 @@ class PasswordResetFlowTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(PasswordResetCode.objects.count(), 1)
         self.assertContains(response, "Подтверждение кода")
+
+    def test_request_form_puts_multipart_email_in_outbox(self):
+        from django.core import mail
+
+        with mock.patch("inventory.views._generate_password_reset_code", return_value="445566"):
+            self.client.post(reverse("password_reset_request"), {"email": "mail_user@example.com"}, follow=True)
+
+        self.assertEqual(len(mail.outbox), 1)
+        sent = mail.outbox[0]
+        self.assertEqual(sent.to, ["mail_user@example.com"])
+        self.assertIn("445566", sent.body)
+        html_bodies = [alt[0] for alt in sent.alternatives if alt[1] == "text/html"]
+        self.assertTrue(html_bodies)
+        self.assertIn("445566", html_bodies[0])
 
     def test_confirm_form_updates_password_from_valid_code(self):
         with mock.patch("inventory.views._generate_password_reset_code", return_value="123456"):
@@ -984,6 +999,50 @@ class InventoryApiTests(TestCase):
         response = client.get("/api/v1/timers/")
 
         self.assertEqual(response.status_code, 404)
+
+    def test_material_usage_depleting_stock_sets_equipment_retired(self):
+        eq = Equipment.objects.create(
+            name="Cable bundle",
+            inventory_number="INV-CAB-RET",
+            category=self.category,
+            workplace=self.workplace,
+            quantity_total=2,
+            quantity_available=2,
+            is_consumable=True,
+            status=STATUS_IN_STOCK,
+        )
+        MaterialUsage.objects.create(
+            equipment=eq,
+            workplace=self.workplace,
+            quantity=2,
+            used_by=self.builder,
+            note="deplete",
+        )
+        eq.refresh_from_db()
+        self.assertEqual(eq.quantity_total, 0)
+        self.assertEqual(eq.quantity_available, 0)
+        self.assertEqual(eq.status, STATUS_RETIRED)
+
+    def test_material_usage_partial_does_not_change_status_to_retired(self):
+        eq = Equipment.objects.create(
+            name="Cable partial",
+            inventory_number="INV-CAB-PAR",
+            category=self.category,
+            workplace=self.workplace,
+            quantity_total=5,
+            quantity_available=5,
+            is_consumable=True,
+            status=STATUS_IN_STOCK,
+        )
+        MaterialUsage.objects.create(
+            equipment=eq,
+            workplace=self.workplace,
+            quantity=2,
+            used_by=self.builder,
+            note="partial",
+        )
+        eq.refresh_from_db()
+        self.assertEqual(eq.status, STATUS_IN_STOCK)
 
     def test_builder_can_create_usage_with_audit_actor(self):
         client = self.api_client_for(self.builder)

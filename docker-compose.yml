@@ -7,6 +7,11 @@
 #   docker compose -f docker-compose.yml -f docker-compose.postgres-host.yml up -d
 
 # Имя Docker-проекта (тома/сеть): задайте в .env COMPOSE_PROJECT_NAME для второго клона.
+#
+# Почта для разработки: сервис mailpit (SMTP 1025 внутри сети). Веб-интерфейс писем:
+#   http://localhost:${MPTTOOLS_MAILPIT_UI_PORT:-18025}
+# Контейнер djangoapp получает EMAIL_HOST=mailpit и EMAIL_PORT=1025 из environment ниже
+# (перекрывает TIP/.env для этих переменных при запуске через compose).
 name: ${COMPOSE_PROJECT_NAME:-mpt_tools}
 
 services:
@@ -33,8 +38,13 @@ services:
       DJANGO_SUPERUSER_USERNAME: ${DJANGO_SUPERUSER_USERNAME:-admin}
       DJANGO_SUPERUSER_EMAIL: ${DJANGO_SUPERUSER_EMAIL:-admin@example.com}
       DJANGO_SUPERUSER_PASSWORD: ${DJANGO_SUPERUSER_PASSWORD:-admin123}
+      # Почта: Mailpit (SMTP 1025 внутри сети compose). Просмотр: http://localhost:${MPTTOOLS_MAILPIT_UI_PORT:-18025}
+      EMAIL_BACKEND: django.core.mail.backends.smtp.EmailBackend
       EMAIL_HOST: mailpit
       EMAIL_PORT: "1025"
+      EMAIL_USE_TLS: "false"
+      EMAIL_USE_SSL: "false"
+      DEFAULT_FROM_EMAIL: ${DEFAULT_FROM_EMAIL:-noreply@mpttools.local}
     ports:
       - "${MPTTOOLS_WEB_PORT:-18080}:8000"
     depends_on:

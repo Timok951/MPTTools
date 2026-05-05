@@ -3,8 +3,11 @@ from django.contrib.auth.models import Group, User
 
 from assets.models import Equipment, EquipmentCheckout, InventoryAdjustment
 from core.models import Cabinet, EquipmentCategory, Workplace, WorkplaceMember
-from operations.models import EquipmentRequest, MaterialUsage
+from operations.models import REQUEST_PENDING, EquipmentRequest, MaterialUsage, PeriodicMaterialUsageSchedule
 from .authz import ROLE_ALIASES
+
+MAX_ALLOWED_QUANTITY = 1000
+MAX_ALLOWED_ADJUSTMENT_DELTA = 1000
 
 
 def _model_fields(model, omit=()):
@@ -70,6 +73,30 @@ class PortalEquipmentForm(forms.ModelForm):
             raise forms.ValidationError("Такой серийный номер уже существует.")
         return value
 
+    def clean_name(self):
+        value = (self.cleaned_data.get("name") or "").strip()
+        if not value:
+            raise forms.ValidationError("Название не может состоять только из пробелов.")
+        return value
+
+    def clean_model(self):
+        return (self.cleaned_data.get("model") or "").strip()
+
+    def clean_notes(self):
+        return (self.cleaned_data.get("notes") or "").strip()
+
+    def clean_quantity_total(self):
+        value = self.cleaned_data.get("quantity_total")
+        if value is not None and value > MAX_ALLOWED_QUANTITY:
+            raise forms.ValidationError(f"Количество не должно превышать {MAX_ALLOWED_QUANTITY}.")
+        return value
+
+    def clean_low_stock_threshold(self):
+        value = self.cleaned_data.get("low_stock_threshold")
+        if value is not None and value > MAX_ALLOWED_QUANTITY:
+            raise forms.ValidationError(f"Порог не должен превышать {MAX_ALLOWED_QUANTITY}.")
+        return value
+
     def save(self, commit=True):
         instance = super().save(commit=False)
         serial_number = (self.cleaned_data.get("serial_number") or "").strip()
@@ -83,6 +110,15 @@ class PortalEquipmentForm(forms.ModelForm):
 
 
 class PortalEquipmentCategoryForm(forms.ModelForm):
+    def clean_name(self):
+        value = (self.cleaned_data.get("name") or "").strip()
+        if not value:
+            raise forms.ValidationError("Название не может состоять только из пробелов.")
+        return value
+
+    def clean_description(self):
+        return (self.cleaned_data.get("description") or "").strip()
+
     class Meta:
         model = EquipmentCategory
         fields = _model_fields(EquipmentCategory)
@@ -124,6 +160,15 @@ class PortalWorkplaceForm(forms.ModelForm):
             self.add_error("location", "Адрес должен быть выбран на карте (с координатами).")
         return cleaned
 
+    def clean_name(self):
+        value = (self.cleaned_data.get("name") or "").strip()
+        if not value:
+            raise forms.ValidationError("Название не может состоять только из пробелов.")
+        return value
+
+    def clean_description(self):
+        return (self.cleaned_data.get("description") or "").strip()
+
     def save(self, commit=True):
         instance = super().save(commit=False)
         instance.map_address = (self.cleaned_data.get("location") or "").strip()
@@ -137,13 +182,19 @@ class PortalCabinetForm(forms.ModelForm):
     def clean_name(self):
         value = (self.cleaned_data.get("name") or "").strip()
         if not value:
-            return value
+            raise forms.ValidationError("Название не может состоять только из пробелов.")
         qs = Cabinet.all_objects.filter(code=value)
         if self.instance and self.instance.pk:
             qs = qs.exclude(pk=self.instance.pk)
         if qs.exists():
             raise forms.ValidationError("Кабинет с таким названием уже существует.")
         return value
+
+    def clean_floor(self):
+        return (self.cleaned_data.get("floor") or "").strip()
+
+    def clean_description(self):
+        return (self.cleaned_data.get("description") or "").strip()
 
     def save(self, commit=True):
         instance = super().save(commit=False)
@@ -168,6 +219,9 @@ class PortalCabinetForm(forms.ModelForm):
 
 
 class PortalWorkplaceMemberForm(forms.ModelForm):
+    def clean_note(self):
+        return (self.cleaned_data.get("note") or "").strip()
+
     class Meta:
         model = WorkplaceMember
         fields = _model_fields(WorkplaceMember)
@@ -182,6 +236,18 @@ class PortalWorkplaceMemberForm(forms.ModelForm):
 
 
 class PortalInventoryAdjustmentForm(forms.ModelForm):
+    def clean_delta(self):
+        value = self.cleaned_data.get("delta")
+        if value is not None and abs(value) > MAX_ALLOWED_ADJUSTMENT_DELTA:
+            raise forms.ValidationError(f"Изменение не должно превышать {MAX_ALLOWED_ADJUSTMENT_DELTA} по модулю.")
+        return value
+
+    def clean_reason(self):
+        value = (self.cleaned_data.get("reason") or "").strip()
+        if not value:
+            raise forms.ValidationError("Причина не может состоять только из пробелов.")
+        return value
+
     class Meta:
         model = InventoryAdjustment
         fields = _model_fields(InventoryAdjustment)
@@ -189,6 +255,15 @@ class PortalInventoryAdjustmentForm(forms.ModelForm):
 
 
 class PortalEquipmentCheckoutForm(forms.ModelForm):
+    def clean_quantity(self):
+        value = self.cleaned_data.get("quantity")
+        if value is not None and value > MAX_ALLOWED_QUANTITY:
+            raise forms.ValidationError(f"Количество не должно превышать {MAX_ALLOWED_QUANTITY}.")
+        return value
+
+    def clean_note(self):
+        return (self.cleaned_data.get("note") or "").strip()
+
     class Meta:
         model = EquipmentCheckout
         fields = _model_fields(EquipmentCheckout)
@@ -213,6 +288,34 @@ class PortalEquipmentCheckoutForm(forms.ModelForm):
 
 
 class PortalEquipmentRequestForm(forms.ModelForm):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        is_new = not (self.instance and self.instance.pk)
+        if is_new:
+            self.fields["status"].initial = REQUEST_PENDING
+            self.fields["status"].widget = forms.HiddenInput()
+            for name in ("requested_at", "processed_by", "processed_at"):
+                if name in self.fields:
+                    del self.fields[name]
+
+    def clean_quantity(self):
+        value = self.cleaned_data.get("quantity")
+        if value is not None and value > MAX_ALLOWED_QUANTITY:
+            raise forms.ValidationError(f"Количество не должно превышать {MAX_ALLOWED_QUANTITY}.")
+        return value
+
+    def clean_comment(self):
+        return (self.cleaned_data.get("comment") or "").strip()
+
+    def save(self, commit=True):
+        instance = super().save(commit=False)
+        if not instance.pk:
+            instance.status = REQUEST_PENDING
+        if commit:
+            instance.save()
+            self.save_m2m()
+        return instance
+
     class Meta:
         model = EquipmentRequest
         fields = _model_fields(EquipmentRequest)
@@ -237,6 +340,15 @@ class PortalEquipmentRequestForm(forms.ModelForm):
 
 
 class PortalMaterialUsageForm(forms.ModelForm):
+    def clean_quantity(self):
+        value = self.cleaned_data.get("quantity")
+        if value is not None and value > MAX_ALLOWED_QUANTITY:
+            raise forms.ValidationError(f"Количество не должно превышать {MAX_ALLOWED_QUANTITY}.")
+        return value
+
+    def clean_note(self):
+        return (self.cleaned_data.get("note") or "").strip()
+
     class Meta:
         model = MaterialUsage
         fields = _model_fields(MaterialUsage)
@@ -250,6 +362,48 @@ class PortalMaterialUsageForm(forms.ModelForm):
             "note": "Примечание",
         }
         widgets = {"note": forms.Textarea(attrs={"rows": 3})}
+
+
+class PortalPeriodicMaterialUsageScheduleForm(forms.ModelForm):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["equipment"].queryset = Equipment.objects.filter(is_consumable=True, deleted_at__isnull=True).order_by(
+            "name"
+        )
+        self.fields["workplace"].required = False
+
+    def clean_quantity(self):
+        value = self.cleaned_data.get("quantity")
+        if value is not None and value > MAX_ALLOWED_QUANTITY:
+            raise forms.ValidationError(f"Количество не должно превышать {MAX_ALLOWED_QUANTITY}.")
+        return value
+
+    def clean_equipment(self):
+        eq = self.cleaned_data.get("equipment")
+        if eq is not None and not eq.is_consumable:
+            raise forms.ValidationError("Выберите позицию с флагом «расходник».")
+        return eq
+
+    class Meta:
+        model = PeriodicMaterialUsageSchedule
+        fields = ["title", "equipment", "workplace", "quantity", "frequency", "next_run_on", "is_active"]
+        labels = {
+            "title": "Название",
+            "equipment": "Расходник",
+            "workplace": "Рабочее место",
+            "quantity": "Количество за раз",
+            "frequency": "Периодичность",
+            "next_run_on": "Следующее списание",
+            "is_active": "Активно",
+        }
+        help_texts = {
+            "title": "Например: «10 кабелей в месяц для лаборатории».",
+            "next_run_on": "В этот день (и далее каждый месяц) будет создана операция списания, пока расписание активно.",
+        }
+        widgets = {
+            "next_run_on": forms.DateInput(attrs={"type": "date"}),
+            "title": forms.TextInput(attrs={"placeholder": "Необязательно"}),
+        }
 
 
 class PortalUserForm(forms.ModelForm):
@@ -298,6 +452,21 @@ class PortalUserForm(forms.ModelForm):
                 self.add_error("password2", "Passwords do not match.")
         return cleaned
 
+    def clean_username(self):
+        value = (self.cleaned_data.get("username") or "").strip()
+        if not value:
+            raise forms.ValidationError("Имя пользователя не может состоять только из пробелов.")
+        return value
+
+    def clean_first_name(self):
+        return (self.cleaned_data.get("first_name") or "").strip()
+
+    def clean_last_name(self):
+        return (self.cleaned_data.get("last_name") or "").strip()
+
+    def clean_email(self):
+        return (self.cleaned_data.get("email") or "").strip()
+
     def save(self, commit=True):
         user = super().save(commit=False)
         if self.cleaned_data.get("password1"):
@@ -309,6 +478,12 @@ class PortalUserForm(forms.ModelForm):
 
 
 class PortalGroupForm(forms.ModelForm):
+    def clean_name(self):
+        value = (self.cleaned_data.get("name") or "").strip()
+        if not value:
+            raise forms.ValidationError("Название группы не может состоять только из пробелов.")
+        return value
+
     class Meta:
         model = Group
         fields = ["name", "permissions"]

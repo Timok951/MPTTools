@@ -19,6 +19,9 @@ from operations.models import (
     REQUEST_ISSUED,
 )
 
+MAX_ALLOWED_QUANTITY = 1000
+MAX_ALLOWED_ADJUSTMENT_DELTA = 1000
+
 
 def _lang_label(ru_text: str, en_text: str, language_code: str) -> str:
     return en_text if str(language_code).lower().startswith("en") else ru_text
@@ -146,6 +149,12 @@ class DirectMessageForm(forms.ModelForm):
             raise ValidationError("Нельзя отправить сообщение самому себе.")
         return recipient
 
+    def clean_body(self):
+        body = (self.cleaned_data.get("body") or "").strip()
+        if not body:
+            raise ValidationError("Сообщение не может состоять только из пробелов.")
+        return body
+
 
 class UserPreferenceForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
@@ -207,7 +216,7 @@ class UserPreferenceForm(forms.ModelForm):
                 ("issued", t("Выдана", "Issued")),
                 ("closed", t("Закрыта", "Closed")),
             ],
-            initial=self.instance.default_request_status if self.instance and self.instance.pk else "",
+            initial=self.instance.default_request_status if self.instance and self.instance.pk else "pending",
         )
         self.fields["default_request_kind"] = forms.ChoiceField(
             label=t("Тип заявок по умолчанию", "Default request type"),
@@ -289,7 +298,7 @@ class EquipmentRequestForm(forms.ModelForm):
         self.fields["quantity"].label = "Количество"
         self.fields["quantity"].help_text = "Укажите нужное количество для склада."
         self.fields["needed_by"].label = "Нужно до"
-        self.fields["needed_by"].help_text = "Необязательная плановая дата, когда оборудование должно понадобиться."
+        self.fields["needed_by"].help_text = "Необязательная плановая дата, когда материал желательно получить."
         self.fields["comment"].label = "Комментарий"
         self.fields["comment"].help_text = "Добавьте детали, которые помогут быстрее согласовать заявку."
 
@@ -297,7 +306,13 @@ class EquipmentRequestForm(forms.ModelForm):
         quantity = self.cleaned_data.get("quantity") or 0
         if quantity <= 0:
             raise ValidationError("Количество должно быть положительным.")
+        if quantity > MAX_ALLOWED_QUANTITY:
+            raise ValidationError(f"Количество не должно превышать {MAX_ALLOWED_QUANTITY}.")
         return quantity
+
+    def clean_comment(self):
+        comment = (self.cleaned_data.get("comment") or "").strip()
+        return comment
 
     def clean(self):
         cleaned = super().clean()
@@ -314,6 +329,12 @@ class EquipmentRequestMessageForm(forms.ModelForm):
             "body": forms.Textarea(attrs={"rows": 3, "placeholder": "Добавьте сообщение по заявке."}),
         }
 
+    def clean_body(self):
+        body = (self.cleaned_data.get("body") or "").strip()
+        if not body:
+            raise ValidationError("Сообщение не может состоять только из пробелов.")
+        return body
+
 
 class EquipmentRequestPhotoForm(forms.ModelForm):
     class Meta:
@@ -322,6 +343,10 @@ class EquipmentRequestPhotoForm(forms.ModelForm):
         widgets = {
             "caption": forms.TextInput(attrs={"placeholder": "Подпись к фото (необязательно)."}),
         }
+
+    def clean_caption(self):
+        caption = (self.cleaned_data.get("caption") or "").strip()
+        return caption
 
 
 class MaterialUsageForm(forms.ModelForm):
@@ -349,6 +374,7 @@ class MaterialUsageForm(forms.ModelForm):
             .order_by("-requested_at")
         )
         self.fields["related_request"].queryset = request_base_qs.select_related("equipment", "requester")
+        self.fields["related_request"].label_from_instance = self._format_related_request_label
         self.fields["related_request"].empty_label = "Без связанной заявки"
         request_rows = request_base_qs.values("id", "quantity", "equipment_id", "workplace_id")
         self.request_quantity_map = {str(item["id"]): item["quantity"] for item in request_rows}
@@ -366,10 +392,22 @@ class MaterialUsageForm(forms.ModelForm):
             "Необязательно. Если выбрана заявка, оборудование, рабочее место и количество подставятся автоматически."
         )
 
+    @staticmethod
+    def _format_related_request_label(request_obj: EquipmentRequest) -> str:
+        requester = request_obj.requester.get_username() if request_obj.requester_id else "без заявителя"
+        equipment = str(request_obj.equipment) if request_obj.equipment_id else "без оборудования"
+        requested_dt = timezone.localtime(request_obj.requested_at).strftime("%d.%m.%Y %H:%M") if request_obj.requested_at else "-"
+        return (
+            f"#{request_obj.pk} | {request_obj.get_status_display()} | "
+            f"{requester} | {equipment} | кол-во: {request_obj.quantity} | {requested_dt}"
+        )
+
     def clean_quantity(self):
         quantity = self.cleaned_data.get("quantity") or 0
         if quantity <= 0:
             raise ValidationError("Количество должно быть положительным.")
+        if quantity > MAX_ALLOWED_QUANTITY:
+            raise ValidationError(f"Количество не должно превышать {MAX_ALLOWED_QUANTITY}.")
         return quantity
 
     def clean(self):
@@ -402,6 +440,10 @@ class MaterialUsageForm(forms.ModelForm):
             self.add_error("workplace", "Рабочее место должно совпадать с выбранной заявкой.")
         return cleaned
 
+    def clean_note(self):
+        note = (self.cleaned_data.get("note") or "").strip()
+        return note
+
 
 class InventoryAdjustmentForm(forms.ModelForm):
     class Meta:
@@ -426,12 +468,20 @@ class InventoryAdjustmentForm(forms.ModelForm):
         cleaned = super().clean()
         equipment = cleaned.get("equipment")
         delta = cleaned.get("delta")
+        if delta is not None and abs(delta) > MAX_ALLOWED_ADJUSTMENT_DELTA:
+            self.add_error("delta", f"Изменение не должно превышать {MAX_ALLOWED_ADJUSTMENT_DELTA} по модулю.")
         if equipment and delta is not None:
             new_total = equipment.quantity_total + delta
             new_available = equipment.quantity_available + delta
             if new_total < 0 or new_available < 0:
                 raise ValidationError("Корректировка приведёт к отрицательному остатку.")
         return cleaned
+
+    def clean_reason(self):
+        reason = (self.cleaned_data.get("reason") or "").strip()
+        if not reason:
+            raise ValidationError("Укажите причину корректировки.")
+        return reason
 
 
 class EquipmentCheckoutForm(forms.ModelForm):
@@ -452,6 +502,7 @@ class EquipmentCheckoutForm(forms.ModelForm):
         if user and not user.is_superuser:
             queryset = queryset.filter(requester=user)
         self.fields["related_request"].queryset = queryset
+        self.fields["related_request"].label_from_instance = self._format_approved_request_label
         self.fields["related_request"].empty_label = "Выберите одобренную заявку"
         self.fields["equipment"].empty_label = "Выберите оборудование"
         self.fields["workplace"].empty_label = "Выберите рабочее место"
@@ -462,10 +513,22 @@ class EquipmentCheckoutForm(forms.ModelForm):
         self.fields["equipment"].help_text = "Должно совпадать с оборудованием в выбранной одобренной заявке."
         self.fields["quantity"].help_text = "Количество задаётся по заявке и правилам выдачи."
 
+    @staticmethod
+    def _format_approved_request_label(request_obj: EquipmentRequest) -> str:
+        requester = request_obj.requester.get_username() if request_obj.requester_id else "без заявителя"
+        equipment = str(request_obj.equipment) if request_obj.equipment_id else "без оборудования"
+        requested_dt = timezone.localtime(request_obj.requested_at).strftime("%d.%m.%Y %H:%M") if request_obj.requested_at else "-"
+        return (
+            f"#{request_obj.pk} | {requester} | {equipment} | "
+            f"кол-во: {request_obj.quantity} | {requested_dt}"
+        )
+
     def clean_quantity(self):
         quantity = self.cleaned_data.get("quantity") or 0
         if quantity <= 0:
             raise ValidationError("Количество должно быть положительным.")
+        if quantity > MAX_ALLOWED_QUANTITY:
+            raise ValidationError(f"Количество не должно превышать {MAX_ALLOWED_QUANTITY}.")
         return quantity
 
     def clean(self):
@@ -485,3 +548,7 @@ class EquipmentCheckoutForm(forms.ModelForm):
         if taken_at and due_at and due_at < taken_at:
             self.add_error("due_at", "Срок возврата не может быть раньше времени выдачи.")
         return cleaned
+
+    def clean_note(self):
+        note = (self.cleaned_data.get("note") or "").strip()
+        return note

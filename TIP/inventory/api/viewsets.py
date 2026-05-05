@@ -1,3 +1,4 @@
+from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import transaction
 from django.db.models import F
 from django.utils import timezone
@@ -217,7 +218,10 @@ class EquipmentRequestViewSet(InventoryModelViewSet):
         elif "status" in changed_fields:
             extra_kwargs["processed_by"] = self.request.user
             extra_kwargs["processed_at"] = timezone.now()
-        self._save_with_actor(serializer, **extra_kwargs)
+        try:
+            self._save_with_actor(serializer, **extra_kwargs)
+        except DjangoValidationError as exc:
+            raise ValidationError(list(exc.messages))
 
 
 class MaterialUsageViewSet(InventoryModelViewSet):
@@ -337,7 +341,11 @@ class EquipmentCheckoutViewSet(InventoryModelViewSet):
                     quantity_available=F("quantity_available") + instance.quantity
                 )
             if instance.related_request_id and not instance.returned_at:
-                EquipmentRequest.objects.filter(pk=instance.related_request_id).update(status=REQUEST_APPROVED)
+                req = EquipmentRequest.objects.select_for_update().filter(pk=instance.related_request_id).first()
+                if req:
+                    req.status = REQUEST_APPROVED
+                    req._actor = self.request.user
+                    req.save(update_fields=["status"])
             super().perform_destroy(instance)
 
 

@@ -2,6 +2,7 @@ import csv
 from datetime import timedelta
 import hashlib
 import io
+import logging
 import os
 from pathlib import Path
 import random
@@ -12,13 +13,15 @@ from urllib.parse import urlencode
 import qrcode
 
 from django.contrib import messages
+from django.core.exceptions import ValidationError
 from django.contrib.auth import login, logout
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import Group, User
 from smtplib import SMTPException
 
 from django.conf import settings
-from django.core.mail import send_mail
+from django.core.mail import EmailMultiAlternatives
+from django.utils.html import escape
 from django.views.decorators.http import require_POST
 from django.utils import translation
 from django.core.management import call_command
@@ -31,6 +34,7 @@ from django.http import FileResponse, HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
+from rest_framework.authtoken.models import Token
 
 from assets.models import Equipment, EquipmentCheckout
 from audit.models import AdminPortalLog, AuditLog
@@ -85,6 +89,15 @@ from .forms import (
     UserPreferenceForm,
 )
 from .quality_report import generate_quality_report, load_quality_report
+
+try:
+    from anymail.exceptions import AnymailError
+
+    _PASSWORD_RESET_MAIL_ERRORS: tuple[type[BaseException], ...] = (OSError, SMTPException, AnymailError)
+except ImportError:
+    _PASSWORD_RESET_MAIL_ERRORS = (OSError, SMTPException)
+
+logger = logging.getLogger(__name__)
 
 ROLE_DESCRIPTIONS = {role_name: spec.description for role_name, spec in ROLE_SPECS.items()}
 
@@ -261,6 +274,36 @@ def _generate_password_reset_code() -> str:
     return f"{random.SystemRandom().randint(0, 999999):06d}"
 
 
+def _send_password_reset_email(*, request, user: User, to_email: str, code: str) -> None:
+    """Send plain-text + HTML recovery email. Raises on delivery failure."""
+    username = user.get_username()
+    confirm_path = reverse("password_reset_confirm")
+    confirm_url = request.build_absolute_uri(confirm_path)
+    subject = "Код восстановления пароля"
+    plain = (
+        f"Здравствуйте, {username}!\n\n"
+        f"Код для восстановления пароля: {code}\n"
+        f"Код действует {PASSWORD_RESET_CODE_TTL_MINUTES} минут.\n\n"
+        f"Страница для ввода кода: {confirm_url}\n\n"
+        "Если вы не запрашивали восстановление, просто проигнорируйте это письмо."
+    )
+    safe_username = escape(username)
+    safe_url = escape(confirm_url)
+    html = (
+        "<!DOCTYPE html><html><body style=\"font-family:system-ui,sans-serif;line-height:1.5;color:#1f2a44;\">"
+        f"<p>Здравствуйте, {safe_username}!</p>"
+        "<p>Код для восстановления пароля:</p>"
+        f"<p style=\"font-size:1.5rem;letter-spacing:0.2em;font-weight:600;\">{code}</p>"
+        f"<p>Код действует <strong>{PASSWORD_RESET_CODE_TTL_MINUTES}</strong> минут.</p>"
+        f"<p><a href=\"{safe_url}\">Открыть страницу ввода кода</a></p>"
+        "<p style=\"color:#5c6478;font-size:0.9rem;\">Если вы не запрашивали восстановление, проигнорируйте это письмо.</p>"
+        "</body></html>"
+    )
+    msg = EmailMultiAlternatives(subject, plain, settings.DEFAULT_FROM_EMAIL, [to_email])
+    msg.attach_alternative(html, "text/html")
+    msg.send(fail_silently=False)
+
+
 def forbidden(request, message: str):
     back_url = request.META.get("HTTP_REFERER") or reverse("analytics")
     return render(
@@ -309,6 +352,15 @@ def _request_history_filtered_queryset(request):
         "requester", "equipment", "workplace", "cabinet", "processed_by"
     ).order_by("-requested_at")
     view_mode = request.GET.get("view", "").strip()
+    # Обработчики по умолчанию видят очередь (как бывшая отдельная «Обработка заявок»);
+    # полный список — чип «Все заявки» с view=all.
+    if (
+        not view_mode
+        and "view" not in request.GET
+        and _can_process_request_status(request.user)
+    ):
+        view_mode = "processing"
+
     if not _can_view_all_operational_data(request.user):
         requests_qs = requests_qs.filter(requester=request.user)
     status = request.GET.get("status", "").strip()
@@ -326,6 +378,7 @@ def _request_history_filtered_queryset(request):
         requests_qs = requests_qs.filter(status__in=[REQUEST_PENDING, REQUEST_APPROVED, REQUEST_ISSUED])
         if _can_process_request_status(request.user):
             requests_qs = requests_qs.exclude(processed_by=request.user, status__in=[REQUEST_APPROVED, REQUEST_ISSUED])
+    # view=all или пусто (у ролей без обработки): без доп. отбора по режиму просмотра
 
     if status:
         requests_qs = requests_qs.filter(status=status)
@@ -1350,10 +1403,14 @@ def request_create(request):
         if form.is_valid():
             new_request = form.save(commit=False)
             new_request.requester = request.user
+            new_request.status = REQUEST_PENDING
             new_request._actor = request.user
             new_request.save()
-            messages.success(request, "Request saved.")
-            return redirect("request_history")
+            messages.success(
+                request,
+                "Заявка создана и находится на рассмотрении. Ниже список ваших заявок с этим фильтром.",
+            )
+            return redirect(f"{reverse('request_history')}?{urlencode({'status': REQUEST_PENDING, 'view': 'mine'})}")
     else:
         form = EquipmentRequestForm(initial={"needed_by": timezone.localdate() + timedelta(days=7)})
 
@@ -1440,7 +1497,11 @@ def request_update_status(request, request_id: int):
         item.processed_by = request.user
         item.processed_at = timezone.now()
         item._actor = request.user
-        item.save(update_fields=["status", "processed_by", "processed_at"])
+        try:
+            item.save(update_fields=["status", "processed_by", "processed_at"])
+        except ValidationError as exc:
+            messages.error(request, "; ".join(exc.messages))
+            return redirect(request.META.get("HTTP_REFERER") or reverse("request_history"))
         note_lines = [f"Статус изменён: {previous_status} -> {item.get_status_display()}."]
         if status_note:
             note_lines.append(status_note)
@@ -1552,6 +1613,30 @@ def api_docs(request):
                 "/api/v1/adjustments/",
                 "/api/v1/checkouts/",
             ]
+        },
+    )
+
+
+@login_required
+def api_token_view(request):
+    token_obj = Token.objects.filter(user=request.user).first()
+    token_value = token_obj.key if token_obj else ""
+    if request.method == "POST":
+        action = (request.POST.get("action") or "").strip()
+        if action == "revoke":
+            Token.objects.filter(user=request.user).delete()
+            token_value = ""
+            messages.success(request, "API токен отозван.")
+            return redirect("api_token")
+        token_obj, _created = Token.objects.get_or_create(user=request.user)
+        token_value = token_obj.key
+        messages.success(request, "API токен готов. Скопируйте и используйте в Authorization: Token <key>.")
+    return render(
+        request,
+        "inventory/api_token.html",
+        {
+            "token_value": token_value,
+            "has_token": bool(token_value),
         },
     )
 
@@ -1779,22 +1864,12 @@ def password_reset_request_view(request):
                 code = _generate_password_reset_code()
                 expires_at = timezone.now() + timedelta(minutes=PASSWORD_RESET_CODE_TTL_MINUTES)
                 try:
-                    send_mail(
-                        "Код восстановления пароля",
-                        (
-                            f"Здравствуйте, {user.get_username()}!\n\n"
-                            f"Код для восстановления пароля: {code}\n"
-                            f"Код действует {PASSWORD_RESET_CODE_TTL_MINUTES} минут.\n\n"
-                            "Если вы не запрашивали восстановление, просто проигнорируйте это письмо."
-                        ),
-                        settings.DEFAULT_FROM_EMAIL,
-                        [email],
-                        fail_silently=False,
-                    )
-                except (OSError, SMTPException):
+                    _send_password_reset_email(request=request, user=user, to_email=email, code=code)
+                except _PASSWORD_RESET_MAIL_ERRORS:
+                    logger.exception("Password reset email failed for %s", email)
                     form.add_error(
                         None,
-                        "Не удалось отправить письмо. Проверьте настройки SMTP-сервера и попробуйте снова.",
+                        "Не удалось отправить письмо. Проверьте настройки почты (SMTP или провайдера) и попробуйте снова.",
                     )
                 else:
                     PasswordResetCode.objects.filter(user=user, email__iexact=email, used_at__isnull=True).update(

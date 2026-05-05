@@ -72,20 +72,20 @@
         {% for item in equipment %}
         <article class="card equipment-card">
             <div class="equipment-card-media">
+                <span class="equipment-card-status-ribbon equipment-card-status--{{ item.status }}">{{ item.get_status_display }}</span>
                 {% if item.photo %}
                 <img src="{{ item.photo.url }}" alt="{{ item.name }}" loading="lazy" />
                 {% else %}
                 <div class="equipment-card-empty">{% ui_text "Нет фото" "No photo" %}</div>
                 {% endif %}
-                <span class="badge equipment-card-badge">{{ item.serial_number|default:"-" }}</span>
+                {% with sn=item.serial_number|default:item.inventory_number %}
+                {% if sn %}
+                <span class="equipment-card-badge" title="{{ sn }}">{{ sn }}</span>
+                {% endif %}
+                {% endwith %}
             </div>
             <div class="equipment-card-body">
                 <div class="catalog-card-head">
-                    <div class="catalog-card-topline">
-                        <span class="catalog-stock-pill">
-                            {% if item.status == "in_stock" %}In stock{% else %}{{ item.get_status_display }}{% endif %}
-                        </span>
-                    </div>
                     <h3 class="equipment-card-title">{{ item.name|truncatechars:52 }}</h3>
                     <div class="equipment-card-subtitle">
                         {{ item.category|default:"-" }}{% if item.model %} • {{ item.model }}{% endif %}
@@ -141,10 +141,6 @@
                         <strong>{{ item.notes|truncatechars:80 }}</strong>
                     </div>
                     {% endif %}
-                </div>
-
-                <div class="equipment-card-flags">
-                    <span class="{{ item.status_badge_class }}">{{ item.get_status_display }}</span>
                 </div>
 
                 <div class="actions">

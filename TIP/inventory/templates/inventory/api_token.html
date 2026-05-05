@@ -1,0 +1,39 @@
+{% extends "inventory/base.html" %}
+{% load i18n %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header">
+        <div>
+            <div class="kicker">API</div>
+            <h2>Токен аутентификации API</h2>
+        </div>
+    </div>
+    <p class="muted">Используйте токен в заголовке: <code>Authorization: Token &lt;ваш_токен&gt;</code>.</p>
+    {% if has_token %}
+    <div class="aside-panel">
+        <strong>Текущий токен</strong>
+        <p><code>{{ token_value }}</code></p>
+        <p class="muted">Храните токен как пароль. При необходимости отзовите его и выпустите новый.</p>
+    </div>
+    {% else %}
+    <div class="aside-panel">
+        <p class="muted">Токен ещё не создан.</p>
+    </div>
+    {% endif %}
+    <div class="actions" style="margin-top: 12px;">
+        <form method="post">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="create">
+            <button class="btn" type="submit">{% if has_token %}Показать/обновить токен{% else %}Получить токен{% endif %}</button>
+        </form>
+        {% if has_token %}
+        <form method="post">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="revoke">
+            <button class="btn secondary" type="submit">Отозвать токен</button>
+        </form>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

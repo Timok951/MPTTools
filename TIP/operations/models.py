@@ -122,3 +122,63 @@ class MaterialUsage(SoftDeleteModel):
             raise ValidationError("Количество должно быть положительным.")
 
 
+PERIODIC_USAGE_MONTHLY = "monthly"
+
+PERIODIC_USAGE_FREQUENCY_CHOICES = [
+    (PERIODIC_USAGE_MONTHLY, "Раз в месяц"),
+]
+
+
+class PeriodicMaterialUsageSchedule(SoftDeleteModel):
+    """Автоматическое списание расходника (MaterialUsage) по календарю — обрабатывается командой process_periodic_usage."""
+
+    title = models.CharField(max_length=200, blank=True, verbose_name="Название")
+    equipment = models.ForeignKey(
+        Equipment,
+        on_delete=models.CASCADE,
+        related_name="periodic_usage_schedules",
+        verbose_name="Оборудование",
+    )
+    workplace = models.ForeignKey(
+        Workplace,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        verbose_name="Рабочее место",
+    )
+    quantity = models.PositiveIntegerField(default=1, verbose_name="Количество за раз")
+    frequency = models.CharField(
+        max_length=20,
+        choices=PERIODIC_USAGE_FREQUENCY_CHOICES,
+        default=PERIODIC_USAGE_MONTHLY,
+        verbose_name="Периодичность",
+    )
+    next_run_on = models.DateField(verbose_name="Следующее списание")
+    is_active = models.BooleanField(default=True, verbose_name="Активно")
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="created_periodic_usage_schedules",
+        verbose_name="Кем создано",
+    )
+    last_run_at = models.DateTimeField(null=True, blank=True, verbose_name="Последний запуск")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["next_run_on", "pk"]
+        verbose_name = "Периодическое списание"
+        verbose_name_plural = "Периодические списания"
+
+    def __str__(self) -> str:
+        return self.title.strip() or f"Расписание #{self.pk} ({self.equipment})"
+
+    def clean(self) -> None:
+        if self.quantity <= 0:
+            raise ValidationError("Количество должно быть положительным.")
+        eq = self.equipment
+        if eq is not None and not eq.is_consumable:
+            raise ValidationError({"equipment": "Периодическое списание доступно только для позиций с флагом «расходник»."})
+
+

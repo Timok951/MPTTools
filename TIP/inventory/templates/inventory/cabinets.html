@@ -4,12 +4,6 @@
 {% block content %}
 <div class="card">
     <h2>Кабинеты</h2>
-    {% if can_manage_cabinets %}
-    <div class="actions" style="margin-bottom: 8px;">
-        <a href="{% url 'portal_create' entity='cabinets' %}">➕ Добавить</a>
-        <a class="secondary" href="{% url 'portal_list' entity='cabinets' %}">🧰 Управление кабинетами</a>
-    </div>
-    {% endif %}
     <table>
         <thead>
             <tr>

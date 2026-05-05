@@ -4,12 +4,6 @@
 {% block content %}
 <div class="card">
     <h2>{% trans "Reports" %}</h2>
-    {% if user|has_group:"Administrator" %}
-    <div class="actions" style="margin-bottom:8px;">
-        <a class="secondary" href="{% url 'portal_list' entity='equipment' %}">🧰 {% trans "Manage equipment" %}</a>
-        <a class="secondary" href="{% url 'portal_list' entity='cabinets' %}">{% trans "Manage cabinets" %}</a>
-    </div>
-    {% endif %}
     <form method="get" class="filters">
         <div>
             <label for="id_from">{% trans "From" %}</label>

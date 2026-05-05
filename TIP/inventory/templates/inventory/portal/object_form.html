@@ -25,15 +25,6 @@
                     <label for="{{ field.id_for_label }}">{{ field.label }}</label>
                     <div class="inline-field-with-action">
                         {{ field }}
-                        {% if field.name == "category" %}
-                        <a class="quick-add-btn" href="{% url 'portal_create' entity='categories' %}" target="_blank" rel="noopener" title="Добавить категорию">+</a>
-                        {% elif field.name == "workplace" %}
-                        <a class="quick-add-btn" href="{% url 'portal_create' entity='workplaces' %}" target="_blank" rel="noopener" title="Добавить рабочее место">+</a>
-                        {% elif field.name == "cabinet" %}
-                        <a class="quick-add-btn" href="{% url 'portal_create' entity='cabinets' %}" target="_blank" rel="noopener" title="Добавить кабинет">+</a>
-                        {% elif field.name == "equipment" %}
-                        <a class="quick-add-btn" href="{% url 'portal_create' entity='equipment' %}" target="_blank" rel="noopener" title="Добавить оборудование">+</a>
-                        {% endif %}
                     </div>
                     {% endif %}
                     {% if field.help_text %}
@@ -62,7 +53,6 @@
         {% endif %}
         <div class="actions">
             <button class="btn" type="submit">{% trans "Save" %}</button>
-            <a class="secondary" href="{% url 'portal_list' entity=cfg.slug %}">{% trans "Cancel" %}</a>
         </div>
     </form>
 </div>

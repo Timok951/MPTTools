@@ -24,7 +24,6 @@
     <div class="actions" style="flex-wrap: wrap; align-items: center;">
         <p class="muted" style="margin:0; flex: 1 1 220px;">{% ui_text "В диалоге печати браузера выберите «Сохранить как PDF»." "In the browser print dialog, choose “Save as PDF”." %}</p>
         <button class="btn" type="button" onclick="window.print()">{% ui_text "Печать / PDF" "Print / PDF" %}</button>
-        <a class="secondary" href="{% url 'request_history' %}{% if export_query %}?{{ export_query }}{% endif %}">{% ui_text "Назад к заявкам" "Back to requests" %}</a>
     </div>
 </div>
 

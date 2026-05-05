@@ -32,9 +32,6 @@
             {% if can_create_checkout %}
             <a href="{% url 'checkout_create' %}">➕ Добавить</a>
             {% endif %}
-            {% if user|has_group:"Administrator" %}
-            <a class="secondary" href="{% url 'portal_list' entity='checkouts' %}">🧰 Управление выдачами</a>
-            {% endif %}
         </div>
     </div>
     <table>

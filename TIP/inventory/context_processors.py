@@ -10,7 +10,7 @@ def _grafana_menu_url() -> str:
     base = (getattr(settings, "GRAFANA_PUBLIC_URL", "") or "").strip().rstrip("/")
     if not base:
         return ""
-    path = (getattr(settings, "GRAFANA_MENU_PATH", "/login") or "/login").strip()
+    path = (getattr(settings, "GRAFANA_MENU_PATH", "/") or "/").strip()
     if not path.startswith("/"):
         path = "/" + path
     return urljoin(base + "/", path.lstrip("/"))

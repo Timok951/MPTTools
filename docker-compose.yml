@@ -48,8 +48,8 @@ services:
       DEFAULT_FROM_EMAIL: ${DEFAULT_FROM_EMAIL:-noreply@mpttools.local}
       PUBLIC_SITE_URL: ${PUBLIC_SITE_URL:-}
       MESSAGE_EMAIL_ENABLED: ${MESSAGE_EMAIL_ENABLED:-true}
-      # Ссылка в меню «Администрирование» (синхронизируйте порт с MPTTOOLS_GRAFANA_PORT / GRAFANA_ROOT_URL).
-      GRAFANA_PUBLIC_URL: ${GRAFANA_PUBLIC_URL:-http://127.0.0.1:${MPTTOOLS_GRAFANA_PORT:-13816}}
+      # GRAFANA_PUBLIC_URL не задаём здесь: блок environment перекрывает env_file и подставлял бы
+      # ${GRAFANA_PUBLIC_URL:-127.0.0.1:…} с хоста (игнорируя TIP/.env). Ссылка в меню — только из TIP/.env.
     ports:
       - "${MPTTOOLS_WEB_PORT:-18080}:8000"
     depends_on:

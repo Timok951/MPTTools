@@ -38,8 +38,9 @@ services:
       DJANGO_SUPERUSER_USERNAME: ${DJANGO_SUPERUSER_USERNAME:-admin}
       DJANGO_SUPERUSER_EMAIL: ${DJANGO_SUPERUSER_EMAIL:-admin@example.com}
       DJANGO_SUPERUSER_PASSWORD: ${DJANGO_SUPERUSER_PASSWORD:-admin123}
-      # Почта: Mailpit (SMTP 1025 внутри сети compose). Просмотр: http://localhost:${MPTTOOLS_MAILPIT_UI_PORT:-18025}
-      EMAIL_BACKEND: django.core.mail.backends.smtp.EmailBackend
+      # Почта: по умолчанию Mailpit (SMTP 1025). Просмотр: http://localhost:${MPTTOOLS_MAILPIT_UI_PORT:-18025}
+      # Для Gmail добавьте в TIP/.env: GMAIL_SMTP_USER, GMAIL_SMTP_APP_PASSWORD — тогда хост mailpit ниже игнорируется в settings.
+      # Иначе: ANYMAIL_* → Anymail; без того — SMTP на этот хост.
       EMAIL_HOST: mailpit
       EMAIL_PORT: "1025"
       EMAIL_USE_TLS: "false"

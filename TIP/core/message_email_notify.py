@@ -7,7 +7,8 @@ from html import escape as html_escape
 
 from django.conf import settings
 from django.contrib.auth.models import User
-from django.core.mail import EmailMultiAlternatives
+
+from core.mail_out import send_multipart_email
 
 logger = logging.getLogger(__name__)
 
@@ -38,11 +39,9 @@ def _truncate(text: str, max_len: int = 800) -> str:
 def _send_to_user(*, user: User, subject: str, plain_body: str, html_body: str) -> None:
     to = (getattr(user, "email", None) or "").strip()
     if not to:
+        logger.info("Пропуск e-mail «%s»: у пользователя id=%s не заполнено поле email", subject, user.pk)
         return
-    from_email = getattr(settings, "DEFAULT_FROM_EMAIL", None) or "noreply@localhost"
-    msg = EmailMultiAlternatives(subject, plain_body, from_email, [to])
-    msg.attach_alternative(html_body, "text/html")
-    msg.send(fail_silently=False)
+    send_multipart_email(subject=subject, plain_body=plain_body, html_body=html_body, to=[to])
 
 
 def notify_direct_message_email(

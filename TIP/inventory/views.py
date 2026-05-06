@@ -20,8 +20,9 @@ from django.contrib.auth.models import Group, User
 from smtplib import SMTPException
 
 from django.conf import settings
-from django.core.mail import EmailMultiAlternatives
 from django.utils.html import escape
+
+from core.mail_out import send_multipart_email
 from django.views.decorators.http import require_POST
 from django.utils import translation
 from django.core.management import call_command
@@ -285,6 +286,10 @@ def _password_reset_delivery_hint() -> str:
                 "Сейчас DEBUG и почта уходит в Mailpit, а не на реальный ящик — откройте веб-интерфейс Mailpit "
                 "(в docker-compose обычно http://localhost:18025 или порт из MPTTOOLS_MAILPIT_UI_PORT)."
             )
+        elif host == "smtp.gmail.com":
+            parts.append(
+                "Сейчас отправка через Gmail SMTP (GMAIL_SMTP_USER / пароль приложения). Проверьте папку «Спам» и настройки аккаунта Google."
+            )
         else:
             parts.append(
                 "В DEBUG проверьте EMAIL_HOST / EMAIL_PORT в окружении или задайте "
@@ -296,6 +301,16 @@ def _password_reset_delivery_hint() -> str:
             "на странице появится сообщение об этом, а не перенаправление дальше."
         )
     return " ".join(parts)
+
+
+def _password_reset_success_hint() -> str:
+    """Доп. строка к сообщению об отправке кода — зависит от способа доставки почты."""
+    host = (getattr(settings, "EMAIL_HOST", "") or "").strip().lower()
+    if host == "mailpit":
+        return "Если письма нет — откройте веб-интерфейс Mailpit или проверьте, что адрес в базе совпадает с введённым."
+    if host == "smtp.gmail.com":
+        return "Если письма нет — проверьте «Спам», папку «Промоакции» и настройки Gmail (пароль приложения, не обычный пароль)."
+    return "Если письма нет — чаще всего адрес в базе не совпадает с введённым или есть ошибка настройки SMTP."
 
 
 def _password_reset_code_hash(email: str, code: str) -> str:
@@ -332,9 +347,7 @@ def _send_password_reset_email(*, request, user: User, to_email: str, code: str)
         "<p style=\"color:#5c6478;font-size:0.9rem;\">Если вы не запрашивали восстановление, проигнорируйте это письмо.</p>"
         "</body></html>"
     )
-    msg = EmailMultiAlternatives(subject, plain, settings.DEFAULT_FROM_EMAIL, [to_email])
-    msg.attach_alternative(html, "text/html")
-    msg.send(fail_silently=False)
+    send_multipart_email(subject=subject, plain_body=plain, html_body=html, to=[to_email])
 
 
 def forbidden(request, message: str):
@@ -1877,8 +1890,8 @@ def password_reset_request_view(request):
             if not form.errors:
                 messages.success(
                     request,
-                    "Если этот адрес есть у учётной записи, на него отправлен код (см. также подсказку на странице ввода кода). "
-                    "Если письма нет — чаще всего адрес в базе не совпадает с введённым или почта настроена на тестовый перехватчик (Mailpit).",
+                    "Если этот адрес есть у учётной записи, на него отправлен код (см. подсказку на странице ввода кода). "
+                    + _password_reset_success_hint(),
                 )
                 return redirect("password_reset_confirm")
     else:

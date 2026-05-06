@@ -204,14 +204,29 @@ LOGIN_URL = '/accounts/login/'
 LOGIN_REDIRECT_URL = '/'
 LOGOUT_REDIRECT_URL = '/accounts/login/'
 
-EMAIL_BACKEND = os.getenv("EMAIL_BACKEND", "django.core.mail.backends.smtp.EmailBackend").strip()
-EMAIL_HOST = os.getenv("EMAIL_HOST", "localhost").strip()
-EMAIL_PORT = int(os.getenv("EMAIL_PORT", "25").strip() or "25")
-EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER", "").strip()
-EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD", "").strip()
-EMAIL_USE_TLS = os.getenv("EMAIL_USE_TLS", "false").strip().lower() in {"1", "true", "yes", "on"}
-EMAIL_USE_SSL = os.getenv("EMAIL_USE_SSL", "false").strip().lower() in {"1", "true", "yes", "on"}
-DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", "noreply@mpt-tools.local").strip()
+# Gmail: задайте GMAIL_SMTP_USER и GMAIL_SMTP_APP_PASSWORD (пароль приложения Google, не обычный пароль).
+# Пробелы в пароле приложения можно оставить — уберутся. Нужна 2FA в аккаунте Google.
+_gmail_smtp_user = os.getenv("GMAIL_SMTP_USER", "").strip()
+_gmail_smtp_app_password = (os.getenv("GMAIL_SMTP_APP_PASSWORD") or "").replace(" ", "").strip()
+_use_gmail_smtp = bool(_gmail_smtp_user and _gmail_smtp_app_password)
+
+if _use_gmail_smtp:
+    EMAIL_HOST = "smtp.gmail.com"
+    EMAIL_PORT = 587
+    EMAIL_HOST_USER = _gmail_smtp_user
+    EMAIL_HOST_PASSWORD = _gmail_smtp_app_password
+    EMAIL_USE_TLS = True
+    EMAIL_USE_SSL = False
+    _from_override = (os.getenv("DEFAULT_FROM_EMAIL") or "").strip()
+    DEFAULT_FROM_EMAIL = _from_override or _gmail_smtp_user
+else:
+    EMAIL_HOST = os.getenv("EMAIL_HOST", "localhost").strip()
+    EMAIL_PORT = int(os.getenv("EMAIL_PORT", "25").strip() or "25")
+    EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER", "").strip()
+    EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD", "").strip()
+    EMAIL_USE_TLS = os.getenv("EMAIL_USE_TLS", "false").strip().lower() in {"1", "true", "yes", "on"}
+    EMAIL_USE_SSL = os.getenv("EMAIL_USE_SSL", "false").strip().lower() in {"1", "true", "yes", "on"}
+    DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", "noreply@mpt-tools.local").strip()
 
 # Базовый URL сайта для ссылок в письмах (уведомления о сообщениях), без завершающего слэша.
 PUBLIC_SITE_URL = os.getenv("PUBLIC_SITE_URL", "").strip()
@@ -223,16 +238,55 @@ GRAFANA_PUBLIC_URL = os.getenv("GRAFANA_PUBLIC_URL", "").strip().rstrip("/")
 MESSAGE_EMAIL_ENABLED = os.getenv("MESSAGE_EMAIL_ENABLED", "true").strip().lower() in {"1", "true", "yes", "on"}
 
 ANYMAIL: dict[str, str] = {}
-if os.getenv("ANYMAIL_BREVO_API_KEY", "").strip():
-    ANYMAIL["BREVO_API_KEY"] = os.getenv("ANYMAIL_BREVO_API_KEY", "").strip()
-if os.getenv("ANYMAIL_SENDGRID_API_KEY", "").strip():
-    ANYMAIL["SENDGRID_API_KEY"] = os.getenv("ANYMAIL_SENDGRID_API_KEY", "").strip()
-if os.getenv("ANYMAIL_MAILGUN_API_KEY", "").strip():
-    ANYMAIL["MAILGUN_API_KEY"] = os.getenv("ANYMAIL_MAILGUN_API_KEY", "").strip()
-if os.getenv("ANYMAIL_MAILGUN_SENDER_DOMAIN", "").strip():
-    ANYMAIL["MAILGUN_SENDER_DOMAIN"] = os.getenv("ANYMAIL_MAILGUN_SENDER_DOMAIN", "").strip()
-if os.getenv("ANYMAIL_POSTMARK_SERVER_TOKEN", "").strip():
-    ANYMAIL["POSTMARK_SERVER_TOKEN"] = os.getenv("ANYMAIL_POSTMARK_SERVER_TOKEN", "").strip()
+# При Gmail SMTP провайдеры Anymail не подключаем — одна исходящая система (см. GMAIL_SMTP_* выше).
+if not _use_gmail_smtp:
+    if os.getenv("ANYMAIL_BREVO_API_KEY", "").strip():
+        ANYMAIL["BREVO_API_KEY"] = os.getenv("ANYMAIL_BREVO_API_KEY", "").strip()
+    if os.getenv("ANYMAIL_SENDGRID_API_KEY", "").strip():
+        ANYMAIL["SENDGRID_API_KEY"] = os.getenv("ANYMAIL_SENDGRID_API_KEY", "").strip()
+    if os.getenv("ANYMAIL_MAILGUN_API_KEY", "").strip():
+        ANYMAIL["MAILGUN_API_KEY"] = os.getenv("ANYMAIL_MAILGUN_API_KEY", "").strip()
+    if os.getenv("ANYMAIL_MAILGUN_SENDER_DOMAIN", "").strip():
+        ANYMAIL["MAILGUN_SENDER_DOMAIN"] = os.getenv("ANYMAIL_MAILGUN_SENDER_DOMAIN", "").strip()
+    if os.getenv("ANYMAIL_POSTMARK_SERVER_TOKEN", "").strip():
+        ANYMAIL["POSTMARK_SERVER_TOKEN"] = os.getenv("ANYMAIL_POSTMARK_SERVER_TOKEN", "").strip()
+
+
+def _select_anymail_email_backend() -> str | None:
+    """Бэкенд Anymail при заданных ANYMAIL_* ключах (или явный ANYMAIL_ESP)."""
+    if not _ANYMAIL_INSTALLED or not ANYMAIL:
+        return None
+    priority: list[tuple[str, str]] = [
+        ("ANYMAIL_BREVO_API_KEY", "anymail.backends.brevo.EmailBackend"),
+        ("ANYMAIL_POSTMARK_SERVER_TOKEN", "anymail.backends.postmark.EmailBackend"),
+        ("ANYMAIL_MAILGUN_API_KEY", "anymail.backends.mailgun.EmailBackend"),
+        ("ANYMAIL_SENDGRID_API_KEY", "anymail.backends.sendgrid.EmailBackend"),
+    ]
+    esp = (os.getenv("ANYMAIL_ESP") or "").strip().lower()
+    by_esp: dict[str, str] = {
+        "brevo": "anymail.backends.brevo.EmailBackend",
+        "sendinblue": "anymail.backends.brevo.EmailBackend",
+        "postmark": "anymail.backends.postmark.EmailBackend",
+        "mailgun": "anymail.backends.mailgun.EmailBackend",
+        "sendgrid": "anymail.backends.sendgrid.EmailBackend",
+    }
+    if esp in by_esp:
+        return by_esp[esp]
+    for env_key, backend in priority:
+        if os.getenv(env_key, "").strip():
+            return backend
+    return None
+
+
+_email_backend_explicit = (os.getenv("EMAIL_BACKEND") or "").strip()
+if _email_backend_explicit:
+    EMAIL_BACKEND = _email_backend_explicit
+elif _use_gmail_smtp:
+    EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
+else:
+    _anymail_backend = _select_anymail_email_backend()
+    EMAIL_BACKEND = _anymail_backend or "django.core.mail.backends.smtp.EmailBackend"
+
 YANDEX_MAPS_API_KEY = os.getenv("YANDEX_MAPS_API_KEY", "").strip()
 
 # Default primary key field type

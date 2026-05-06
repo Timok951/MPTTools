@@ -54,6 +54,20 @@
     {% endif %}
 </div>
 
+{% if photos %}
+<div class="card request-photos-hero">
+    <h3>Фотографии к заявке</h3>
+    <p class="muted" style="margin-top:0;">Вложения отображаются сразу при открытии заявки. Нажмите на снимок, чтобы открыть в полном размере.</p>
+    <div class="request-photo-strip">
+        {% for photo in photos %}
+        <a href="{{ photo.image.url }}" target="_blank" rel="noopener noreferrer" title="{% if photo.caption %}{{ photo.caption }}{% else %}Фото #{{ photo.pk }}{% endif %}">
+            <img src="{{ photo.image.url }}" alt="{% if photo.caption %}{{ photo.caption }}{% else %}request-photo-{{ photo.pk }}{% endif %}" loading="eager" />
+        </a>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+
 <div class="grid cols-2">
     <div class="card">
         <h3>Сообщения</h3>

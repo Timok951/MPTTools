@@ -1378,13 +1378,14 @@ def request_detail(request, request_id: int):
     threaded_messages = _build_request_message_thread(
         item.messages.select_related("author", "parent").all()
     )
+    request_photos = list(item.photos.select_related("uploaded_by").all())
     return render(
         request,
         "inventory/request_detail.html",
         {
             "item": item,
             "messages_list": threaded_messages,
-            "photos": item.photos.select_related("uploaded_by").all(),
+            "photos": request_photos,
             "message_form": message_form,
             "photo_form": photo_form,
             "can_quick_status": _can_process_request_status(request.user),
@@ -1628,6 +1629,21 @@ def quality_report_view(request):
 
 @login_required
 def direct_messages_view(request):
+    is_dm_moderator = user_has_capability(request.user, "users_and_site_admin")
+    dm_moderation_mode = bool(is_dm_moderator and request.GET.get("moderation") == "1")
+
+    if request.method == "POST" and request.POST.get("action") == "delete_direct_message":
+        if not is_dm_moderator:
+            return forbidden(request, "Удаление сообщений доступно только администраторам.")
+        mid = (request.POST.get("message_id") or "").strip()
+        if not mid.isdigit():
+            messages.error(request, "Не удалось определить сообщение.")
+            return redirect(request.POST.get("next") or reverse("direct_messages"))
+        dm = get_object_or_404(DirectMessage, pk=int(mid))
+        dm.delete()
+        messages.success(request, "Сообщение удалено.")
+        return redirect(request.POST.get("next") or reverse("direct_messages"))
+
     selected_user = None
     selected_user_id = request.GET.get("user") or request.POST.get("recipient")
     if selected_user_id:
@@ -1666,7 +1682,7 @@ def direct_messages_view(request):
         )
 
     conversations = _message_conversation_summaries(request.user)
-    if selected_user is None and conversations:
+    if selected_user is None and conversations and not dm_moderation_mode:
         selected_user = conversations[0]["user"]
         form = DirectMessageForm(sender=request.user, initial={"recipient": selected_user.pk})
         conversation_messages = (
@@ -1678,6 +1694,13 @@ def direct_messages_view(request):
             .order_by("created_at", "id")
         )
 
+    all_direct_messages = []
+    if dm_moderation_mode:
+        all_direct_messages = list(
+            DirectMessage.objects.select_related("sender", "recipient")
+            .order_by("-created_at", "-id")[:500]
+        )
+
     return render(
         request,
         "inventory/direct_messages.html",
@@ -1686,6 +1709,9 @@ def direct_messages_view(request):
             "selected_user": selected_user,
             "conversation_messages": conversation_messages,
             "form": form,
+            "is_dm_moderator": is_dm_moderator,
+            "dm_moderation_mode": dm_moderation_mode,
+            "all_direct_messages": all_direct_messages,
         },
     )
 

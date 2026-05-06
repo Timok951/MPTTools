@@ -45,6 +45,10 @@ services:
       EMAIL_USE_TLS: "false"
       EMAIL_USE_SSL: "false"
       DEFAULT_FROM_EMAIL: ${DEFAULT_FROM_EMAIL:-noreply@mpttools.local}
+      PUBLIC_SITE_URL: ${PUBLIC_SITE_URL:-}
+      MESSAGE_EMAIL_ENABLED: ${MESSAGE_EMAIL_ENABLED:-true}
+      # Ссылка в меню «Администрирование» (синхронизируйте порт с MPTTOOLS_GRAFANA_PORT / GRAFANA_ROOT_URL).
+      GRAFANA_PUBLIC_URL: ${GRAFANA_PUBLIC_URL:-http://127.0.0.1:${MPTTOOLS_GRAFANA_PORT:-13816}}
     ports:
       - "${MPTTOOLS_WEB_PORT:-18080}:8000"
     depends_on:
@@ -114,6 +118,9 @@ services:
     networks:
       - django_monitoring
 
+  # Grafana: http://localhost:${MPTTOOLS_GRAFANA_PORT:-13816} (GRAFANA_ADMIN_*).
+  # Дашборд «MPT Tools — обзор»: Django RPS/статусы, PostgreSQL (подключения, транзакции, cache hit, размер БД), Prometheus up.
+  # Для продакшена задайте GRAFANA_ROOT_URL на внешний URL Grafana. Свои панели — json в grafana/dashboards/ или UI → Save.
   grafana:
     image: grafana/grafana:latest
     restart: unless-stopped

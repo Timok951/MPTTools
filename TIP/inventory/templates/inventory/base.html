@@ -1008,6 +1008,50 @@
             color: #eef3ff;
             border-color: var(--border);
         }
+        .request-photo-strip {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            align-items: flex-start;
+            margin-top: 12px;
+        }
+        .request-photo-strip a {
+            display: block;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: var(--shadow);
+            border: 1px solid var(--border);
+        }
+        .request-photo-strip img {
+            display: block;
+            max-height: 240px;
+            width: auto;
+            max-width: min(100%, 360px);
+            vertical-align: middle;
+        }
+        body.theme-dark .request-photo-strip a {
+            border-color: var(--border);
+        }
+        .table-scroll {
+            overflow-x: auto;
+            margin-top: 12px;
+        }
+        .dm-moderation-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        .dm-moderation-table th,
+        .dm-moderation-table td {
+            padding: 8px 10px;
+            border-bottom: 1px solid var(--border);
+            text-align: left;
+            vertical-align: top;
+        }
+        .dm-moderation-table th {
+            font-weight: 600;
+            color: var(--muted);
+            font-size: 0.85rem;
+        }
         .actions {
             display: flex;
             flex-wrap: wrap;
@@ -1754,6 +1798,9 @@
                             <div class="nav-panel" role="region" aria-label="{% ui_text 'Дополнительно' 'More sections' %}">
                                 <div class="nav-panel-section">
                                     <a href="{% url 'direct_messages' %}">{% ui_text "Сообщения" "Messages" %}</a>
+                                    {% if user|has_capability:"users_and_site_admin" %}
+                                    <a href="{% url 'direct_messages' %}?moderation=1">{% ui_text "Все сообщения (админ)" "All messages (admin)" %}</a>
+                                    {% endif %}
                                 </div>
                                 {% if user|has_capability:"request_creation" or user|has_capability:"request_processing" or user|has_capability:"usage_writeoff" or user|has_capability:"users_and_site_admin" %}
                                 <div class="nav-panel-section">
@@ -1814,6 +1861,12 @@
                                     <a href="{% url 'role_assignment' %}">{% ui_text "Кто в какой роли" "Role assignment" %}</a>
                                     <a href="{% url 'api_token' %}">{% ui_text "Токен API" "API token" %}</a>
                                 </div>
+                                {% if grafana_public_url %}
+                                <div class="nav-panel-section">
+                                    <div class="nav-panel-section-title">{% ui_text "Мониторинг" "Monitoring" %}</div>
+                                    <a href="{{ grafana_public_url }}/" target="_blank" rel="noopener noreferrer">{% ui_text "Grafana" "Grafana" %}</a>
+                                </div>
+                                {% endif %}
                                 {% endif %}
                                 {% if user|has_capability:"data_tools_access" %}
                                 <div class="nav-panel-section">

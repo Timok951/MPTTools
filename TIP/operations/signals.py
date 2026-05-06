@@ -4,8 +4,13 @@ from django.db.models.signals import post_save, pre_save
 from django.dispatch import receiver
 
 from assets.models import Equipment, STATUS_RETIRED
+from core.message_email_notify import (
+    notify_direct_message_email,
+    notify_request_message_subscribers,
+)
+from core.models import DirectMessage
 
-from .models import REQUEST_APPROVED, EquipmentRequest, MaterialUsage
+from .models import REQUEST_APPROVED, EquipmentRequest, EquipmentRequestMessage, MaterialUsage
 
 
 @receiver(post_save, sender=MaterialUsage)
@@ -61,3 +66,35 @@ def auto_consume_consumable_on_request_approval(sender, instance, created, **kwa
         related_request=instance,
         note=f"Авторасход по одобренной заявке #{instance.pk}",
     )
+
+
+@receiver(post_save, sender=DirectMessage)
+def notify_email_on_direct_message(sender, instance, created, **kwargs):
+    if not created:
+        return
+    notify_direct_message_email(
+        instance.recipient,
+        sender_username=instance.sender.get_username(),
+        sender_id=instance.sender_id,
+        body=instance.body,
+    )
+
+
+@receiver(post_save, sender=EquipmentRequestMessage)
+def notify_email_on_request_message(sender, instance, created, **kwargs):
+    if not created:
+        return
+    req = (
+        EquipmentRequest.objects.select_related("requester", "processed_by")
+        .filter(pk=instance.request_id)
+        .first()
+    )
+    if req:
+        notify_request_message_subscribers(
+            request_id=instance.request_id,
+            author_id=instance.author_id,
+            author_username=instance.author.get_username(),
+            body=instance.body,
+            requester=req.requester,
+            processed_by=req.processed_by,
+        )

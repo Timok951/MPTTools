@@ -212,6 +212,16 @@ EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD", "").strip()
 EMAIL_USE_TLS = os.getenv("EMAIL_USE_TLS", "false").strip().lower() in {"1", "true", "yes", "on"}
 EMAIL_USE_SSL = os.getenv("EMAIL_USE_SSL", "false").strip().lower() in {"1", "true", "yes", "on"}
 DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", "noreply@mpt-tools.local").strip()
+
+# Базовый URL сайта для ссылок в письмах (уведомления о сообщениях), без завершающего слэша.
+PUBLIC_SITE_URL = os.getenv("PUBLIC_SITE_URL", "").strip()
+
+# Публичный URL Grafana для ссылки в шапке (роли «Администратор» и «Системный администратор»). Пусто — пункт скрыт.
+GRAFANA_PUBLIC_URL = os.getenv("GRAFANA_PUBLIC_URL", "").strip().rstrip("/")
+
+# Уведомления о новых сообщениях (личных и по заявкам) на e-mail получателям.
+MESSAGE_EMAIL_ENABLED = os.getenv("MESSAGE_EMAIL_ENABLED", "true").strip().lower() in {"1", "true", "yes", "on"}
+
 ANYMAIL: dict[str, str] = {}
 if os.getenv("ANYMAIL_BREVO_API_KEY", "").strip():
     ANYMAIL["BREVO_API_KEY"] = os.getenv("ANYMAIL_BREVO_API_KEY", "").strip()

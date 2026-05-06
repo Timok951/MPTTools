@@ -1,5 +1,5 @@
 from django.contrib.auth.models import Group, User
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from django.urls import reverse
 
 from core.models import Workplace
@@ -9,6 +9,7 @@ from inventory.authz import (
     GROUP_SYSADMIN,
     GROUP_TECHNICIAN,
 )
+from core.models import DirectMessage
 from operations.models import (
     EquipmentRequest,
     EquipmentRequestMessage,
@@ -97,12 +98,38 @@ class RoleAssignmentUiTests(TestCase):
         response = self.client.get(reverse("request_history"))
         self.assertEqual(response.status_code, 200)
 
+    def test_admin_can_view_moderation_messages_and_delete(self):
+        DirectMessage.objects.create(sender=self.tech, recipient=self.support, body="Hello mod")
+        self.client.force_login(self.admin)
+        r = self.client.get(reverse("direct_messages"), {"moderation": "1"})
+        self.assertEqual(r.status_code, 200)
+        self.assertContains(r, "Hello mod")
+        mid = DirectMessage.objects.get().pk
+        r2 = self.client.post(
+            reverse("direct_messages"),
+            {
+                "action": "delete_direct_message",
+                "message_id": str(mid),
+                "next": reverse("direct_messages") + "?moderation=1",
+            },
+        )
+        self.assertEqual(r2.status_code, 302)
+        self.assertFalse(DirectMessage.objects.filter(pk=mid).exists())
 
+
+@override_settings(
+    EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend",
+    PUBLIC_SITE_URL="https://example.test",
+)
 class RequestStatusUxTests(TestCase):
     def setUp(self):
         self.password = "secret123"
         self.support = User.objects.create_user(username="line_support", password=self.password)
-        self.requester = User.objects.create_user(username="requester", password=self.password)
+        self.requester = User.objects.create_user(
+            username="requester",
+            email="requester@mpt.ru",
+            password=self.password,
+        )
         support_group, _ = Group.objects.get_or_create(name=GROUP_FIRST_LINE_SUPPORT)
         requester_group, _ = Group.objects.get_or_create(name=GROUP_TECHNICIAN)
         self.support.groups.add(support_group)
@@ -118,6 +145,8 @@ class RequestStatusUxTests(TestCase):
         )
 
     def test_status_update_creates_service_message_with_note(self):
+        from django.core import mail
+
         self.client.force_login(self.support)
 
         response = self.client.post(
@@ -133,6 +162,8 @@ class RequestStatusUxTests(TestCase):
         status_message = EquipmentRequestMessage.objects.latest("id")
         self.assertIn("Статус изменён", status_message.body)
         self.assertIn("Готово к выдаче.", status_message.body)
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertEqual(mail.outbox[0].to, ["requester@mpt.ru"])
 
     def test_request_detail_shows_contextual_quick_actions(self):
         self.request_item.status = REQUEST_APPROVED

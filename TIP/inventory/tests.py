@@ -210,6 +210,10 @@ class EquipmentQRCodeTests(TestCase):
         self.assertContains(response, "qr-toggle-btn")
 
 
+@override_settings(
+    EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend",
+    PUBLIC_SITE_URL="https://example.test",
+)
 class DirectMessageTests(TestCase):
     def setUp(self):
         self.password = "secret123"
@@ -228,6 +232,10 @@ class DirectMessageTests(TestCase):
         self.assertContains(response, "Сообщения пользователям")
 
     def test_user_can_send_direct_message(self):
+        from django.core import mail
+
+        self.recipient.email = "recipient@mpt.ru"
+        self.recipient.save(update_fields=["email"])
         self.client.force_login(self.sender)
 
         response = self.client.post(
@@ -242,6 +250,9 @@ class DirectMessageTests(TestCase):
         self.assertEqual(message.recipient, self.recipient)
         self.assertEqual(message.body, "Привет, проверь оборудование.")
         self.assertContains(response, self.recipient.username)
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertIn("recipient@mpt.ru", mail.outbox[0].to)
+        self.assertIn("Привет", mail.outbox[0].body)
 
     def test_opening_dialog_marks_received_messages_as_read(self):
         message = DirectMessage.objects.create(

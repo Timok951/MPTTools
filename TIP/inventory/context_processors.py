@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.db.utils import OperationalError, ProgrammingError
 
 from core.models import UserPreference
@@ -19,4 +20,5 @@ def user_preferences(request):
         "preferred_page_size": preference.page_size if preference else 25,
         "hotkeys_enabled": preference.hotkeys_enabled if preference else True,
         "show_hotkey_legend": preference.show_hotkey_legend if preference else True,
+        "grafana_public_url": getattr(settings, "GRAFANA_PUBLIC_URL", "") or "",
     }

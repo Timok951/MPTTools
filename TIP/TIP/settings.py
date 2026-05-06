@@ -50,6 +50,15 @@ DEBUG = os.getenv("DEBUG", "true").strip().lower() in {"1", "true", "yes", "on"}
 _allowed_hosts = os.getenv("ALLOWED_HOSTS", "").strip()
 ALLOWED_HOSTS = [h.strip() for h in _allowed_hosts.split(",") if h.strip()] if _allowed_hosts else []
 
+# Prometheus в Docker скрейпит http://djangoapp:8000/metrics → Host: djangoapp.
+# Если ALLOWED_HOSTS задан только под внешний домен/IP, без сервисного имени — будет 400 DisallowedHost.
+_wildcard_allowed = any(h == "*" for h in ALLOWED_HOSTS)
+_internal_scrape = os.getenv("INTERNAL_SCRAPE_HOSTS", "djangoapp,web").strip()
+if ALLOWED_HOSTS and not _wildcard_allowed and _internal_scrape:
+    for _h in (x.strip() for x in _internal_scrape.split(",") if x.strip()):
+        if _h not in ALLOWED_HOSTS:
+            ALLOWED_HOSTS.append(_h)
+
 _csrf_origins = os.getenv("CSRF_TRUSTED_ORIGINS", "").strip()
 CSRF_TRUSTED_ORIGINS = [o.strip() for o in _csrf_origins.split(",") if o.strip()] if _csrf_origins else []
 

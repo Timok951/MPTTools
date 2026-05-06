@@ -1861,10 +1861,10 @@
                                     <a href="{% url 'role_assignment' %}">{% ui_text "Кто в какой роли" "Role assignment" %}</a>
                                     <a href="{% url 'api_token' %}">{% ui_text "Токен API" "API token" %}</a>
                                 </div>
-                                {% if grafana_public_url %}
+                                {% if grafana_menu_url %}
                                 <div class="nav-panel-section">
                                     <div class="nav-panel-section-title">{% ui_text "Мониторинг" "Monitoring" %}</div>
-                                    <a href="{{ grafana_public_url }}/" target="_blank" rel="noopener noreferrer">{% ui_text "Grafana" "Grafana" %}</a>
+                                    <a href="{{ grafana_menu_url }}" target="_blank" rel="noopener noreferrer">{% ui_text "Grafana" "Grafana" %}</a>
                                 </div>
                                 {% endif %}
                                 {% endif %}

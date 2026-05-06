@@ -233,6 +233,8 @@ PUBLIC_SITE_URL = os.getenv("PUBLIC_SITE_URL", "").strip()
 
 # Публичный URL Grafana для ссылки в шапке (роли «Администратор» и «Системный администратор»). Пусто — пункт скрыт.
 GRAFANA_PUBLIC_URL = os.getenv("GRAFANA_PUBLIC_URL", "").strip().rstrip("/")
+# Путь страницы входа Grafana для пункта меню (к базовому URL выше).
+GRAFANA_MENU_PATH = os.getenv("GRAFANA_MENU_PATH", "/login").strip() or "/login"
 
 # Уведомления о новых сообщениях (личных и по заявкам) на e-mail получателям.
 MESSAGE_EMAIL_ENABLED = os.getenv("MESSAGE_EMAIL_ENABLED", "true").strip().lower() in {"1", "true", "yes", "on"}

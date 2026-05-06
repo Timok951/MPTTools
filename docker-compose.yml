@@ -48,8 +48,9 @@ services:
       DEFAULT_FROM_EMAIL: ${DEFAULT_FROM_EMAIL:-noreply@mpttools.local}
       PUBLIC_SITE_URL: ${PUBLIC_SITE_URL:-}
       MESSAGE_EMAIL_ENABLED: ${MESSAGE_EMAIL_ENABLED:-true}
-      # GRAFANA_PUBLIC_URL не задаём здесь: блок environment перекрывает env_file и подставлял бы
-      # ${GRAFANA_PUBLIC_URL:-127.0.0.1:…} с хоста (игнорируя TIP/.env). Ссылка в меню — только из TIP/.env.
+      # Ссылка «Grafana» в Django: задаётся здесь через подстановку compose. Значение из корневого .env
+      # рядом с этим файлом (или переменная окружения хоста); TIP/.env этим ключом не перекрывается.
+      GRAFANA_PUBLIC_URL: ${GRAFANA_PUBLIC_URL:-http://127.0.0.1:${MPTTOOLS_GRAFANA_PORT:-13816}}
     ports:
       - "${MPTTOOLS_WEB_PORT:-18080}:8000"
     depends_on:

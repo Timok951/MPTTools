@@ -1,7 +1,19 @@
+from urllib.parse import urljoin
+
 from django.conf import settings
 from django.db.utils import OperationalError, ProgrammingError
 
 from core.models import UserPreference
+
+
+def _grafana_menu_url() -> str:
+    base = (getattr(settings, "GRAFANA_PUBLIC_URL", "") or "").strip().rstrip("/")
+    if not base:
+        return ""
+    path = (getattr(settings, "GRAFANA_MENU_PATH", "/login") or "/login").strip()
+    if not path.startswith("/"):
+        path = "/" + path
+    return urljoin(base + "/", path.lstrip("/"))
 
 
 def user_preferences(request):
@@ -21,4 +33,5 @@ def user_preferences(request):
         "hotkeys_enabled": preference.hotkeys_enabled if preference else True,
         "show_hotkey_legend": preference.show_hotkey_legend if preference else True,
         "grafana_public_url": getattr(settings, "GRAFANA_PUBLIC_URL", "") or "",
+        "grafana_menu_url": _grafana_menu_url(),
     }

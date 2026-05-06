@@ -4,7 +4,7 @@
 {% block content %}
 <div class="card auth-card">
     <h2>{% ui_text "Регистрация" "Registration" %}</h2>
-    <p class="muted">{% ui_text "После регистрации администратор назначит роль." "An administrator will assign a role after registration." %}</p>
+    <p class="muted">{% ui_text "После регистрации администратор назначит роль. Нужен корпоративный email на домене @mpt.ru — он же используется для смены пароля по коду." "An administrator will assign a role after registration. A corporate @mpt.ru email is required; the same address is used for password reset codes." %}</p>
     <form method="post" class="grid">
         {% csrf_token %}
         {{ form.as_p }}

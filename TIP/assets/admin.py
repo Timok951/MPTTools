@@ -12,7 +12,6 @@ class EquipmentAdmin(SoftDeleteAdmin):
         "inventory_number",
         "category",
         "workplace",
-        "cabinet",
         "quantity_total",
         "quantity_available",
         "is_consumable",
@@ -20,8 +19,9 @@ class EquipmentAdmin(SoftDeleteAdmin):
         "is_low_stock",
         "deleted_at",
     )
-    list_filter = ("status", "is_consumable", "category", "workplace", "cabinet", "deleted_at")
+    list_filter = ("status", "is_consumable", "category", "workplace", "deleted_at")
     search_fields = ("name", "inventory_number", "serial_number", "model")
+
 
 @admin.register(InventoryAdjustment)
 class InventoryAdjustmentAdmin(SoftDeleteAdmin):

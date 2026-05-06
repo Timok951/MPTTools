@@ -3,7 +3,14 @@
 
 {% block content %}
 <div class="card">
-    <h2>Рабочие места</h2>
+    <div class="toolbar-spread" style="align-items:flex-start;">
+        <h2 style="margin:0;">Рабочие места</h2>
+        {% if can_manage_workplaces %}
+        <div class="actions">
+            <a class="btn" href="{% url 'portal_create' entity='workplaces' %}">Добавить рабочее место</a>
+        </div>
+        {% endif %}
+    </div>
     {% for workplace in workplaces %}
         <div class="card">
             <strong>{{ workplace.name }}</strong>

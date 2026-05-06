@@ -8,7 +8,15 @@ from rest_framework.response import Response
 
 from assets.models import Equipment, EquipmentCheckout, InventoryAdjustment
 from core.models import Cabinet, EquipmentCategory, Workplace
-from inventory.authz import GROUP_ADMIN, GROUP_BUILDER, GROUP_FIRST_LINE_SUPPORT, GROUP_SYSADMIN, GROUP_WAREHOUSE, user_in_group
+from inventory.authz import (
+    GROUP_ADMIN,
+    GROUP_BUILDER,
+    GROUP_FIRST_LINE_SUPPORT,
+    GROUP_ROLE_ADMIN,
+    GROUP_SYSADMIN,
+    GROUP_WAREHOUSE,
+    user_in_group,
+)
 from operations.models import (
     REQUEST_APPROVED,
     REQUEST_KIND_BUILDER,
@@ -70,6 +78,9 @@ class InventoryModelViewSet(viewsets.ModelViewSet):
     def filter_queryset_by_role(self, queryset):
         if user_in_group(self.request.user, GROUP_ADMIN) or user_in_group(self.request.user, GROUP_WAREHOUSE):
             return queryset
+        privileged_read = getattr(self, "privileged_read_roles", ())
+        if privileged_read and any(user_in_group(self.request.user, role) for role in privileged_read):
+            return queryset
         return self.scope_queryset_for_user(queryset)
 
     def list(self, request, *args, **kwargs):
@@ -123,12 +134,11 @@ class EquipmentViewSet(InventoryModelViewSet):
         "quantity_available",
         "low_stock_threshold",
         "workplace",
-        "cabinet",
         "notes",
     }
 
     def get_queryset(self):
-        return Equipment.objects.select_related("category", "workplace", "cabinet").order_by("name", "inventory_number")
+        return Equipment.objects.select_related("category", "workplace").order_by("name", "inventory_number")
 
     def perform_create(self, serializer):
         self._save_with_actor(serializer)
@@ -166,11 +176,11 @@ class EquipmentRequestViewSet(InventoryModelViewSet):
     serializer_class = EquipmentRequestSerializer
     role_matrix = {
         "read": ALL_API_ROLES,
-        "create": (GROUP_ADMIN, GROUP_SYSADMIN, GROUP_BUILDER),
+        "create": (GROUP_ADMIN, GROUP_SYSADMIN, GROUP_BUILDER, GROUP_WAREHOUSE),
         "update": (GROUP_ADMIN, GROUP_WAREHOUSE, GROUP_SYSADMIN, GROUP_BUILDER, GROUP_FIRST_LINE_SUPPORT),
         "delete": (GROUP_ADMIN,),
     }
-    privileged_read_roles = (GROUP_WAREHOUSE, GROUP_FIRST_LINE_SUPPORT)
+    privileged_read_roles = (GROUP_WAREHOUSE, GROUP_FIRST_LINE_SUPPORT, GROUP_ROLE_ADMIN)
     privileged_update_roles = (GROUP_ADMIN, GROUP_WAREHOUSE, GROUP_FIRST_LINE_SUPPORT)
     owner_field = "requester"
     owner_read_roles = (GROUP_SYSADMIN, GROUP_BUILDER)

@@ -39,10 +39,10 @@
         </article>
         <article class="kpi-card">
             <div class="kpi-head">
-                <span class="kpi-label">{% trans "Active checkouts" %}</span>
-                <span class="kpi-icon">CO</span>
+                <span class="kpi-label">{% ui_text "Операции расхода (30 дн.)" "Usage records (30d)" %}</span>
+                <span class="kpi-icon">US</span>
             </div>
-            <strong class="kpi-value">{{ active_checkouts }}</strong>
+            <strong class="kpi-value">{{ usage_records_30d }}</strong>
         </article>
     </div>
 </div>
@@ -65,8 +65,25 @@
 </div>
 
 <div class="card">
-    <h3>{% trans "Activity last 30 days" %}</h3>
+    <h3>{% ui_text "Активность за 30 дней" "Activity last 30 days" %}</h3>
     <canvas id="activityChart" height="120"></canvas>
+</div>
+
+<div class="card">
+    <div class="grid cols-2">
+        <div>
+            <h3>{% ui_text "Объём списаний по типу (30 дней)" "Write-off volume by type (30 days)" %}</h3>
+            <canvas id="usageTypeQtyChart" height="200"></canvas>
+        </div>
+        <div>
+            <h3>{% ui_text "Топ расходников по количеству (30 дней)" "Top consumables by quantity (30 days)" %}</h3>
+            {% if top_consumable_usage %}
+            <canvas id="topConsumablesChart" height="200"></canvas>
+            {% else %}
+            <p class="muted">{% ui_text "Нет данных за выбранный период." "No data for this period." %}</p>
+            {% endif %}
+        </div>
+    </div>
 </div>
 
 <div class="card">
@@ -106,50 +123,15 @@
     </table>
 </div>
 
-<div class="card">
-    <h3>{% trans "Recent material usage" %}</h3>
-    <table>
-        <thead>
-            <tr>
-                <th>{% trans "ID" %}</th>
-                <th>{% trans "Equipment" %}</th>
-                <th>{% trans "Qty" %}</th>
-                <th>{% trans "User" %}</th>
-                <th>{% trans "Workplace" %}</th>
-                <th>{% trans "Date" %}</th>
-                {% if user|has_group:"Administrator" %}<th>Actions</th>{% endif %}
-            </tr>
-        </thead>
-        <tbody>
-            {% for item in recent_usage %}
-            <tr>
-                <td>{{ item.id }}</td>
-                <td>{{ item.equipment }}</td>
-                <td>{{ item.quantity }}</td>
-                <td>{{ item.used_by }}</td>
-                <td>{{ item.workplace }}</td>
-                <td>{{ item.used_at }}</td>
-                {% if user|has_group:"Administrator" %}
-                <td class="actions">
-                    <a href="{% url 'portal_edit' entity='usage' pk=item.pk %}">✏️</a>
-                    <a class="secondary" href="{% url 'portal_delete' entity='usage' pk=item.pk %}">🗑</a>
-                </td>
-                {% endif %}
-            </tr>
-            {% empty %}
-            <tr><td colspan="{% if user|has_group:'Administrator' %}7{% else %}6{% endif %}" class="muted">{% trans "No usage records yet." %}</td></tr>
-            {% endfor %}
-        </tbody>
-    </table>
-</div>
-
 {{ equipment_by_status|json_script:"equipmentStatusData" }}
 {{ requests_by_status|json_script:"requestStatusData" }}
 {{ day_labels|json_script:"dayLabelsData" }}
 {{ requests_daily|json_script:"requestsDailyData" }}
-{{ usage_daily|json_script:"usageDailyData" }}
-{{ checkouts_daily|json_script:"checkoutsDailyData" }}
+{{ usage_consumable_daily|json_script:"usageConsumableDailyData" }}
+{{ usage_non_consumable_daily|json_script:"usageNonConsumableDailyData" }}
 {{ category_stock|json_script:"categoryStockData" }}
+{{ usage_qty_totals_30d|json_script:"usageQtyTotals30dData" }}
+{{ top_consumable_usage|json_script:"topConsumableUsageData" }}
 {% endblock %}
 
 {% block scripts %}
@@ -159,9 +141,11 @@
     const requestData = JSON.parse(document.getElementById("requestStatusData").textContent || "[]");
     const dayLabels = JSON.parse(document.getElementById("dayLabelsData").textContent || "[]");
     const requestsDaily = JSON.parse(document.getElementById("requestsDailyData").textContent || "[]");
-    const usageDaily = JSON.parse(document.getElementById("usageDailyData").textContent || "[]");
-    const checkoutsDaily = JSON.parse(document.getElementById("checkoutsDailyData").textContent || "[]");
+    const usageConsumableDaily = JSON.parse(document.getElementById("usageConsumableDailyData").textContent || "[]");
+    const usageNonConsumableDaily = JSON.parse(document.getElementById("usageNonConsumableDailyData").textContent || "[]");
     const categoryStock = JSON.parse(document.getElementById("categoryStockData").textContent || "[]");
+    const usageQtyTotals30d = JSON.parse(document.getElementById("usageQtyTotals30dData").textContent || "{}");
+    const topConsumableUsage = JSON.parse(document.getElementById("topConsumableUsageData").textContent || "[]");
 
     const equipmentCtx = document.getElementById("equipmentStatusChart");
     if (equipmentCtx) {
@@ -200,11 +184,7 @@
             data: {
                 labels: categoryStock.map(item => item.category),
                 datasets: [{
-                    label: "{% trans 'Available' %}",
-                    data: categoryStock.map(item => item.available),
-                    backgroundColor: "#0f5e4b",
-                }, {
-                    label: "{% trans 'Total' %}",
+                    label: "{% ui_text 'Остаток на учёте (всего единиц)' 'Stock on books (total units)' %}",
                     data: categoryStock.map(item => item.total),
                     backgroundColor: "#f2b84b",
                 }]
@@ -229,16 +209,16 @@
                         fill: true,
                     },
                     {
-                        label: "{% trans 'Usage' %}",
-                        data: usageDaily,
+                        label: "{% ui_text 'Расход расходников (операции)' 'Consumable usage (operations)' %}",
+                        data: usageConsumableDaily,
                         borderColor: "#0f5e4b",
                         backgroundColor: "rgba(15, 94, 75, 0.2)",
                         tension: 0.3,
                         fill: true,
                     },
                     {
-                        label: "{% trans 'Checkouts' %}",
-                        data: checkoutsDaily,
+                        label: "{% ui_text 'Списание нерасходуемого (поломка и др.)' 'Non-consumable write-off (breakage, etc.)' %}",
+                        data: usageNonConsumableDaily,
                         borderColor: "#748cab",
                         backgroundColor: "rgba(116, 140, 171, 0.2)",
                         tension: 0.3,
@@ -247,6 +227,46 @@
                 ],
             },
             options: { responsive: true, plugins: { legend: { position: "bottom" } } },
+        });
+    }
+
+    const usageTypeQtyCtx = document.getElementById("usageTypeQtyChart");
+    if (usageTypeQtyCtx) {
+        const cQty = Number(usageQtyTotals30d.consumable || 0);
+        const ncQty = Number(usageQtyTotals30d.non_consumable || 0);
+        new Chart(usageTypeQtyCtx, {
+            type: "doughnut",
+            data: {
+                labels: [
+                    "{% ui_text 'Расходники (шт.)' 'Consumables (qty)' %}",
+                    "{% ui_text 'Нерасходуемое / поломка (шт.)' 'Non-consumable / breakage (qty)' %}",
+                ],
+                datasets: [{
+                    data: [cQty, ncQty],
+                    backgroundColor: ["#0f5e4b", "#748cab"],
+                }],
+            },
+            options: { responsive: true, plugins: { legend: { position: "bottom" } } },
+        });
+    }
+
+    const topConsumablesCtx = document.getElementById("topConsumablesChart");
+    if (topConsumablesCtx && topConsumableUsage.length) {
+        new Chart(topConsumablesCtx, {
+            type: "bar",
+            data: {
+                labels: topConsumableUsage.map((row) => row.name),
+                datasets: [{
+                    label: "{% ui_text 'Количество' 'Quantity' %}",
+                    data: topConsumableUsage.map((row) => row.qty),
+                    backgroundColor: "#d4572a",
+                }],
+            },
+            options: {
+                indexAxis: "y",
+                responsive: true,
+                plugins: { legend: { display: false } },
+            },
         });
     }
 </script>

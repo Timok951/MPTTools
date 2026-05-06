@@ -28,7 +28,6 @@ class Equipment(SoftDeleteModel):
     serial_number = models.CharField(max_length=100, blank=True)
     model = models.CharField(max_length=200, blank=True)
     workplace = models.ForeignKey(Workplace, on_delete=models.SET_NULL, null=True, blank=True)
-    cabinet = models.ForeignKey(Cabinet, on_delete=models.SET_NULL, null=True, blank=True)
     is_consumable = models.BooleanField(default=False)
     status = models.CharField(max_length=20, choices=EQUIPMENT_STATUS_CHOICES, default=STATUS_IN_STOCK)
     quantity_total = models.PositiveIntegerField(default=1)

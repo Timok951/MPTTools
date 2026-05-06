@@ -2,15 +2,15 @@
 {% load i18n %}
 
 {% block content %}
-{% include "inventory/portal/_entity_tabs.html" %}
+{% include "inventory/portal/_portal_bar.html" %}
 <div class="card">
-    <h2>{% trans "Restore" %}: {{ cfg.title }}</h2>
-    <p>{% trans "Restore record" %}: <strong>{{ object }}</strong>.</p>
+    <h2>Восстановление: {{ cfg.title }}</h2>
+    <p>Подтвердите восстановление записи: <strong>{{ object }}</strong>.</p>
     <form method="post">
         {% csrf_token %}
         <div class="actions">
-            <button class="btn" type="submit">{% trans "Restore" %}</button>
-            <a class="secondary" href="{% url 'portal_list' entity=cfg.slug %}">{% trans "Cancel" %}</a>
+            <button class="btn" type="submit">Восстановить</button>
+            <a class="secondary" href="{{ portal_back_url }}">Отмена</a>
         </div>
     </form>
 </div>

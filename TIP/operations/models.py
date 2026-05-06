@@ -12,6 +12,11 @@ REQUEST_REJECTED = "rejected"
 REQUEST_ISSUED = "issued"
 REQUEST_CLOSED = "closed"
 
+
+def default_needed_by_date():
+    return timezone.localdate()
+
+
 REQUEST_STATUS_CHOICES = [
     (REQUEST_PENDING, "На рассмотрении"),
     (REQUEST_APPROVED, "Одобрена"),
@@ -40,7 +45,7 @@ class EquipmentRequest(SoftDeleteModel):
     request_kind = models.CharField(max_length=20, choices=REQUEST_KIND_CHOICES)
     status = models.CharField(max_length=20, choices=REQUEST_STATUS_CHOICES, default=REQUEST_PENDING)
     requested_at = models.DateTimeField(default=timezone.now)
-    needed_by = models.DateField(null=True, blank=True)
+    needed_by = models.DateField(default=default_needed_by_date)
     comment = models.TextField(blank=True)
     processed_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,

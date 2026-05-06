@@ -36,7 +36,7 @@ from django.urls import reverse
 from django.utils import timezone
 from rest_framework.authtoken.models import Token
 
-from assets.models import Equipment, EquipmentCheckout
+from assets.models import Equipment, EquipmentCheckout, STATUS_REPAIR, STATUS_RETIRED
 from audit.models import AdminPortalLog, AuditLog
 from core.models import (
     Cabinet,
@@ -83,7 +83,6 @@ from .forms import (
     InventoryAdjustmentForm,
     PasswordResetConfirmForm,
     PasswordResetRequestForm,
-    MaterialUsageForm,
     RussianAuthenticationForm,
     RussianUserCreationForm,
     UserPreferenceForm,
@@ -191,12 +190,18 @@ def _can_process_request_status(user) -> bool:
     return user_has_capability(user, "request_processing")
 
 
+def _can_access_requests_module(user) -> bool:
+    """Журнал заявок и экспорт: склад, обработка/создание заявок или админы портала."""
+    return (
+        user_has_capability(user, "request_creation")
+        or user_has_capability(user, "request_processing")
+        or user_has_capability(user, "warehouse_operations")
+        or user_has_capability(user, "users_and_site_admin")
+    )
+
+
 def _can_create_checkout(user) -> bool:
     return user_has_capability(user, "checkout_operations")
-
-
-def _can_create_usage(user) -> bool:
-    return user_has_capability(user, "usage_writeoff") or user_has_capability(user, "warehouse_operations")
 
 
 def _can_return_checkout(user, checkout: EquipmentCheckout) -> bool:
@@ -215,7 +220,9 @@ def _decorate_request(item: EquipmentRequest):
 
 def _decorate_equipment(item: Equipment):
     helper = EQUIPMENT_STATUS_HELPERS.get(item.status, {})
-    item.status_badge_class = helper.get("badge_class", "badge")
+    bc = helper.get("badge_class", "badge")
+    item.status_badge_class = bc
+    item.badge_class = bc
     return item
 
 
@@ -263,6 +270,32 @@ def _message_conversation_summaries(user):
 
 
 PASSWORD_RESET_CODE_TTL_MINUTES = 15
+
+
+def _password_reset_delivery_hint() -> str:
+    """Текст для UI: почему код может не оказаться в ящике (Mailpit, SMTP, несовпадение email в БД)."""
+    parts = [
+        "Код отправляется только если в системе есть активный пользователь с тем же адресом @mpt.ru, что вы ввели.",
+        "Проверьте папку «Спам».",
+    ]
+    if getattr(settings, "DEBUG", False):
+        host = (getattr(settings, "EMAIL_HOST", "") or "").strip().lower()
+        if host == "mailpit":
+            parts.append(
+                "Сейчас DEBUG и почта уходит в Mailpit, а не на реальный ящик — откройте веб-интерфейс Mailpit "
+                "(в docker-compose обычно http://localhost:18025 или порт из MPTTOOLS_MAILPIT_UI_PORT)."
+            )
+        else:
+            parts.append(
+                "В DEBUG проверьте EMAIL_HOST / EMAIL_PORT в окружении или задайте "
+                "EMAIL_BACKEND=django.core.mail.backends.console.EmailBackend — код появится в консоли сервера."
+            )
+    else:
+        parts.append(
+            "На сервере должны быть настроены исходящая почта (EMAIL_* или ANYMAIL_*). При ошибке отправки "
+            "на странице появится сообщение об этом, а не перенаправление дальше."
+        )
+    return " ".join(parts)
 
 
 def _password_reset_code_hash(email: str, code: str) -> str:
@@ -393,37 +426,16 @@ def _request_history_filtered_queryset(request):
     return requests_qs, filters
 
 
-def _usage_history_filtered_queryset(request):
-    preferences = _get_user_preferences(request.user)
-    show_deleted = bool(request.session.get("show_deleted_global", False))
-    usage_manager = MaterialUsage.all_objects if show_deleted else MaterialUsage.objects
-    usage_qs = usage_manager.select_related(
-        "equipment", "equipment__cabinet", "used_by", "workplace", "related_request"
-    ).order_by("-used_at")
-    if not _can_view_all_operational_data(request.user):
-        usage_qs = usage_qs.filter(used_by=request.user)
-    date_from = request.GET.get("from", "").strip()
-    date_to = request.GET.get("to", "").strip()
-    if not date_from and "from" not in request.GET and preferences and preferences.default_usage_period_days:
-        date_from = (timezone.localdate() - timedelta(days=preferences.default_usage_period_days)).isoformat()
-    if date_from:
-        usage_qs = usage_qs.filter(used_at__date__gte=date_from)
-    if date_to:
-        usage_qs = usage_qs.filter(used_at__date__lte=date_to)
-    filters = {"from": date_from, "to": date_to}
-    return usage_qs, filters
-
-
 def _build_analytics_context(
     *,
     recent_requests_limit: int = 10,
-    recent_usage_limit: int = 10,
 ) -> dict:
+    start_date = timezone.now().date() - timedelta(days=29)
     equipment_total = Equipment.objects.count()
     consumables_total = Equipment.objects.filter(is_consumable=True).count()
     low_stock_total = Equipment.objects.filter(quantity_available__lte=F("low_stock_threshold")).count()
     requests_pending = EquipmentRequest.objects.filter(status=REQUEST_PENDING).count()
-    active_checkouts = EquipmentCheckout.objects.filter(returned_at__isnull=True).count()
+    usage_records_30d = MaterialUsage.objects.filter(used_at__date__gte=start_date).count()
 
     equipment_status_labels = dict(Equipment._meta.get_field("status").choices)
     equipment_by_status_raw = Equipment.objects.values("status").annotate(count=Count("id")).order_by("status")
@@ -443,12 +455,6 @@ def _build_analytics_context(
         EquipmentRequest.objects.select_related("requester", "equipment", "workplace", "cabinet")
         .order_by("-requested_at")[:recent_requests_limit]
     )
-    recent_usage = list(
-        MaterialUsage.objects.select_related("used_by", "equipment", "workplace")
-        .order_by("-used_at")[:recent_usage_limit]
-    )
-
-    start_date = timezone.now().date() - timedelta(days=29)
     days = [start_date + timedelta(days=idx) for idx in range(30)]
     day_labels = [day.isoformat() for day in days]
 
@@ -466,31 +472,58 @@ def _build_analytics_context(
         .values("day")
         .annotate(count=Count("id"))
     )
-    usage_daily_qs = (
-        MaterialUsage.objects.filter(used_at__date__gte=start_date)
+    usage_consumable_daily_qs = (
+        MaterialUsage.objects.filter(used_at__date__gte=start_date, equipment__is_consumable=True)
         .annotate(day=TruncDate("used_at"))
         .values("day")
         .annotate(count=Count("id"))
     )
-    checkout_daily_qs = (
-        EquipmentCheckout.objects.filter(taken_at__date__gte=start_date)
-        .annotate(day=TruncDate("taken_at"))
+    usage_non_consumable_daily_qs = (
+        MaterialUsage.objects.filter(used_at__date__gte=start_date)
+        .filter(Q(equipment__is_consumable=False) | Q(equipment__isnull=True))
+        .annotate(day=TruncDate("used_at"))
         .values("day")
         .annotate(count=Count("id"))
     )
 
     category_stock_raw = (
         Equipment.objects.values("category__name")
-        .annotate(total=Sum("quantity_total"), available=Sum("quantity_available"))
+        .annotate(total=Sum("quantity_total"))
         .order_by("category__name")
     )
     category_stock = [
         {
             "category": item["category__name"] or "Uncategorized",
             "total": item["total"] or 0,
-            "available": item["available"] or 0,
         }
         for item in category_stock_raw
+    ]
+
+    consumable_qty_30d = (
+        MaterialUsage.objects.filter(used_at__date__gte=start_date, equipment__is_consumable=True).aggregate(
+            t=Sum("quantity")
+        )["t"]
+        or 0
+    )
+    non_consumable_qty_30d = (
+        MaterialUsage.objects.filter(used_at__date__gte=start_date)
+        .filter(Q(equipment__is_consumable=False) | Q(equipment__isnull=True))
+        .aggregate(t=Sum("quantity"))["t"]
+        or 0
+    )
+
+    top_consumable_usage_raw = list(
+        MaterialUsage.objects.filter(
+            used_at__date__gte=start_date,
+            equipment__is_consumable=True,
+            equipment_id__isnull=False,
+        )
+        .values("equipment__name")
+        .annotate(qty=Sum("quantity"))
+        .order_by("-qty")[:10]
+    )
+    top_consumable_usage = [
+        {"name": row["equipment__name"] or "—", "qty": int(row["qty"] or 0)} for row in top_consumable_usage_raw
     ]
 
     return {
@@ -498,16 +531,17 @@ def _build_analytics_context(
         "consumables_total": consumables_total,
         "low_stock_total": low_stock_total,
         "requests_pending": requests_pending,
-        "active_checkouts": active_checkouts,
+        "usage_records_30d": usage_records_30d,
         "recent_requests": recent_requests,
-        "recent_usage": recent_usage,
         "equipment_by_status": equipment_by_status,
         "requests_by_status": requests_by_status,
         "day_labels": day_labels,
         "requests_daily": series_from_queryset(request_daily_qs, "count"),
-        "usage_daily": series_from_queryset(usage_daily_qs, "count"),
-        "checkouts_daily": series_from_queryset(checkout_daily_qs, "count"),
+        "usage_consumable_daily": series_from_queryset(usage_consumable_daily_qs, "count"),
+        "usage_non_consumable_daily": series_from_queryset(usage_non_consumable_daily_qs, "count"),
         "category_stock": category_stock,
+        "usage_qty_totals_30d": {"consumable": consumable_qty_30d, "non_consumable": non_consumable_qty_30d},
+        "top_consumable_usage": top_consumable_usage,
     }
 
 
@@ -531,7 +565,7 @@ def analytics(request):
 def analytics_export_csv_zip(request):
     if not user_in_group(request.user, GROUP_ADMIN):
         return forbidden(request, "Экспорт доступен только администратору.")
-    ctx = _build_analytics_context(recent_requests_limit=8000, recent_usage_limit=8000)
+    ctx = _build_analytics_context(recent_requests_limit=8000)
     files: list[tuple[str, bytes]] = []
     files.append(
         _zip_csv_bytes(
@@ -542,7 +576,7 @@ def analytics_export_csv_zip(request):
                 ["consumables_total", ctx["consumables_total"]],
                 ["low_stock_total", ctx["low_stock_total"]],
                 ["requests_pending", ctx["requests_pending"]],
-                ["active_checkouts", ctx["active_checkouts"]],
+                ["usage_records_30d", ctx["usage_records_30d"]],
             ],
         )
     )
@@ -563,8 +597,8 @@ def analytics_export_csv_zip(request):
     files.append(
         _zip_csv_bytes(
             "04_category_stock.csv",
-            ["category", "total", "available"],
-            [[row["category"], row["total"], row["available"]] for row in ctx["category_stock"]],
+            ["category", "total_on_books"],
+            [[row["category"], row["total"]] for row in ctx["category_stock"]],
         )
     )
     activity_rows = []
@@ -573,14 +607,14 @@ def analytics_export_csv_zip(request):
             [
                 day,
                 ctx["requests_daily"][idx],
-                ctx["usage_daily"][idx],
-                ctx["checkouts_daily"][idx],
+                ctx["usage_consumable_daily"][idx],
+                ctx["usage_non_consumable_daily"][idx],
             ]
         )
     files.append(
         _zip_csv_bytes(
             "05_activity_daily_30d.csv",
-            ["date", "requests", "usage", "checkouts"],
+            ["date", "requests", "usage_consumable_ops", "usage_non_consumable_ops"],
             activity_rows,
         )
     )
@@ -605,23 +639,23 @@ def analytics_export_csv_zip(request):
             req_rows,
         )
     )
-    usage_rows = []
-    for u in ctx["recent_usage"]:
-        usage_rows.append(
-            [
-                u.pk,
-                str(u.equipment) if u.equipment_id else "",
-                u.quantity,
-                u.used_by.get_username() if u.used_by_id else "",
-                str(u.workplace) if u.workplace_id else "",
-                timezone.localtime(u.used_at).isoformat() if u.used_at else "",
-            ]
-        )
+    qty_totals = ctx["usage_qty_totals_30d"]
     files.append(
         _zip_csv_bytes(
-            "07_recent_usage.csv",
-            ["id", "equipment", "quantity", "used_by", "workplace", "used_at"],
-            usage_rows,
+            "07_usage_qty_totals_30d.csv",
+            ["kind", "quantity"],
+            [
+                ["consumable", qty_totals["consumable"]],
+                ["non_consumable", qty_totals["non_consumable"]],
+            ],
+        )
+    )
+    top_rows = [[row["name"], row["qty"]] for row in ctx["top_consumable_usage"]]
+    files.append(
+        _zip_csv_bytes(
+            "08_top_consumables_30d.csv",
+            ["equipment_name", "quantity"],
+            top_rows,
         )
     )
 
@@ -639,15 +673,15 @@ def analytics_export_csv_zip(request):
 def analytics_print(request):
     if not user_in_group(request.user, GROUP_ADMIN):
         return forbidden(request, "Аналитика доступна только администратору.")
-    ctx = _build_analytics_context(recent_requests_limit=250, recent_usage_limit=250)
+    ctx = _build_analytics_context(recent_requests_limit=250)
     activity_rows = []
     for idx, day in enumerate(ctx["day_labels"]):
         activity_rows.append(
             {
                 "date": day,
                 "requests": ctx["requests_daily"][idx],
-                "usage": ctx["usage_daily"][idx],
-                "checkouts": ctx["checkouts_daily"][idx],
+                "usage_consumable": ctx["usage_consumable_daily"][idx],
+                "usage_non_consumable": ctx["usage_non_consumable_daily"][idx],
             }
         )
     ctx["activity_table_rows"] = activity_rows
@@ -657,7 +691,7 @@ def analytics_print(request):
 def _equipment_list_filtered_queryset(request):
     show_deleted = bool(request.session.get("show_deleted_global", False))
     manager = Equipment.all_objects if show_deleted else Equipment.objects
-    queryset = manager.select_related("category", "workplace", "cabinet")
+    queryset = manager.select_related("category", "workplace")
 
     query = request.GET.get("q", "").strip()
     status = request.GET.get("status", "").strip()
@@ -718,7 +752,6 @@ def equipment_export_csv(request):
             "model",
             "category",
             "workplace",
-            "cabinet",
             "status",
             "is_consumable",
             "quantity_total",
@@ -737,7 +770,6 @@ def equipment_export_csv(request):
                 eq.model,
                 eq.category.name if eq.category_id else "",
                 eq.workplace.name if eq.workplace_id else "",
-                eq.cabinet.name if eq.cabinet_id else "",
                 eq.get_status_display(),
                 "1" if eq.is_consumable else "0",
                 eq.quantity_total,
@@ -796,7 +828,7 @@ def equipment_list(request):
             if new_status not in allowed_statuses:
                 messages.error(request, "Некорректный статус оборудования.")
                 return redirect(next_url)
-            item = get_object_or_404(Equipment.all_objects.select_related("category", "workplace", "cabinet"), pk=int(equipment_id))
+            item = get_object_or_404(Equipment.all_objects.select_related("category", "workplace"), pk=int(equipment_id))
             item.status = new_status
             item._actor = request.user
             item.save(update_fields=["status"])
@@ -807,7 +839,7 @@ def equipment_list(request):
             if not equipment_id.isdigit():
                 messages.error(request, "Не удалось определить запись оборудования.")
                 return redirect(next_url)
-            item = get_object_or_404(Equipment.all_objects.select_related("category", "workplace", "cabinet"), pk=int(equipment_id))
+            item = get_object_or_404(Equipment.all_objects.select_related("category", "workplace"), pk=int(equipment_id))
             if item.deleted_at:
                 item.restore()
                 messages.success(request, "Оборудование восстановлено.")
@@ -876,124 +908,46 @@ def equipment_list(request):
 
 
 @login_required
-def usage_history(request):
-    preferences = _get_user_preferences(request.user)
-    page_size = preferences.page_size if preferences else 25
-    request_id = (request.GET.get("request_id") or "").strip()
-    initial_request_id = int(request_id) if request_id.isdigit() else None
-    can_create_usage = _can_create_usage(request.user)
-
-    usage_form = MaterialUsageForm(initial_request_id=initial_request_id) if can_create_usage else None
-    if request.method == "POST":
-        if not can_create_usage:
-            return forbidden(request, "Списание доступно только уполномоченным ролям.")
-        usage_form = MaterialUsageForm(request.POST, initial_request_id=initial_request_id)
-        if usage_form.is_valid():
-            usage_obj = usage_form.save(commit=False)
-            if usage_obj.related_request and usage_obj.related_request.processed_by_id:
-                usage_obj.used_by = usage_obj.related_request.processed_by
-            else:
-                usage_obj.used_by = request.user
-            usage_obj._actor = request.user
-            usage_obj.save()
-            messages.success(request, "Операция сохранена: выдача расходуемого или списание сломанного оборудования.")
-            redirect_params = {}
-            date_from_post = (request.POST.get("from") or "").strip()
-            date_to_post = (request.POST.get("to") or "").strip()
-            if date_from_post:
-                redirect_params["from"] = date_from_post
-            if date_to_post:
-                redirect_params["to"] = date_to_post
-            if redirect_params:
-                return redirect(f"{reverse('usage_history')}?{urlencode(redirect_params)}")
-            return redirect("usage_history")
-
-    usage, list_filters = _usage_history_filtered_queryset(request)
-    page_obj = _paginate(request, usage, page_size)
+def equipment_detail(request, equipment_id: int):
+    show_deleted = bool(request.session.get("show_deleted_global", False))
+    manager = Equipment.all_objects if show_deleted else Equipment.objects
+    item = get_object_or_404(manager.select_related("category", "workplace"), pk=equipment_id)
+    can_manage_equipment = (
+        user_has_capability(request.user, "warehouse_operations")
+        or user_has_capability(request.user, "users_and_site_admin")
+    )
     return render(
         request,
-        "inventory/usage_history.html",
+        "inventory/equipment_detail.html",
         {
-            "usage": page_obj.object_list,
-            "filters": list_filters,
-            "export_query": _export_querystring(list_filters),
-            "can_create_usage": can_create_usage,
-            "can_manage_usage_records": can_create_usage or user_has_capability(request.user, "users_and_site_admin"),
-            "usage_form": usage_form,
-            "request_quantity_map": getattr(usage_form, "request_quantity_map", {}) if usage_form else {},
-            "request_equipment_map": getattr(usage_form, "request_equipment_map", {}) if usage_form else {},
-            "request_workplace_map": getattr(usage_form, "request_workplace_map", {}) if usage_form else {},
-            "prefilled_request_id": initial_request_id,
-            **_with_page_context(page_obj),
+            "item": _decorate_equipment(item),
+            "can_manage_equipment": can_manage_equipment,
         },
     )
+
+
+@login_required
+def usage_history(request):
+    return forbidden(request, "Раздел «Расход и списание» отключён.")
 
 
 @login_required
 def usage_export_csv(request):
-    usage, _filters = _usage_history_filtered_queryset(request)
-    buffer = io.StringIO()
-    writer = csv.writer(buffer)
-    writer.writerow(
-        [
-            "id",
-            "equipment",
-            "operation_type",
-            "quantity",
-            "used_by",
-            "workplace",
-            "cabinet",
-            "used_at",
-            "related_request_id",
-            "note",
-            "deleted_at",
-        ]
-    )
-    for row in usage.iterator(chunk_size=500):
-        eq = row.equipment
-        op = "consumable_issue" if (eq and eq.is_consumable) else "non_consumable_writeoff"
-        writer.writerow(
-            [
-                row.pk,
-                str(eq) if eq else "",
-                op,
-                row.quantity,
-                row.used_by.get_username() if row.used_by_id else "",
-                row.workplace.name if row.workplace_id else "",
-                eq.cabinet.name if eq and eq.cabinet_id else "",
-                timezone.localtime(row.used_at).isoformat() if row.used_at else "",
-                row.related_request_id or "",
-                (row.note or "").replace("\r\n", "\n"),
-                row.deleted_at.isoformat() if row.deleted_at else "",
-            ]
-        )
-    response = HttpResponse(buffer.getvalue().encode("utf-8-sig"), content_type="text/csv; charset=utf-8")
-    response["Content-Disposition"] = 'attachment; filename="usage-export.csv"'
-    return response
+    return forbidden(request, "Раздел «Расход и списание» отключён.")
 
 
 @login_required
 def usage_print(request):
-    usage, list_filters = _usage_history_filtered_queryset(request)
-    total = usage.count()
-    cap = 8000
-    rows = list(usage[:cap])
-    return render(
-        request,
-        "inventory/usage_history_print.html",
-        {
-            "usage": rows,
-            "filters": list_filters,
-            "export_query": _export_querystring(list_filters),
-            "exported_count": len(rows),
-            "total_matching": total,
-            "truncated": total > len(rows),
-        },
-    )
+    return forbidden(request, "Раздел «Расход и списание» отключён.")
 
 
 @login_required
 def request_history(request):
+    if not _can_access_requests_module(request.user):
+        return forbidden(
+            request,
+            "Раздел заявок доступен ролям «Техник», «Поддержка первой линии», «Старший техник», «Системный администратор» или «Администратор».",
+        )
     preferences = _get_user_preferences(request.user)
     page_size = preferences.page_size if preferences else 25
     requests_qs, list_filters = _request_history_filtered_queryset(request)
@@ -1021,6 +975,11 @@ def request_history(request):
 
 @login_required
 def request_export_csv(request):
+    if not _can_access_requests_module(request.user):
+        return forbidden(
+            request,
+            "Экспорт заявок доступен только уполномоченным ролям.",
+        )
     requests_qs, _filters = _request_history_filtered_queryset(request)
     buffer = io.StringIO()
     writer = csv.writer(buffer)
@@ -1068,6 +1027,11 @@ def request_export_csv(request):
 
 @login_required
 def request_print(request):
+    if not _can_access_requests_module(request.user):
+        return forbidden(
+            request,
+            "Печать списка заявок доступна только уполномоченным ролям.",
+        )
     requests_qs, list_filters = _request_history_filtered_queryset(request)
     total = requests_qs.count()
     cap = 8000
@@ -1100,9 +1064,6 @@ def inventory_search(request):
         context.update(
             {
                 "equipment_results": [],
-                "request_results": [],
-                "usage_results": [],
-                "checkout_results": [],
                 "workplace_results": [],
                 "cabinet_results": [],
             }
@@ -1110,9 +1071,6 @@ def inventory_search(request):
         return render(request, "inventory/search.html", context)
 
     equipment_manager = Equipment.all_objects if show_deleted else Equipment.objects
-    requests_manager = EquipmentRequest.all_objects if show_deleted else EquipmentRequest.objects
-    usage_manager = MaterialUsage.all_objects if show_deleted else MaterialUsage.objects
-    checkouts_manager = EquipmentCheckout.all_objects if show_deleted else EquipmentCheckout.objects
     workplaces_manager = Workplace.all_objects if show_deleted else Workplace.objects
     cabinets_manager = Cabinet.all_objects if show_deleted else Cabinet.objects
 
@@ -1124,45 +1082,8 @@ def inventory_search(request):
             | Q(model__icontains=q)
             | Q(category__name__icontains=q)
             | Q(workplace__name__icontains=q)
-            | Q(cabinet__name__icontains=q)
         )
         .order_by("name")[:25]
-    )
-    if not _can_view_all_operational_data(request.user):
-        requests_manager = requests_manager.filter(requester=request.user)
-        usage_manager = usage_manager.filter(used_by=request.user)
-        checkouts_manager = checkouts_manager.filter(taken_by=request.user)
-    request_results = (
-        requests_manager.select_related("requester", "equipment", "workplace")
-        .filter(
-            Q(requester__username__icontains=q)
-            | Q(equipment__name__icontains=q)
-            | Q(workplace__name__icontains=q)
-            | Q(comment__icontains=q)
-            | Q(status__icontains=q)
-        )
-        .order_by("-requested_at")[:25]
-    )
-    usage_results = (
-        usage_manager.select_related("equipment", "used_by", "workplace")
-        .filter(
-            Q(equipment__name__icontains=q)
-            | Q(used_by__username__icontains=q)
-            | Q(workplace__name__icontains=q)
-            | Q(note__icontains=q)
-        )
-        .order_by("-used_at")[:25]
-    )
-    checkout_results = (
-        checkouts_manager.select_related("equipment", "taken_by", "workplace", "cabinet")
-        .filter(
-            Q(equipment__name__icontains=q)
-            | Q(taken_by__username__icontains=q)
-            | Q(workplace__name__icontains=q)
-            | Q(cabinet__code__icontains=q)
-            | Q(note__icontains=q)
-        )
-        .order_by("-taken_at")[:25]
     )
     workplace_results = workplaces_manager.filter(
         Q(name__icontains=q) | Q(location__icontains=q) | Q(description__icontains=q)
@@ -1173,9 +1094,6 @@ def inventory_search(request):
     context.update(
         {
             "equipment_results": equipment_results,
-            "request_results": request_results,
-            "usage_results": usage_results,
-            "checkout_results": checkout_results,
             "workplace_results": workplace_results,
             "cabinet_results": cabinet_results,
         }
@@ -1277,11 +1195,11 @@ def _reports_page_context(request) -> dict:
     date_from = request.GET.get("from", "").strip()
     date_to = request.GET.get("to", "").strip()
 
-    cabinet_report = (
-        Equipment.objects.filter(cabinet__isnull=False)
-        .values("cabinet__code", "cabinet__name", "cabinet__workplace__name")
+    workplace_equipment_report = (
+        Equipment.objects.filter(workplace__isnull=False)
+        .values("workplace__name")
         .annotate(items=Count("id"), total=Sum("quantity_total"), available=Sum("quantity_available"))
-        .order_by("cabinet__code")
+        .order_by("workplace__name")
     )
 
     usage_qs = MaterialUsage.objects.filter(equipment__is_consumable=True)
@@ -1312,7 +1230,7 @@ def _reports_page_context(request) -> dict:
     ]
 
     return {
-        "cabinet_report": cabinet_report,
+        "workplace_equipment_report": workplace_equipment_report,
         "materials_report": materials_report,
         "filters": {"from": date_from, "to": date_to},
     }
@@ -1343,19 +1261,18 @@ def reports_export(request, report_type: str):
     response["Content-Disposition"] = f'attachment; filename="{report_type}-report.csv"'
     writer = csv.writer(response)
 
-    if report_type == "cabinets":
-        writer.writerow(["Cabinet", "Workplace", "Items", "Total qty", "Available qty"])
-        cabinet_report = (
-            Equipment.objects.filter(cabinet__isnull=False)
-            .values("cabinet__code", "cabinet__workplace__name")
+    if report_type in ("cabinets", "workplaces"):
+        writer.writerow(["Workplace", "Items", "Total qty", "Available qty"])
+        workplace_report = (
+            Equipment.objects.filter(workplace__isnull=False)
+            .values("workplace__name")
             .annotate(items=Count("id"), total=Sum("quantity_total"), available=Sum("quantity_available"))
-            .order_by("cabinet__code")
+            .order_by("workplace__name")
         )
-        for item in cabinet_report:
+        for item in workplace_report:
             writer.writerow(
                 [
-                    item["cabinet__code"] or "-",
-                    item["cabinet__workplace__name"] or "-",
+                    item["workplace__name"] or "-",
                     item["items"],
                     item["total"] or 0,
                     item["available"] or 0,
@@ -1390,7 +1307,7 @@ def reports_export(request, report_type: str):
             )
         return response
 
-    return HttpResponse("Unknown report type", status=400)
+    return HttpResponse("Неизвестный тип отчёта", status=400)
 
 
 @login_required
@@ -1412,7 +1329,7 @@ def request_create(request):
             )
             return redirect(f"{reverse('request_history')}?{urlencode({'status': REQUEST_PENDING, 'view': 'mine'})}")
     else:
-        form = EquipmentRequestForm(initial={"needed_by": timezone.localdate() + timedelta(days=7)})
+        form = EquipmentRequestForm(initial={"needed_by": timezone.localdate()})
 
     return render(request, "inventory/request_form.html", {"form": form})
 
@@ -1458,8 +1375,6 @@ def request_detail(request, request_id: int):
                 messages.success(request, "Фото добавлено.")
                 return redirect("request_detail", request_id=item.pk)
 
-    request_usage_url = reverse("usage_history")
-    request_usage_url = f"{request_usage_url}?request_id={item.pk}"
     threaded_messages = _build_request_message_thread(
         item.messages.select_related("author", "parent").all()
     )
@@ -1472,9 +1387,13 @@ def request_detail(request, request_id: int):
             "photos": item.photos.select_related("uploaded_by").all(),
             "message_form": message_form,
             "photo_form": photo_form,
-            "request_usage_url": request_usage_url,
             "can_quick_status": _can_process_request_status(request.user),
             "status_choices": EquipmentRequest._meta.get_field("status").choices,
+            "can_update_equipment_condition": bool(
+                _can_process_request_status(request.user)
+                and item.equipment_id
+                and not (item.equipment and item.equipment.is_consumable)
+            ),
         },
     )
 
@@ -1522,11 +1441,49 @@ def request_update_status(request, request_id: int):
 
 
 @login_required
+@require_POST
+def request_update_equipment_condition(request, request_id: int):
+    item = get_object_or_404(EquipmentRequest.objects.select_related("equipment"), pk=request_id)
+    if not _can_process_request_status(request.user):
+        return forbidden(request, "Смена состояния оборудования доступна только обработчикам заявок.")
+    if not item.equipment_id:
+        messages.error(request, "В заявке не указано оборудование.")
+        return redirect(request.META.get("HTTP_REFERER") or reverse("request_detail", kwargs={"request_id": item.pk}))
+    if item.equipment and item.equipment.is_consumable:
+        messages.error(request, "Для расходников используйте одобрение заявки: количество уменьшается автоматически.")
+        return redirect(request.META.get("HTTP_REFERER") or reverse("request_detail", kwargs={"request_id": item.pk}))
+
+    action = (request.POST.get("equipment_condition") or "").strip()
+    target_status = STATUS_REPAIR if action == "repair" else STATUS_RETIRED if action == "retired" else None
+    if target_status is None:
+        messages.error(request, "Некорректное действие для оборудования.")
+        return redirect(request.META.get("HTTP_REFERER") or reverse("request_detail", kwargs={"request_id": item.pk}))
+
+    equipment = item.equipment
+    if equipment is None:
+        messages.error(request, "Оборудование не найдено.")
+        return redirect(request.META.get("HTTP_REFERER") or reverse("request_detail", kwargs={"request_id": item.pk}))
+
+    previous_status_display = equipment.get_status_display()
+    equipment.status = target_status
+    equipment._actor = request.user
+    equipment.save(update_fields=["status"])
+
+    EquipmentRequestMessage.objects.create(
+        request=item,
+        author=request.user,
+        body=(
+            f"Состояние оборудования изменено: {previous_status_display} -> {equipment.get_status_display()} "
+            f"(оборудование #{equipment.pk})."
+        ),
+    )
+    messages.success(request, "Состояние оборудования обновлено.")
+    return redirect(request.META.get("HTTP_REFERER") or reverse("request_detail", kwargs={"request_id": item.pk}))
+
+
+@login_required
 def usage_create(request):
-    request_id = (request.GET.get("request_id") or "").strip()
-    if request_id:
-        return redirect(f"{reverse('usage_history')}?request_id={request_id}")
-    return redirect("usage_history")
+    return forbidden(request, "Раздел «Расход и списание» отключён.")
 
 
 @login_required
@@ -1541,7 +1498,7 @@ def adjustment_create(request):
             adjustment.created_by = request.user
             adjustment._actor = request.user
             adjustment.save()
-            messages.success(request, "Stock adjustment saved.")
+            messages.success(request, "Корректировка остатка сохранена.")
             return redirect("equipment_list")
     else:
         form = InventoryAdjustmentForm(initial={"delta": 1})
@@ -1619,6 +1576,8 @@ def api_docs(request):
 
 @login_required
 def api_token_view(request):
+    if not user_has_capability(request.user, "users_and_site_admin"):
+        return forbidden(request, "Управление API-токеном доступно только администраторам.")
     token_obj = Token.objects.filter(user=request.user).first()
     token_value = token_obj.key if token_obj else ""
     if request.method == "POST":
@@ -1871,7 +1830,14 @@ def password_reset_request_view(request):
                         None,
                         "Не удалось отправить письмо. Проверьте настройки почты (SMTP или провайдера) и попробуйте снова.",
                     )
+                except Exception:
+                    logger.exception("Password reset email unexpected error for %s", email)
+                    form.add_error(
+                        None,
+                        "Не удалось отправить письмо. Проверьте настройки почты (SMTP или провайдера) и попробуйте снова.",
+                    )
                 else:
+                    logger.info("Password reset email sent to %s (user_id=%s)", email, user.pk)
                     PasswordResetCode.objects.filter(user=user, email__iexact=email, used_at__isnull=True).update(
                         used_at=timezone.now()
                     )
@@ -1885,7 +1851,8 @@ def password_reset_request_view(request):
             if not form.errors:
                 messages.success(
                     request,
-                    "Если адрес найден, мы отправили на него код для восстановления пароля.",
+                    "Если этот адрес есть у учётной записи, на него отправлен код (см. также подсказку на странице ввода кода). "
+                    "Если письма нет — чаще всего адрес в базе не совпадает с введённым или почта настроена на тестовый перехватчик (Mailpit).",
                 )
                 return redirect("password_reset_confirm")
     else:
@@ -1900,13 +1867,17 @@ def password_reset_request_view(request):
         {
             "form": form,
             "password_reset_needs_email": request.user.is_authenticated and not (request.user.email or "").strip(),
+            "password_reset_delivery_hint": _password_reset_delivery_hint(),
         },
     )
 
 
 def password_reset_confirm_view(request):
     if request.method == "POST":
-        form = PasswordResetConfirmForm(request.POST)
+        form = PasswordResetConfirmForm(
+            request.POST,
+            user=request.user if request.user.is_authenticated else None,
+        )
         if form.is_valid():
             email = form.cleaned_data["email"].strip().lower()
             code = form.cleaned_data["code"]
@@ -1940,9 +1911,19 @@ def password_reset_confirm_view(request):
         initial = {}
         if request.user.is_authenticated and (request.user.email or "").strip():
             initial["email"] = request.user.email.strip()
-        form = PasswordResetConfirmForm(initial=initial)
+        form = PasswordResetConfirmForm(
+            initial=initial,
+            user=request.user if request.user.is_authenticated else None,
+        )
 
-    return render(request, "inventory/password_reset_confirm.html", {"form": form})
+    return render(
+        request,
+        "inventory/password_reset_confirm.html",
+        {
+            "form": form,
+            "password_reset_delivery_hint": _password_reset_delivery_hint(),
+        },
+    )
 
 
 @login_required
@@ -2137,11 +2118,8 @@ def export_portal_logs_csv(request):
 @login_required
 def equipment_qr(request, equipment_id: int):
     item = get_object_or_404(Equipment, pk=equipment_id)
-    qr_query = item.serial_number or item.name
-    search_url = request.build_absolute_uri(
-        f"{reverse('equipment_list')}?q={qr_query}"
-    )
-    img = qrcode.make(search_url, box_size=8, border=2)
+    target_url = request.build_absolute_uri(reverse("equipment_detail", kwargs={"equipment_id": item.pk}))
+    img = qrcode.make(target_url, box_size=8, border=2)
     buf = io.BytesIO()
     img.save(buf, format="PNG")
     buf.seek(0)

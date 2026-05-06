@@ -28,11 +28,6 @@
 <div class="card">
     <div class="toolbar-spread">
         <div class="table-meta">Показано: {{ checkouts|length }} / {{ total_rows }}</div>
-        <div class="actions">
-            {% if can_create_checkout %}
-            <a href="{% url 'checkout_create' %}">➕ Добавить</a>
-            {% endif %}
-        </div>
     </div>
     <table>
         <thead>

@@ -1,4 +1,4 @@
-"""Логика периодического списания расходников по расписанию."""
+"""Логика периодических одобренных заявок на расходники."""
 
 from __future__ import annotations
 
@@ -22,7 +22,7 @@ def add_one_calendar_month(d: date) -> date:
 
 
 def process_due_periodic_schedules(*, today: date | None = None) -> int:
-    """Создаёт записи списаний для всех просроченных расписаний. Возвращает число созданных строк MaterialUsage."""
+    """Создаёт записи расхода для всех просроченных одобренных периодических заявок."""
     if today is None:
         today = timezone.localdate()
     created = 0
@@ -42,7 +42,7 @@ def process_due_periodic_schedules(*, today: date | None = None) -> int:
                 continue
             while schedule.next_run_on <= today:
                 note = schedule.title.strip() if schedule.title else ""
-                prefix = f"Периодическое списание #{schedule.pk}"
+                prefix = f"Периодическая заявка #{schedule.pk}"
                 full_note = f"{prefix}" + (f": {note}" if note else "")
                 MaterialUsage.objects.create(
                     equipment=schedule.equipment,

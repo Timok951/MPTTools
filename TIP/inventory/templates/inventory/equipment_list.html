@@ -3,7 +3,16 @@
 
 {% block content %}
 <div class="card">
-    <h2>{% trans "Equipment" %}</h2>
+    <div class="toolbar-spread" style="align-items: flex-start;">
+        <h2 style="margin: 0;">{% trans "Equipment" %}</h2>
+        {% if can_manage_equipment %}
+        <div class="actions" style="flex-wrap: wrap; justify-content: flex-end;">
+            <a class="btn" href="{% url 'portal_create' entity='equipment' %}">{% ui_text "Добавить оборудование" "Add equipment" %}</a>
+            <a class="secondary" href="{% url 'portal_create' entity='workplaces' %}">{% ui_text "Рабочее место" "Workplace" %}</a>
+            <a class="secondary" href="{% url 'portal_create' entity='cabinets' %}">{% ui_text "Кабинет" "Cabinet" %}</a>
+        </div>
+        {% endif %}
+    </div>
     <div class="request-shortcuts">
         {% for item in status_filter_links %}
         <a class="shortcut-chip {% if item.is_active %}is-active{% endif %}" href="{{ item.url }}">
@@ -14,7 +23,7 @@
     <form method="get" class="filters">
         <div>
             <label for="id_q">{% trans "Search" %}</label>
-            <input id="id_q" type="text" name="q" value="{{ filters.q }}" placeholder="{% trans 'Name, serial, model' %}" />
+            <input id="id_q" type="text" name="q" value="{{ filters.q }}" placeholder="{% ui_text 'Название, серийный номер, модель' 'Name, serial, model' %}" />
         </div>
         <div>
             <label for="id_status">{% trans "Status" %}</label>
@@ -70,11 +79,13 @@
         <article class="card equipment-card">
             <div class="equipment-card-media">
                 <span class="equipment-card-status-ribbon equipment-card-status--{{ item.status }}">{{ item.get_status_display }}</span>
+                <a class="equipment-card-media-link" href="{% url 'equipment_detail' equipment_id=item.pk %}" aria-label="{% ui_text 'Открыть карточку' 'Open item' %}: {{ item.name }}">
                 {% if item.photo %}
                 <img src="{{ item.photo.url }}" alt="{{ item.name }}" loading="lazy" />
                 {% else %}
-                <div class="equipment-card-empty">{% ui_text "Нет фото" "No photo" %}</div>
+                <div class="equipment-card-empty">{% ui_text "Нет фото — открыть карточку" "No photo — open item" %}</div>
                 {% endif %}
+                </a>
                 {% with sn=item.serial_number|default:item.inventory_number %}
                 {% if sn %}
                 <span class="equipment-card-badge" title="{{ sn }}">{{ sn }}</span>
@@ -83,7 +94,7 @@
             </div>
             <div class="equipment-card-body">
                 <div class="catalog-card-head">
-                    <h3 class="equipment-card-title">{{ item.name|truncatechars:52 }}</h3>
+                    <h3 class="equipment-card-title"><a href="{% url 'equipment_detail' equipment_id=item.pk %}">{{ item.name|truncatechars:52 }}</a></h3>
                     <div class="equipment-card-subtitle">
                         {{ item.category|default:"-" }}{% if item.model %} • {{ item.model }}{% endif %}
                     </div>
@@ -93,16 +104,6 @@
                     <div class="equipment-card-row">
                         <span>{% ui_text "Статус" "Status" %}</span>
                         <strong>{{ item.get_status_display }}</strong>
-                    </div>
-                    <div class="equipment-card-row">
-                        <span>{% ui_text "Доступность" "Availability" %}</span>
-                        <strong>
-                            {% if item.status != "repair" and item.status != "retired" %}
-                                {% ui_text "Доступно" "Available" %}
-                            {% else %}
-                                {% ui_text "Недоступно" "Unavailable" %}
-                            {% endif %}
-                        </strong>
                     </div>
                     <div class="equipment-card-row">
                         <span>{% ui_text "Рабочее место" "Workplace" %}</span>

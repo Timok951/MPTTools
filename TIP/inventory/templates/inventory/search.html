@@ -1,5 +1,5 @@
 {% extends "inventory/base.html" %}
-{% load i18n %}
+{% load i18n inventory_extras %}
 
 {% block content %}
 <div class="card">
@@ -7,12 +7,20 @@
     <form method="get" class="filters">
         <div>
             <label for="id_q">{% trans "Search" %}</label>
-            <input id="id_q" type="text" name="q" value="{{ q }}" placeholder="{% trans 'Name, serial, model' %}" />
+            <input id="id_q" type="text" name="q" value="{{ q }}" placeholder="{% ui_text 'Название, серийный номер, модель' 'Name, serial, model' %}" />
         </div>
         <div>
             <button class="btn" type="submit">Отбор</button>
         </div>
     </form>
+    <p class="muted" style="margin-top: 12px;">
+        {% if user.is_authenticated %}
+        {% if user|has_capability:"request_creation" or user|has_capability:"request_processing" or user|has_capability:"warehouse_operations" or user|has_capability:"users_and_site_admin" %}
+        {% ui_text "Журнал заявок — в меню «Заявки» или откройте список." "Request log: use the «Requests» menu or open the list." %}
+        <a href="{% url 'request_history' %}">{% ui_text "Открыть" "Open" %}</a>
+        {% endif %}
+        {% endif %}
+    </p>
 </div>
 
 {% if has_query %}
@@ -24,49 +32,7 @@
         </thead>
         <tbody>
             {% for item in equipment_results %}
-            <tr><td>{{ item.pk }}</td><td>{{ item.name }}</td><td>{{ item.serial_number|default:"-" }}</td><td>{{ item.get_status_display }}</td></tr>
-            {% empty %}<tr><td colspan="4" class="muted">{% trans "No records." %}</td></tr>{% endfor %}
-        </tbody>
-    </table>
-</div>
-
-<div class="card">
-    <h3>{% trans "Requests" %}</h3>
-    <table>
-        <thead>
-            <tr><th>{% trans "ID" %}</th><th>{% trans "Requester" %}</th><th>{% trans "Equipment" %}</th><th>{% trans "Status" %}</th></tr>
-        </thead>
-        <tbody>
-            {% for item in request_results %}
-            <tr><td>{{ item.pk }}</td><td>{{ item.requester }}</td><td>{{ item.equipment }}</td><td>{{ item.get_status_display }}</td></tr>
-            {% empty %}<tr><td colspan="4" class="muted">{% trans "No records." %}</td></tr>{% endfor %}
-        </tbody>
-    </table>
-</div>
-
-<div class="card">
-    <h3>{% trans "Usage" %}</h3>
-    <table>
-        <thead>
-            <tr><th>{% trans "ID" %}</th><th>{% trans "Equipment" %}</th><th>{% trans "User" %}</th><th>{% trans "Date" %}</th></tr>
-        </thead>
-        <tbody>
-            {% for item in usage_results %}
-            <tr><td>{{ item.pk }}</td><td>{{ item.equipment }}</td><td>{{ item.used_by }}</td><td>{{ item.used_at }}</td></tr>
-            {% empty %}<tr><td colspan="4" class="muted">{% trans "No records." %}</td></tr>{% endfor %}
-        </tbody>
-    </table>
-</div>
-
-<div class="card">
-    <h3>{% trans "Checkouts" %}</h3>
-    <table>
-        <thead>
-            <tr><th>{% trans "ID" %}</th><th>{% trans "Equipment" %}</th><th>{% trans "User" %}</th><th>{% trans "Taken at" %}</th></tr>
-        </thead>
-        <tbody>
-            {% for item in checkout_results %}
-            <tr><td>{{ item.pk }}</td><td>{{ item.equipment }}</td><td>{{ item.taken_by }}</td><td>{{ item.taken_at }}</td></tr>
+            <tr><td>{{ item.pk }}</td><td><a href="{% url 'equipment_detail' equipment_id=item.pk %}">{{ item.name }}</a></td><td>{{ item.serial_number|default:"-" }}</td><td>{{ item.get_status_display }}</td></tr>
             {% empty %}<tr><td colspan="4" class="muted">{% trans "No records." %}</td></tr>{% endfor %}
         </tbody>
     </table>

@@ -40,11 +40,10 @@
 </div>
 
 <div class="card">
-    <h3>{% trans "Cabinet summary" %}</h3>
+    <h3>{% ui_text "Оборудование по рабочим местам" "Equipment by workplace" %}</h3>
     <table>
         <thead>
             <tr>
-                <th>{% trans "Cabinet" %}</th>
                 <th>{% trans "Workplace" %}</th>
                 <th>{% trans "Items" %}</th>
                 <th>{% trans "Total qty" %}</th>
@@ -52,16 +51,15 @@
             </tr>
         </thead>
         <tbody>
-            {% for item in cabinet_report %}
+            {% for item in workplace_equipment_report %}
             <tr>
-                <td>{{ item.cabinet__code }}</td>
-                <td>{{ item.cabinet__workplace__name }}</td>
+                <td>{{ item.workplace__name }}</td>
                 <td>{{ item.items }}</td>
                 <td>{{ item.total }}</td>
                 <td>{{ item.available }}</td>
             </tr>
             {% empty %}
-            <tr><td colspan="5" class="muted">{% trans "No cabinet data." %}</td></tr>
+            <tr><td colspan="4" class="muted">{% ui_text "Нет данных." "No data." %}</td></tr>
             {% endfor %}
         </tbody>
     </table>

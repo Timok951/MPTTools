@@ -46,7 +46,7 @@
             <tr><td>{% trans "Consumables" %}</td><td>{{ consumables_total }}</td></tr>
             <tr><td>{% trans "Low stock" %}</td><td>{{ low_stock_total }}</td></tr>
             <tr><td>{% trans "Pending requests" %}</td><td>{{ requests_pending }}</td></tr>
-            <tr><td>{% trans "Active checkouts" %}</td><td>{{ active_checkouts }}</td></tr>
+            <tr><td>{% ui_text "Операции расхода (30 дн.)" "Usage records (30d)" %}</td><td>{{ usage_records_30d }}</td></tr>
         </tbody>
     </table>
 </div>
@@ -89,15 +89,14 @@
         <thead>
             <tr>
                 <th>{% ui_text "Категория" "Category" %}</th>
-                <th>{% trans "Total" %}</th>
-                <th>{% trans "Available" %}</th>
+                <th>{% ui_text "Остаток на учёте" "Stock on books" %}</th>
             </tr>
         </thead>
         <tbody>
             {% for row in category_stock %}
-            <tr><td>{{ row.category }}</td><td>{{ row.total }}</td><td>{{ row.available }}</td></tr>
+            <tr><td>{{ row.category }}</td><td>{{ row.total }}</td></tr>
             {% empty %}
-            <tr><td colspan="3" class="muted">—</td></tr>
+            <tr><td colspan="2" class="muted">—</td></tr>
             {% endfor %}
         </tbody>
     </table>
@@ -110,8 +109,8 @@
             <tr>
                 <th>{% ui_text "Дата" "Date" %}</th>
                 <th>{% trans "Requests" %}</th>
-                <th>{% trans "Usage" %}</th>
-                <th>{% trans "Checkouts" %}</th>
+                <th>{% ui_text "Расход расходников (опер.)" "Consumable usage (ops)" %}</th>
+                <th>{% ui_text "Нерасходуемое (опер.)" "Non-consumable (ops)" %}</th>
             </tr>
         </thead>
         <tbody>
@@ -119,8 +118,8 @@
             <tr>
                 <td>{{ row.date }}</td>
                 <td>{{ row.requests }}</td>
-                <td>{{ row.usage }}</td>
-                <td>{{ row.checkouts }}</td>
+                <td>{{ row.usage_consumable }}</td>
+                <td>{{ row.usage_non_consumable }}</td>
             </tr>
             {% endfor %}
         </tbody>
@@ -162,30 +161,29 @@
 </div>
 
 <div class="card">
-    <h3>{% trans "Recent material usage" %}</h3>
+    <h3>{% ui_text "Объём списаний за 30 дней" "Write-off volume (30 days)" %}</h3>
     <table>
         <thead>
-            <tr>
-                <th>{% trans "ID" %}</th>
-                <th>{% trans "Equipment" %}</th>
-                <th>{% trans "Qty" %}</th>
-                <th>{% trans "User" %}</th>
-                <th>{% trans "Workplace" %}</th>
-                <th>{% trans "Date" %}</th>
-            </tr>
+            <tr><th>{% ui_text "Тип" "Type" %}</th><th>{% ui_text "Количество" "Quantity" %}</th></tr>
         </thead>
         <tbody>
-            {% for item in recent_usage %}
-            <tr>
-                <td>{{ item.id }}</td>
-                <td>{{ item.equipment|default:"—" }}</td>
-                <td>{{ item.quantity }}</td>
-                <td>{{ item.used_by|default:"—" }}</td>
-                <td>{{ item.workplace|default:"—" }}</td>
-                <td>{{ item.used_at|date:"SHORT_DATETIME_FORMAT" }}</td>
-            </tr>
+            <tr><td>{% ui_text "Расходники" "Consumables" %}</td><td>{{ usage_qty_totals_30d.consumable }}</td></tr>
+            <tr><td>{% ui_text "Нерасходуемое" "Non-consumable" %}</td><td>{{ usage_qty_totals_30d.non_consumable }}</td></tr>
+        </tbody>
+    </table>
+</div>
+
+<div class="card">
+    <h3>{% ui_text "Топ расходников (30 дней)" "Top consumables (30 days)" %}</h3>
+    <table>
+        <thead>
+            <tr><th>{% ui_text "Позиция" "Item" %}</th><th>{% ui_text "Количество" "Quantity" %}</th></tr>
+        </thead>
+        <tbody>
+            {% for row in top_consumable_usage %}
+            <tr><td>{{ row.name }}</td><td>{{ row.qty }}</td></tr>
             {% empty %}
-            <tr><td colspan="6" class="muted">{% trans "No usage records yet." %}</td></tr>
+            <tr><td colspan="2" class="muted">—</td></tr>
             {% endfor %}
         </tbody>
     </table>

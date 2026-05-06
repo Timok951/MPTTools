@@ -2,10 +2,17 @@
 {% load i18n inventory_extras %}
 
 {% block content %}
-{% include "inventory/portal/_entity_tabs.html" %}
+{% include "inventory/portal/_portal_bar.html" %}
 <div class="card">
     <h2>Портал администратора</h2>
-    <p class="muted">Центральный CRUD-доступ ко всем таблицам, включая сотрудников, пользователей и роли.</p>
+    <p class="muted">Разделы данных: откройте список и используйте кнопку «Добавить» для создания записей.</p>
+    <div class="portal-section-grid" style="display:grid; grid-template-columns:repeat(auto-fill,minmax(200px,1fr)); gap:10px; margin-top:14px;">
+        {% for s in portal_sections %}
+        <a class="card" href="{{ s.url }}" style="padding:14px 16px; text-decoration:none; color:var(--ink); border:1px solid var(--border); box-shadow:none;">
+            <strong style="font-size:14px;">{{ s.title }}</strong>
+        </a>
+        {% endfor %}
+    </div>
 </div>
 
 <div class="card">

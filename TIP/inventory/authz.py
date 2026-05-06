@@ -9,7 +9,7 @@ GROUP_FIRST_LINE_SUPPORT = "Поддержка первой линии"
 
 # Backward-compatible aliases for previous role names.
 ROLE_ALIASES = {
-    GROUP_ROLE_ADMIN: set(),
+    GROUP_ROLE_ADMIN: {"Administrator"},
     GROUP_SENIOR_TECHNICIAN: {"Warehouse"},
     GROUP_TECHNICIAN: {"Builder"},
     GROUP_SYSADMIN: {"Sysadmin"},
@@ -30,8 +30,8 @@ ROLE_CAPABILITY_LABELS = {
     "warehouse_operations": "Склад: оборудование, остатки, корректировки",
     "request_creation": "Создание заявок на оборудование",
     "request_processing": "Обработка и смена статусов заявок",
-    "checkout_operations": "Выдача и просмотр выдач",
-    "usage_writeoff": "Списание оборудования",
+    "checkout_operations": "Устаревшие выдачи (API), веб-раздел отключён",
+    "usage_writeoff": "Операции с расходуемым оборудованием",
     "report_access": "Просмотр отчётов и аналитики",
     "users_and_site_admin": "Управление пользователями, сайтом, кабинетами",
     "quality_access": "Просмотр и обновление отчёта качества",
@@ -42,10 +42,12 @@ ROLE_SPECS: dict[str, RoleSpec] = {
     GROUP_ROLE_ADMIN: RoleSpec(
         slug="administrator",
         title=GROUP_ROLE_ADMIN,
-        description="Администрирование ролей пользователей без складских и операционных действий.",
+        description="Администрирование пользователей, ролей, API, качества сайта и резервных копий (без складских операций).",
         permissions=(),
         capabilities=(
             "users_and_site_admin",
+            "quality_access",
+            "data_tools_access",
         ),
     ),
     GROUP_SYSADMIN: RoleSpec(
@@ -68,7 +70,7 @@ ROLE_SPECS: dict[str, RoleSpec] = {
     GROUP_SENIOR_TECHNICIAN: RoleSpec(
         slug="senior_technician",
         title=GROUP_SENIOR_TECHNICIAN,
-        description="Работа со складом, выдачей оборудования и операционной отчётностью.",
+        description="Главный/старший техник: склад, рабочие места и кабинеты, обработка заявок, расход и отчёты; может подавать заявки.",
         permissions=(
             "view_equipment",
             "change_equipment",
@@ -85,6 +87,7 @@ ROLE_SPECS: dict[str, RoleSpec] = {
         ),
         capabilities=(
             "warehouse_operations",
+            "request_creation",
             "request_processing",
             "checkout_operations",
             "usage_writeoff",
@@ -109,11 +112,13 @@ ROLE_SPECS: dict[str, RoleSpec] = {
     GROUP_FIRST_LINE_SUPPORT: RoleSpec(
         slug="first_line_support",
         title=GROUP_FIRST_LINE_SUPPORT,
-        description="Быстрая обработка и сопровождение заявок пользователей.",
+        description="Первая линия: все типы заявок, обработка статусов, просмотр каталога склада (без правок склада).",
         permissions=(
             "view_equipmentrequest",
             "change_equipmentrequest",
             "view_equipment",
+            "view_workplace",
+            "view_cabinet",
         ),
         capabilities=(
             "request_processing",

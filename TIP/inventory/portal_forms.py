@@ -1,9 +1,10 @@
 from django import forms
 from django.contrib.auth.models import Group, User
+from django.utils import timezone
 
 from assets.models import Equipment, EquipmentCheckout, InventoryAdjustment
-from core.models import Cabinet, EquipmentCategory, Workplace, WorkplaceMember
-from operations.models import REQUEST_PENDING, EquipmentRequest, MaterialUsage, PeriodicMaterialUsageSchedule
+from core.models import Cabinet, EquipmentCategory, Workplace
+from operations.models import REQUEST_PENDING, EquipmentRequest, PeriodicMaterialUsageSchedule
 from .authz import ROLE_ALIASES
 
 MAX_ALLOWED_QUANTITY = 1000
@@ -38,7 +39,7 @@ class PortalEquipmentForm(forms.ModelForm):
 
     class Meta:
         model = Equipment
-        fields = _model_fields(Equipment, omit=("inventory_number", "cabinet", "quantity_available"))
+        fields = _model_fields(Equipment, omit=("inventory_number", "quantity_available"))
         labels = {
             "name": "Название",
             "category": "Категория",
@@ -218,23 +219,6 @@ class PortalCabinetForm(forms.ModelForm):
         widgets = {"description": forms.Textarea(attrs={"rows": 4})}
 
 
-class PortalWorkplaceMemberForm(forms.ModelForm):
-    def clean_note(self):
-        return (self.cleaned_data.get("note") or "").strip()
-
-    class Meta:
-        model = WorkplaceMember
-        fields = _model_fields(WorkplaceMember)
-        labels = {
-            "workplace": "Рабочее место",
-            "user": "Сотрудник",
-            "role": "Роль",
-            "assigned_at": "Назначен",
-            "note": "Примечание",
-        }
-        widgets = {"note": forms.Textarea(attrs={"rows": 3})}
-
-
 class PortalInventoryAdjustmentForm(forms.ModelForm):
     def clean_delta(self):
         value = self.cleaned_data.get("delta")
@@ -297,6 +281,10 @@ class PortalEquipmentRequestForm(forms.ModelForm):
             for name in ("requested_at", "processed_by", "processed_at"):
                 if name in self.fields:
                     del self.fields[name]
+        if "needed_by" in self.fields:
+            self.fields["needed_by"].required = True
+            if is_new:
+                self.fields["needed_by"].initial = timezone.localdate()
 
     def clean_quantity(self):
         value = self.cleaned_data.get("quantity")
@@ -339,31 +327,6 @@ class PortalEquipmentRequestForm(forms.ModelForm):
         }
 
 
-class PortalMaterialUsageForm(forms.ModelForm):
-    def clean_quantity(self):
-        value = self.cleaned_data.get("quantity")
-        if value is not None and value > MAX_ALLOWED_QUANTITY:
-            raise forms.ValidationError(f"Количество не должно превышать {MAX_ALLOWED_QUANTITY}.")
-        return value
-
-    def clean_note(self):
-        return (self.cleaned_data.get("note") or "").strip()
-
-    class Meta:
-        model = MaterialUsage
-        fields = _model_fields(MaterialUsage)
-        labels = {
-            "equipment": "Материал",
-            "workplace": "Рабочее место",
-            "quantity": "Количество",
-            "used_by": "Кем списано",
-            "used_at": "Дата",
-            "related_request": "Связанная заявка",
-            "note": "Примечание",
-        }
-        widgets = {"note": forms.Textarea(attrs={"rows": 3})}
-
-
 class PortalPeriodicMaterialUsageScheduleForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -393,12 +356,12 @@ class PortalPeriodicMaterialUsageScheduleForm(forms.ModelForm):
             "workplace": "Рабочее место",
             "quantity": "Количество за раз",
             "frequency": "Периодичность",
-            "next_run_on": "Следующее списание",
-            "is_active": "Активно",
+            "next_run_on": "Следующее выполнение",
+            "is_active": "Одобрена",
         }
         help_texts = {
             "title": "Например: «10 кабелей в месяц для лаборатории».",
-            "next_run_on": "В этот день (и далее каждый месяц) будет создана операция списания, пока расписание активно.",
+            "next_run_on": "В этот день (и далее каждый месяц) будет автоматически создан расход по заявке, пока заявка одобрена.",
         }
         widgets = {
             "next_run_on": forms.DateInput(attrs={"type": "date"}),

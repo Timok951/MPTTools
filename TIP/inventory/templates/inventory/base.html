@@ -138,37 +138,79 @@
             transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease;
             display: inline-flex;
             align-items: center;
-            gap: 4px;
         }
         .nav-mega > summary::-webkit-details-marker {
             display: none;
-        }
-        .nav-mega > summary::after {
-            content: "";
-            display: inline-block;
-            width: 0.32em;
-            height: 0.32em;
-            margin-left: 0.15em;
-            border-right: 2px solid currentColor;
-            border-bottom: 2px solid currentColor;
-            transform: rotate(45deg);
-            opacity: 0.65;
-            transition: transform 0.15s ease;
         }
         .nav-mega[open] > summary {
             border-color: var(--accent);
             color: var(--accent-2);
             background: var(--panel-soft);
         }
-        .nav-mega[open] > summary::after {
-            transform: rotate(-135deg);
-            margin-top: 0.12em;
-        }
         body.theme-dark .nav-mega > summary {
             color: #eaf0ff;
             background: rgba(26, 38, 68, 0.96);
         }
         body.theme-dark .nav-mega[open] > summary {
+            background: rgba(38, 56, 98, 0.96);
+            color: #ffffff;
+        }
+        .nav-mega-cue {
+            margin-left: 5px;
+            font-size: 9px;
+            opacity: 0.78;
+            line-height: 1;
+        }
+        .nav-mega-tag {
+            margin-left: 6px;
+            font-size: 9px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--muted);
+        }
+        body.theme-dark .nav-mega-tag {
+            color: rgba(226, 235, 255, 0.72);
+        }
+        .visually-hidden {
+            position: absolute;
+            width: 1px;
+            height: 1px;
+            padding: 0;
+            margin: -1px;
+            overflow: hidden;
+            clip: rect(0, 0, 0, 0);
+            white-space: nowrap;
+            border: 0;
+        }
+        a.nav-mega-direct {
+            display: inline-flex;
+            align-items: center;
+            box-sizing: border-box;
+            color: var(--ink);
+            padding: 5px 12px;
+            border-radius: 10px;
+            border: 1px solid var(--border);
+            background: var(--surface);
+            font-size: 12px;
+            font-weight: 600;
+            text-decoration: none;
+            transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease;
+        }
+        a.nav-mega-direct:hover {
+            border-color: var(--accent);
+            color: var(--accent-2);
+            background: var(--panel-soft);
+        }
+        a.nav-mega-direct:focus-visible {
+            outline: 2px solid var(--ring);
+            outline-offset: 2px;
+        }
+        body.theme-dark a.nav-mega-direct {
+            color: #eaf0ff;
+            background: rgba(26, 38, 68, 0.96);
+        }
+        body.theme-dark a.nav-mega-direct:hover {
             background: rgba(38, 56, 98, 0.96);
             color: #ffffff;
         }
@@ -193,31 +235,42 @@
         }
         .nav-panel a {
             display: block;
-            padding: 8px 12px;
-            border-radius: 8px;
+            padding: 6px 10px;
+            border-radius: 6px;
             text-decoration: none;
             color: var(--ink);
             font-size: 13px;
             font-weight: 600;
-            transition: background 0.15s ease;
+            transition: color 0.15s ease;
         }
         .nav-panel a:hover {
-            background: var(--panel-soft);
+            color: var(--accent);
         }
         body.theme-dark .nav-panel a:hover {
-            background: rgba(125, 150, 255, 0.14);
+            color: var(--accent-3);
+        }
+        .nav-panel a:focus-visible {
+            outline: 2px solid var(--ring);
+            outline-offset: 2px;
         }
         .nav-panel a.nav-emphasis {
-            border: 1px solid var(--accent);
-            background: linear-gradient(180deg, var(--accent), #3d52d4);
-            color: #fff;
-            box-shadow: 0 6px 16px rgba(76, 103, 255, 0.25);
+            border: none;
+            background: transparent;
+            color: var(--accent);
+            box-shadow: none;
         }
         .nav-panel a.nav-emphasis:hover {
-            filter: brightness(1.05);
+            color: var(--accent-2);
+            filter: none;
+        }
+        body.theme-dark .nav-panel a.nav-emphasis {
+            color: var(--accent);
+        }
+        body.theme-dark .nav-panel a.nav-emphasis:hover {
+            color: var(--accent-3);
         }
         body.theme-contrast .nav-panel a.nav-emphasis {
-            background: linear-gradient(180deg, var(--accent), #b83232);
+            color: var(--accent);
         }
         .nav-panel-hint {
             font-size: 11px;
@@ -226,12 +279,36 @@
             padding: 4px 12px 6px;
             line-height: 1.35;
         }
-        .nav-panel .switch-form {
-            margin: 6px 0 2px;
+        .nav-panel-section {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+            padding: 8px 0 6px;
+            border-top: 1px solid var(--border);
         }
-        .nav-panel .switch-btn {
-            width: 100%;
-            justify-content: flex-start;
+        .nav-panel-section:first-of-type {
+            border-top: none;
+            padding-top: 2px;
+        }
+        .nav-panel-section-title {
+            font-size: 11px;
+            font-weight: 700;
+            color: var(--muted);
+            padding: 2px 12px 6px;
+            letter-spacing: 0.02em;
+        }
+        .nav-panel--wide {
+            min-width: 288px;
+            max-width: min(420px, 94vw);
+            max-height: min(70vh, 520px);
+            overflow-y: auto;
+        }
+        .user-strip-deleted-toggle {
+            flex-shrink: 0;
+            margin-left: 4px;
+        }
+        .user-strip-deleted-toggle .switch-btn {
+            white-space: nowrap;
         }
         .user-strip .nav-mega {
             position: relative;
@@ -260,8 +337,12 @@
             border: 1px solid transparent;
         }
         .user-strip a.plain-link:hover {
-            border-color: var(--border);
-            background: var(--surface);
+            border-color: transparent;
+            background: transparent;
+            color: var(--accent);
+        }
+        body.theme-dark .user-strip a.plain-link:hover {
+            color: var(--accent-3);
         }
         body.theme-dark .user-strip a.plain-link {
             color: var(--accent-3);
@@ -932,17 +1013,6 @@
             flex-wrap: wrap;
             gap: 10px;
         }
-        .usage-history-actions {
-            justify-content: flex-end;
-            align-items: center;
-        }
-        .usage-history-actions a {
-            min-height: 38px;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            white-space: nowrap;
-        }
         .actions a,
         .btn {
             text-decoration: none;
@@ -1165,6 +1235,22 @@
             padding: 12px;
             flex-shrink: 0;
         }
+        .equipment-card-media-link {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
+            height: 100%;
+            min-height: 0;
+            text-decoration: none;
+            color: inherit;
+            cursor: pointer;
+        }
+        .equipment-card-media-link:focus-visible {
+            outline: 2px solid var(--ring);
+            outline-offset: 2px;
+            border-radius: 8px;
+        }
         .equipment-card-media img {
             max-width: 100%;
             max-height: 100%;
@@ -1173,6 +1259,94 @@
             object-fit: contain;
             object-position: center;
             display: block;
+        }
+        .equipment-detail-body {
+            display: grid;
+            gap: 20px;
+            grid-template-columns: minmax(220px, 360px) minmax(0, 1fr);
+            align-items: start;
+        }
+        .equipment-detail-photo-col {
+            position: sticky;
+            top: 72px;
+        }
+        .equipment-detail-photo-hit {
+            display: block;
+            width: 100%;
+            margin: 0;
+            padding: 0;
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            background: linear-gradient(145deg, var(--surface-strong), var(--panel-soft));
+            cursor: zoom-in;
+            overflow: hidden;
+            font: inherit;
+            color: inherit;
+        }
+        .equipment-detail-photo-hit:focus-visible {
+            outline: 2px solid var(--ring);
+            outline-offset: 3px;
+        }
+        .equipment-detail-photo-hit img {
+            width: 100%;
+            height: auto;
+            max-height: min(52vh, 440px);
+            object-fit: contain;
+            display: block;
+            vertical-align: middle;
+            background: var(--panel);
+        }
+        .equipment-detail-photo-hint {
+            margin: 8px 0 0;
+            font-size: 12px;
+        }
+        .equipment-detail-photo-placeholder {
+            border: 1px dashed var(--border);
+            border-radius: 16px;
+            min-height: 200px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            color: var(--muted);
+            font-weight: 600;
+            text-align: center;
+            background: var(--surface);
+        }
+        .equipment-photo-dialog {
+            max-width: min(96vw, 1120px);
+            width: 100%;
+            border: none;
+            border-radius: 16px;
+            padding: 0;
+            background: var(--panel);
+            color: var(--ink);
+            box-shadow: var(--shadow);
+        }
+        .equipment-photo-dialog::backdrop {
+            background: rgba(15, 23, 42, 0.72);
+        }
+        body.theme-dark .equipment-photo-dialog::backdrop {
+            background: rgba(0, 0, 0, 0.78);
+        }
+        .equipment-photo-dialog-bar {
+            margin: 0;
+            padding: 10px 12px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            justify-content: flex-end;
+            gap: 8px;
+        }
+        .equipment-photo-dialog-body {
+            padding: 12px 14px 16px;
+            max-height: calc(100vh - 120px);
+            overflow: auto;
+        }
+        .equipment-photo-dialog-body img {
+            width: 100%;
+            height: auto;
+            display: block;
+            border-radius: 8px;
         }
         .equipment-card-empty {
             width: 100%;
@@ -1276,6 +1450,22 @@
             margin: 0;
             font-size: 14px;
             line-height: 1.3;
+        }
+        .equipment-card-title a {
+            color: inherit;
+            text-decoration: none;
+            transition: color 0.15s ease;
+        }
+        .equipment-card-title a:hover {
+            color: var(--accent);
+        }
+        body.theme-dark .equipment-card-title a:hover {
+            color: var(--accent-3);
+        }
+        .equipment-card-title a:focus-visible {
+            outline: 2px solid var(--ring);
+            outline-offset: 2px;
+            border-radius: 4px;
         }
         .equipment-card-subtitle {
             font-size: 12px;
@@ -1391,6 +1581,12 @@
             .equipment-card-grid {
                 grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
             }
+            .equipment-detail-body {
+                grid-template-columns: 1fr;
+            }
+            .equipment-detail-photo-col {
+                position: static;
+            }
         }
         @media (max-width: 720px) {
             .shell-header-inner {
@@ -1406,6 +1602,10 @@
             .nav-mega > summary {
                 width: 100%;
                 justify-content: space-between;
+            }
+            a.nav-mega-direct {
+                width: 100%;
+                justify-content: center;
             }
             .nav-panel {
                 position: static;
@@ -1424,6 +1624,10 @@
             .switch-btn {
                 width: 100%;
                 justify-content: flex-start;
+            }
+            .user-strip-deleted-toggle .switch-btn {
+                width: auto;
+                max-width: 100%;
             }
             .toolbar-spread,
             .pagination {
@@ -1474,8 +1678,13 @@
                         </div>
                         {% if user.is_authenticated %}
                         <details class="nav-mega nav-account-mega">
-                            <summary>{% ui_text "Аккаунт" "Account" %}</summary>
-                            <div class="nav-panel">
+                            <summary title="{% ui_text 'Открыть выпадающее меню' 'Open dropdown menu' %}">
+                                {% ui_text "Аккаунт" "Account" %}
+                                <span class="nav-mega-tag">{% ui_text "меню" "menu" %}</span>
+                                <span class="nav-mega-cue" aria-hidden="true">▾</span>
+                                <span class="visually-hidden">{% ui_text "Выпадающее меню" "Dropdown menu" %}</span>
+                            </summary>
+                            <div class="nav-panel" role="region" aria-label="{% ui_text 'Меню аккаунта' 'Account menu' %}">
                                 <a href="{% url 'user_preferences' %}">{% ui_text "Настройки" "Preferences" %}</a>
                                 <a href="{% url 'password_reset_request' %}">{% ui_text "Сменить пароль (код на почту)" "Change password (email code)" %}</a>
                                 <a href="{% url 'logout' %}">{% ui_text "Выйти" "Logout" %}</a>
@@ -1485,43 +1694,88 @@
                         <a class="plain-link" href="{% url 'login' %}">{% ui_text "Войти" "Login" %}</a>
                         <a class="plain-link" href="{% url 'register' %}">{% ui_text "Регистрация" "Register" %}</a>
                         {% endif %}
+                        {% if user.is_authenticated and user|has_capability:"users_and_site_admin" %}
+                        <form method="post" action="{% url 'toggle_show_deleted' %}" class="switch-form user-strip-deleted-toggle">
+                            {% csrf_token %}
+                            <input type="hidden" name="show_deleted_global" value="{% if request.session.show_deleted_global %}0{% else %}1{% endif %}">
+                            <button type="submit" class="switch-btn {% if request.session.show_deleted_global %}is-on{% endif %}" aria-pressed="{% if request.session.show_deleted_global %}true{% else %}false{% endif %}">
+                                <span class="switch-track"><span class="switch-dot"></span></span>
+                                <span class="switch-copy">
+                                    <span class="switch-title">{% ui_text "Показать удалённые" "Show deleted" %}</span>
+                                    <span class="switch-state">
+                                        {% if request.session.show_deleted_global %}{% ui_text "Вкл." "On" %}{% else %}{% ui_text "Выкл." "Off" %}{% endif %}
+                                    </span>
+                                </span>
+                            </button>
+                        </form>
+                        {% endif %}
                     </div>
                 </div>
 
                 <div class="header-nav-row">
                     <nav class="primary-nav" aria-label='{% ui_text "Основное меню" "Main menu" %}'>
                         <details class="nav-mega">
-                            <summary>{% ui_text "Активы" "Assets" %}</summary>
-                            <div class="nav-panel">
-                                <a href="{% url 'equipment_list' %}">{% ui_text "Оборудование" "Equipment" %}</a>
-                                <a href="{% url 'inventory_search' %}">{% ui_text "Поиск" "Search" %}</a>
-                                <a href="{% url 'workplaces' %}">{% ui_text "Рабочие места" "Workplaces" %}</a>
-                                <a href="{% url 'cabinets' %}">{% ui_text "Кабинеты" "Cabinets" %}</a>
-                                <a href="{% url 'usage_history' %}">{% ui_text "Выдача расходуемого" "Consumable usage" %}</a>
+                            <summary title="{% ui_text 'Открыть выпадающее меню' 'Open dropdown menu' %}">
+                                {% ui_text "Склад" "Warehouse" %}
+                                <span class="nav-mega-tag">{% ui_text "меню" "menu" %}</span>
+                                <span class="nav-mega-cue" aria-hidden="true">▾</span>
+                                <span class="visually-hidden">{% ui_text "Выпадающее меню" "Dropdown menu" %}</span>
+                            </summary>
+                            <div class="nav-panel" role="region" aria-label="{% ui_text 'Раздел Склад' 'Warehouse menu' %}">
+                                <div class="nav-panel-section">
+                                    <div class="nav-panel-section-title">{% ui_text "Каталог" "Catalog" %}</div>
+                                    <a href="{% url 'equipment_list' %}">{% ui_text "Оборудование" "Equipment" %}</a>
+                                    <a href="{% url 'inventory_search' %}">{% ui_text "Поиск" "Search" %}</a>
+                                    <a href="{% url 'workplaces' %}">{% ui_text "Рабочие места" "Workplaces" %}</a>
+                                    <a href="{% url 'cabinets' %}">{% ui_text "Кабинеты" "Cabinets" %}</a>
+                                </div>
+                                {% if user|has_capability:"warehouse_operations" %}
+                                <div class="nav-panel-section">
+                                    <div class="nav-panel-section-title">{% ui_text "Добавить на склад" "Add to warehouse" %}</div>
+                                    <a href="{% url 'portal_create' entity='equipment' %}">{% ui_text "Оборудование" "Equipment" %}</a>
+                                    <a href="{% url 'portal_create' entity='workplaces' %}">{% ui_text "Рабочее место" "Workplace" %}</a>
+                                    <a href="{% url 'portal_create' entity='cabinets' %}">{% ui_text "Кабинет" "Cabinet" %}</a>
+                                </div>
+                                {% endif %}
                             </div>
                         </details>
 
                         {% if user.is_authenticated %}
+                        {% if user|has_capability:"request_creation" or user|has_capability:"request_processing" or user|has_capability:"warehouse_operations" or user|has_capability:"users_and_site_admin" %}
+                        <a class="nav-mega-direct" href="{% url 'request_history' %}">{% ui_text "Заявки" "Requests" %}</a>
+                        {% endif %}
                         <details class="nav-mega">
-                            <summary>{% ui_text "Заявки и связь" "Requests & messages" %}</summary>
-                            <div class="nav-panel">
-                                <a href="{% url 'request_history' %}">{% ui_text "Заявки" "Requests" %}</a>
-                                <a href="{% url 'direct_messages' %}">{% ui_text "Сообщения" "Messages" %}</a>
-                                {% if user|has_capability:"request_processing" %}
-                                <a href="{% url 'portal_list' entity='requests' %}">{% ui_text "Заявки в портале" "Requests in portal" %}</a>
-                                {% endif %}
-                                {% if user|has_capability:"request_creation" %}
-                                <a href="{% url 'request_create' %}">{% ui_text "Новая заявка" "New request" %}</a>
-                                <a href="{% url 'portal_list' entity='periodic-usage' %}">{% ui_text "Периодические заявки" "Periodic requests" %}</a>
-                                <a href="{% url 'portal_create' entity='periodic-usage' %}">{% ui_text "Новая периодическая заявка" "New periodic request" %}</a>
+                            <summary title="{% ui_text 'Сообщения и периодика' 'Messages & periodic usage' %}">
+                                {% ui_text "Ещё" "More" %}
+                                <span class="nav-mega-tag">{% ui_text "меню" "menu" %}</span>
+                                <span class="nav-mega-cue" aria-hidden="true">▾</span>
+                                <span class="visually-hidden">{% ui_text "Выпадающее меню" "Dropdown menu" %}</span>
+                            </summary>
+                            <div class="nav-panel" role="region" aria-label="{% ui_text 'Дополнительно' 'More sections' %}">
+                                <div class="nav-panel-section">
+                                    <a href="{% url 'direct_messages' %}">{% ui_text "Сообщения" "Messages" %}</a>
+                                </div>
+                                {% if user|has_capability:"request_creation" or user|has_capability:"request_processing" or user|has_capability:"usage_writeoff" or user|has_capability:"users_and_site_admin" %}
+                                <div class="nav-panel-section">
+                                    <div class="nav-panel-section-title">{% ui_text "Периодический расход" "Periodic usage" %}</div>
+                                    <a href="{% url 'portal_list' entity='periodic-usage' %}">{% ui_text "Список" "List" %}</a>
+                                    {% if user|has_capability:"request_creation" or user|has_capability:"usage_writeoff" or user|has_capability:"users_and_site_admin" %}
+                                    <a href="{% url 'portal_create' entity='periodic-usage' %}">{% ui_text "Новая запись" "New entry" %}</a>
+                                    {% endif %}
+                                </div>
                                 {% endif %}
                             </div>
                         </details>
                         {% endif %}
 
                         <details class="nav-mega">
-                            <summary>{% ui_text "Отчёты и сводки" "Reports & analytics" %}</summary>
-                            <div class="nav-panel">
+                            <summary title="{% ui_text 'Открыть выпадающее меню' 'Open dropdown menu' %}">
+                                {% ui_text "Сводки" "Insights" %}
+                                <span class="nav-mega-tag">{% ui_text "меню" "menu" %}</span>
+                                <span class="nav-mega-cue" aria-hidden="true">▾</span>
+                                <span class="visually-hidden">{% ui_text "Выпадающее меню" "Dropdown menu" %}</span>
+                            </summary>
+                            <div class="nav-panel" role="region" aria-label="{% ui_text 'Сводки и отчёты' 'Insights & reports' %}">
                                 <a href="{% url 'about_site' %}">{% ui_text "О сайте" "About" %}</a>
                                 {% if user|has_group:"Sysadmin" %}
                                 <a href="{% url 'analytics' %}">{% ui_text "Аналитика" "Analytics" %}</a>
@@ -1530,54 +1784,44 @@
                                 <a href="{% url 'reports' %}">{% ui_text "Отчёты" "Reports" %}</a>
                                 {% endif %}
                                 {% if user|has_capability:"users_and_site_admin" %}
-                                <a href="{% url 'history' %}">{% ui_text "История" "History" %}</a>
+                                <a href="{% url 'history' %}">{% ui_text "История изменений" "Change history" %}</a>
                                 {% endif %}
                             </div>
                         </details>
 
-                        {% if user|has_capability:"warehouse_operations" or user|has_capability:"users_and_site_admin" or user|has_capability:"usage_writeoff" %}
+                        {% if user|has_capability:"users_and_site_admin" or user|has_capability:"data_tools_access" %}
                         <details class="nav-mega">
-                            <summary>{% ui_text "Управление" "Management" %}</summary>
-                            <div class="nav-panel">
-                                <p class="nav-panel-hint">{% ui_text "Портал, пользователи и складские действия" "Portal, users, and warehouse actions" %}</p>
+                            <summary title="{% ui_text 'Открыть выпадающее меню' 'Open dropdown menu' %}">
+                                {% ui_text "Администрирование" "Administration" %}
+                                <span class="nav-mega-tag">{% ui_text "меню" "menu" %}</span>
+                                <span class="nav-mega-cue" aria-hidden="true">▾</span>
+                                <span class="visually-hidden">{% ui_text "Выпадающее меню" "Dropdown menu" %}</span>
+                            </summary>
+                            <div class="nav-panel nav-panel--wide" role="region" aria-label="{% ui_text 'Администрирование' 'Administration' %}">
                                 {% if user|has_capability:"users_and_site_admin" %}
-                                <a class="nav-emphasis" href="{% url 'portal_home' %}">{% ui_text "Портал администратора" "Administrator portal" %}</a>
-                                {% endif %}
-                                {% if user|has_capability:"warehouse_operations" %}
-                                <a href="{% url 'portal_create' entity='equipment' %}">{% ui_text "Добавить оборудование" "Add equipment" %}</a>
-                                <a href="{% url 'portal_create' entity='workplaces' %}">{% ui_text "Добавить рабочее место" "Add workplace" %}</a>
-                                <a href="{% url 'portal_create' entity='cabinets' %}">{% ui_text "Добавить кабинет" "Add cabinet" %}</a>
-                                {% endif %}
-                                {% if user|has_capability:"usage_writeoff" %}
-                                <a href="{% url 'portal_list' entity='periodic-usage' %}">{% ui_text "Периодические заявки" "Periodic requests" %}</a>
-                                {% endif %}
-                                {% if user|has_capability:"users_and_site_admin" %}
-                                <a href="{% url 'portal_list' entity='users' %}">{% ui_text "Пользователи" "Users" %}</a>
-                                <a href="{% url 'portal_list' entity='workplace-members' %}">{% ui_text "Сотрудники на рабочих местах" "Workplace members" %}</a>
-                                <a href="{% url 'portal_list' entity='groups' %}">{% ui_text "Группы и роли" "Groups and roles" %}</a>
-                                <a href="{% url 'portal_create' entity='groups' %}">{% ui_text "Добавить роль" "Add role" %}</a>
-                                <a href="{% url 'role_assignment' %}">{% ui_text "Роли" "Roles" %}</a>
-                                <a href="{% url 'api_token' %}">{% ui_text "API токен" "API token" %}</a>
+                                <div class="nav-panel-section">
+                                    <div class="nav-panel-section-title">{% ui_text "Портал" "Portal" %}</div>
+                                    <a class="nav-emphasis" href="{% url 'portal_home' %}">{% ui_text "Главная портала" "Portal home" %}</a>
+                                </div>
+                                <div class="nav-panel-section">
+                                    <div class="nav-panel-section-title">{% ui_text "Пользователи" "Users" %}</div>
+                                    <a href="{% url 'portal_list' entity='users' %}">{% ui_text "Учётные записи" "Accounts" %}</a>
+                                </div>
+                                <div class="nav-panel-section">
+                                    <div class="nav-panel-section-title">{% ui_text "Роли и интеграции" "Roles & integrations" %}</div>
+                                    <a href="{% url 'portal_list' entity='groups' %}">{% ui_text "Группы (роли)" "Groups (roles)" %}</a>
+                                    <a href="{% url 'portal_create' entity='groups' %}">{% ui_text "Создать группу" "Create group" %}</a>
+                                    <a href="{% url 'role_assignment' %}">{% ui_text "Кто в какой роли" "Role assignment" %}</a>
+                                    <a href="{% url 'api_token' %}">{% ui_text "Токен API" "API token" %}</a>
+                                </div>
                                 {% endif %}
                                 {% if user|has_capability:"data_tools_access" %}
-                                <a href="{% url 'quality_report' %}">{% ui_text "Качество сайта" "Site quality" %}</a>
-                                <a href="{% url 'data_tools' %}">{% ui_text "Резервные копии" "Backups" %}</a>
-                                <a href="{% url 'api_docs' %}">{% ui_text "Документация API" "API docs" %}</a>
-                                {% endif %}
-                                {% if user|has_capability:"users_and_site_admin" %}
-                                <form method="post" action="{% url 'toggle_show_deleted' %}" class="switch-form">
-                                    {% csrf_token %}
-                                    <input type="hidden" name="show_deleted_global" value="{% if request.session.show_deleted_global %}0{% else %}1{% endif %}">
-                                    <button type="submit" class="switch-btn {% if request.session.show_deleted_global %}is-on{% endif %}" aria-pressed="{% if request.session.show_deleted_global %}true{% else %}false{% endif %}">
-                                        <span class="switch-track"><span class="switch-dot"></span></span>
-                                        <span class="switch-copy">
-                                            <span class="switch-title">{% ui_text "Показать удалённые" "Show deleted" %}</span>
-                                            <span class="switch-state">
-                                                {% if request.session.show_deleted_global %}{% ui_text "Включено" "Enabled" %}{% else %}{% ui_text "Выключено" "Disabled" %}{% endif %}
-                                            </span>
-                                        </span>
-                                    </button>
-                                </form>
+                                <div class="nav-panel-section">
+                                    <div class="nav-panel-section-title">{% ui_text "Сервис" "Service" %}</div>
+                                    <a href="{% url 'quality_report' %}">{% ui_text "Качество сайта" "Site quality" %}</a>
+                                    <a href="{% url 'data_tools' %}">{% ui_text "Резервные копии" "Backups" %}</a>
+                                    <a href="{% url 'api_docs' %}">{% ui_text "Документация API" "API documentation" %}</a>
+                                </div>
                                 {% endif %}
                             </div>
                         </details>
@@ -1629,7 +1873,6 @@
                     <div class="hotkey-grid">
                         <div class="hotkey-item"><code>G</code><code>E</code> {% ui_text "Оборудование" "Equipment" %}</div>
                         <div class="hotkey-item"><code>G</code><code>R</code> {% ui_text "Заявки" "Requests" %}</div>
-                        <div class="hotkey-item"><code>G</code><code>U</code> {% ui_text "Выдача расходуемого" "Consumable usage" %}</div>
                         <div class="hotkey-item"><code>G</code><code>S</code> {% ui_text "Поиск" "Search" %}</div>
                         <div class="hotkey-item"><code>N</code><code>R</code> {% ui_text "Новая заявка" "New request" %}</div>
                         {% if user|has_capability:"request_creation" %}
@@ -1651,7 +1894,6 @@
             const routes = {
                 "ge": "{% url 'equipment_list' %}",
                 "gr": "{% url 'request_history' %}",
-                "gu": "{% url 'usage_history' %}",
                 "gs": "{% url 'inventory_search' %}",
                 "nr": "{% url 'request_create' %}",
                 {% if user|has_capability:"request_creation" %}
@@ -1665,7 +1907,6 @@
             const actionCodes = {
                 KeyE: "e",
                 KeyR: "r",
-                KeyU: "u",
                 KeyS: "s",
                 {% if user|has_capability:"request_creation" %}
                 KeyP: "p",

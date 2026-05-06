@@ -2,13 +2,13 @@
 {% load i18n %}
 
 {% block content %}
-{% include "inventory/portal/_entity_tabs.html" %}
+{% include "inventory/portal/_portal_bar.html" %}
 <div class="card">
     <h2>
         {% if is_edit %}
-            {% trans "Edit" %}: {{ cfg.title }}
+            Редактирование: {{ cfg.title }}
         {% else %}
-            {% trans "Create" %}: {{ cfg.title }}
+            Создание: {{ cfg.title }}
         {% endif %}
     </h2>
     <form method="post" class="form-shell" enctype="multipart/form-data">

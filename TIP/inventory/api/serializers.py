@@ -1,3 +1,4 @@
+from django.utils import timezone
 from rest_framework import serializers
 
 from assets.models import Equipment, EquipmentCheckout, InventoryAdjustment
@@ -50,7 +51,6 @@ class EquipmentCategorySerializer(AuditActorModelSerializer):
 class EquipmentSerializer(AuditActorModelSerializer):
     category_name = serializers.CharField(source="category.name", read_only=True)
     workplace_name = serializers.CharField(source="workplace.name", read_only=True)
-    cabinet_code = serializers.CharField(source="cabinet.code", read_only=True)
 
     class Meta:
         model = Equipment
@@ -64,8 +64,6 @@ class EquipmentSerializer(AuditActorModelSerializer):
             "model",
             "workplace",
             "workplace_name",
-            "cabinet",
-            "cabinet_code",
             "is_consumable",
             "status",
             "quantity_total",
@@ -89,6 +87,8 @@ class EquipmentRequestSerializer(AuditActorModelSerializer):
 
     def create(self, validated_data):
         validated_data.setdefault("status", REQUEST_PENDING)
+        if not validated_data.get("needed_by"):
+            validated_data["needed_by"] = timezone.localdate()
         return super().create(validated_data)
 
     class Meta:

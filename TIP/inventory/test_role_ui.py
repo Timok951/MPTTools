@@ -77,6 +77,26 @@ class RoleAssignmentUiTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
 
+    def test_user_without_role_cannot_open_request_history(self):
+        self.client.force_login(self.no_role)
+        response = self.client.get(reverse("request_history"))
+        self.assertEqual(response.status_code, 403)
+
+    def test_technician_can_open_request_history(self):
+        self.client.force_login(self.tech)
+        response = self.client.get(reverse("request_history"))
+        self.assertEqual(response.status_code, 200)
+
+    def test_first_line_can_open_request_history(self):
+        self.client.force_login(self.support)
+        response = self.client.get(reverse("request_history"))
+        self.assertEqual(response.status_code, 200)
+
+    def test_portal_admin_can_open_request_history(self):
+        self.client.force_login(self.admin)
+        response = self.client.get(reverse("request_history"))
+        self.assertEqual(response.status_code, 200)
+
 
 class RequestStatusUxTests(TestCase):
     def setUp(self):

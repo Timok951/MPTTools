@@ -51,7 +51,6 @@ class TimerAndPreferenceViewTests(TestCase):
                 "default_request_status": "pending",
                 "default_request_kind": "builder",
                 "default_usage_period_days": 14,
-                "default_checkout_status": "returned",
                 "hotkeys_enabled": "on",
                 "show_hotkey_legend": "on",
             },
@@ -69,7 +68,6 @@ class TimerAndPreferenceViewTests(TestCase):
         self.assertEqual(pref.default_request_status, "pending")
         self.assertEqual(pref.default_request_kind, "builder")
         self.assertEqual(pref.default_usage_period_days, 14)
-        self.assertEqual(pref.default_checkout_status, "returned")
         self.assertTrue(pref.hotkeys_enabled)
         self.assertTrue(pref.show_hotkey_legend)
 
@@ -87,7 +85,6 @@ class TimerAndPreferenceViewTests(TestCase):
                 "default_request_status": "",
                 "default_request_kind": "",
                 "default_usage_period_days": 30,
-                "default_checkout_status": "",
             },
         )
         self.assertEqual(response.status_code, 200)
@@ -267,14 +264,14 @@ class PasswordResetFlowTests(TestCase):
         self.password = "secret123"
         self.user = User.objects.create_user(
             username="mail_user",
-            email="mail_user@example.com",
+            email="mail_user@mpt.ru",
             password=self.password,
         )
 
     def test_request_form_sends_code_and_creates_reset_entry(self):
         response = self.client.post(
             reverse("password_reset_request"),
-            {"email": "mail_user@example.com"},
+            {"email": "mail_user@mpt.ru"},
             follow=True,
         )
 
@@ -286,11 +283,11 @@ class PasswordResetFlowTests(TestCase):
         from django.core import mail
 
         with mock.patch("inventory.views._generate_password_reset_code", return_value="445566"):
-            self.client.post(reverse("password_reset_request"), {"email": "mail_user@example.com"}, follow=True)
+            self.client.post(reverse("password_reset_request"), {"email": "mail_user@mpt.ru"}, follow=True)
 
         self.assertEqual(len(mail.outbox), 1)
         sent = mail.outbox[0]
-        self.assertEqual(sent.to, ["mail_user@example.com"])
+        self.assertEqual(sent.to, ["mail_user@mpt.ru"])
         self.assertIn("445566", sent.body)
         html_bodies = [alt[0] for alt in sent.alternatives if alt[1] == "text/html"]
         self.assertTrue(html_bodies)
@@ -298,12 +295,12 @@ class PasswordResetFlowTests(TestCase):
 
     def test_confirm_form_updates_password_from_valid_code(self):
         with mock.patch("inventory.views._generate_password_reset_code", return_value="123456"):
-            self.client.post(reverse("password_reset_request"), {"email": "mail_user@example.com"})
+            self.client.post(reverse("password_reset_request"), {"email": "mail_user@mpt.ru"})
 
         response = self.client.post(
             reverse("password_reset_confirm"),
             {
-                "email": "mail_user@example.com",
+                "email": "mail_user@mpt.ru",
                 "code": "123456",
                 "new_password1": "new-secret-123",
                 "new_password2": "new-secret-123",
@@ -319,12 +316,12 @@ class PasswordResetFlowTests(TestCase):
 
     def test_confirm_form_rejects_invalid_code(self):
         with mock.patch("inventory.views._generate_password_reset_code", return_value="123456"):
-            self.client.post(reverse("password_reset_request"), {"email": "mail_user@example.com"})
+            self.client.post(reverse("password_reset_request"), {"email": "mail_user@mpt.ru"})
 
         response = self.client.post(
             reverse("password_reset_confirm"),
             {
-                "email": "mail_user@example.com",
+                "email": "mail_user@mpt.ru",
                 "code": "654321",
                 "new_password1": "new-secret-123",
                 "new_password2": "new-secret-123",
@@ -341,42 +338,81 @@ class PasswordResetFlowTests(TestCase):
         self.assertEqual((user.email or "").strip(), "")
         self.client.force_login(user)
         with mock.patch("inventory.views._generate_password_reset_code", return_value="123456"):
-            self.client.post(reverse("password_reset_request"), {"email": "newmail@example.com"}, follow=True)
+            self.client.post(reverse("password_reset_request"), {"email": "newmail@mpt.ru"}, follow=True)
         user.refresh_from_db()
-        self.assertEqual(user.email.lower(), "newmail@example.com")
+        self.assertEqual(user.email.lower(), "newmail@mpt.ru")
 
     def test_authenticated_user_without_email_rejects_taken_email(self):
-        User.objects.create_user(username="taken_owner", email="taken@example.com", password=self.password)
+        User.objects.create_user(username="taken_owner", email="taken@mpt.ru", password=self.password)
         user = User.objects.create_user(username="no_mail_two", password=self.password)
         self.client.force_login(user)
-        response = self.client.post(reverse("password_reset_request"), {"email": "taken@example.com"})
+        response = self.client.post(reverse("password_reset_request"), {"email": "taken@mpt.ru"})
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "уже используется")
 
     def test_authenticated_user_with_email_rejects_other_email(self):
         self.client.force_login(self.user)
-        response = self.client.post(reverse("password_reset_request"), {"email": "other@example.com"})
+        response = self.client.post(reverse("password_reset_request"), {"email": "other@mpt.ru"})
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "профиле")
 
     def test_authenticated_confirm_rejects_code_for_other_account(self):
-        other = User.objects.create_user(username="other_mail_user", email="other@example.com", password="pass-other-9")
+        other = User.objects.create_user(username="other_mail_user", email="other@mpt.ru", password="pass-other-9")
         with mock.patch("inventory.views._generate_password_reset_code", return_value="999888"):
-            self.client.post(reverse("password_reset_request"), {"email": "mail_user@example.com"})
+            self.client.post(reverse("password_reset_request"), {"email": "mail_user@mpt.ru"})
         self.client.force_login(other)
         response = self.client.post(
             reverse("password_reset_confirm"),
             {
-                "email": "mail_user@example.com",
+                "email": "mail_user@mpt.ru",
                 "code": "999888",
                 "new_password1": "new-secret-999",
                 "new_password2": "new-secret-999",
             },
         )
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "другой учётной записи")
+        self.assertContains(response, "профиле")
         self.user.refresh_from_db()
         self.assertTrue(self.user.check_password(self.password))
+
+    def test_password_reset_request_rejects_non_corporate_email(self):
+        response = self.client.post(reverse("password_reset_request"), {"email": "outsider@gmail.com"})
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "mpt.ru")
+        self.assertEqual(PasswordResetCode.objects.count(), 0)
+
+
+class RegistrationEmailDomainTests(TestCase):
+    def test_register_accepts_mpt_ru_email(self):
+        pwd = "Reg-Test-9x!"
+        response = self.client.post(
+            reverse("register"),
+            {
+                "username": "new_reg_user",
+                "email": "colleague@mpt.ru",
+                "password1": pwd,
+                "password2": pwd,
+            },
+        )
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.url, reverse("login"))
+        user = User.objects.get(username="new_reg_user")
+        self.assertEqual(user.email.lower(), "colleague@mpt.ru")
+
+    def test_register_rejects_non_corporate_email(self):
+        pwd = "Reg-Test-9y!"
+        response = self.client.post(
+            reverse("register"),
+            {
+                "username": "bad_reg_user",
+                "email": "person@gmail.com",
+                "password1": pwd,
+                "password2": pwd,
+            },
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "mpt.ru")
+        self.assertFalse(User.objects.filter(username="bad_reg_user").exists())
 
 
 class LightweightPerformanceTests(TestCase):

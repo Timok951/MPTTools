@@ -8,7 +8,12 @@
             <div class="kicker">Заявки</div>
             <h2>Заявки</h2>
         </div>
-        <div class="table-meta">Строк на странице: {{ page_size }}</div>
+        <div class="actions" style="flex-wrap: wrap; align-items: center; gap: 10px;">
+            {% if can_create_request %}
+            <a class="btn" href="{% url 'request_create' %}">{% ui_text "Создать заявку" "Create request" %}</a>
+            {% endif %}
+            <span class="table-meta">{% ui_text "Строк на странице" "Rows per page" %}: {{ page_size }}</span>
+        </div>
     </div>
     <div class="request-shortcuts">
         <a class="shortcut-chip {% if filters.view == 'all' or not filters.view %}is-active{% endif %}" href="{% url 'request_history' %}?view=all&status={{ filters.status }}&kind={{ filters.kind }}&from={{ filters.from }}&to={{ filters.to }}">Все заявки</a>
@@ -95,14 +100,13 @@
                     {% if can_quick_status %}
                     <form method="post" action="{% url 'request_update_status' request_id=item.pk %}" class="request-status-form">
                         {% csrf_token %}
-                        <select name="status" class="request-status-select">
+                        <select name="status" class="request-status-select" aria-label="{% trans 'Status' %}">
                             {% for value, label in status_choices %}
                             <option value="{{ value }}" {% if item.status == value %}selected{% endif %}>{{ label }}</option>
                             {% endfor %}
                         </select>
                         <button class="btn secondary" type="submit">Сохранить</button>
                     </form>
-                    <div class="{{ item.badge_class }}" style="margin-top:6px;">{{ item.get_status_display }}</div>
                     {% else %}
                     <span class="{{ item.badge_class }}">{{ item.get_status_display }}</span>
                     {% endif %}

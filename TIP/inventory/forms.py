@@ -13,14 +13,28 @@ from operations.models import (
     EquipmentRequest,
     EquipmentRequestMessage,
     EquipmentRequestPhoto,
-    MaterialUsage,
     REQUEST_APPROVED,
-    REQUEST_CLOSED,
-    REQUEST_ISSUED,
 )
 
 MAX_ALLOWED_QUANTITY = 1000
 MAX_ALLOWED_ADJUSTMENT_DELTA = 1000
+
+# Корпоративная почта: регистрация и восстановление пароля (гостевой сценарий).
+REGISTRATION_EMAIL_DOMAIN = "mpt.ru"
+
+
+def _normalize_email(email: str | None) -> str:
+    return (email or "").strip().lower()
+
+
+def _email_has_allowed_domain(email: str) -> bool:
+    return email.endswith(f"@{REGISTRATION_EMAIL_DOMAIN}")
+
+
+def _validate_corporate_email(email: str) -> str:
+    if not _email_has_allowed_domain(email):
+        raise ValidationError(f"Разрешены адреса только на домене @{REGISTRATION_EMAIL_DOMAIN}.")
+    return email
 
 
 def _lang_label(ru_text: str, en_text: str, language_code: str) -> str:
@@ -36,6 +50,12 @@ class RussianAuthenticationForm(AuthenticationForm):
 
 class RussianUserCreationForm(UserCreationForm):
     username = forms.CharField(label="Имя пользователя", help_text="Обязательно. Не более 150 символов.")
+    email = forms.EmailField(
+        label="Электронная почта",
+        required=True,
+        help_text=f"Обязательно. Только корпоративный адрес @{REGISTRATION_EMAIL_DOMAIN}.",
+        widget=forms.EmailInput(attrs={"autocomplete": "email", "placeholder": f"user@{REGISTRATION_EMAIL_DOMAIN}"}),
+    )
     password1 = forms.CharField(
         label="Пароль", strip=False, widget=forms.PasswordInput(attrs={"autocomplete": "new-password"})
     )
@@ -45,6 +65,16 @@ class RussianUserCreationForm(UserCreationForm):
         widget=forms.PasswordInput(attrs={"autocomplete": "new-password"}),
         help_text="Введите пароль ещё раз для проверки.",
     )
+
+    class Meta(UserCreationForm.Meta):
+        fields = (*UserCreationForm.Meta.fields, "email")
+
+    def clean_email(self):
+        email = _normalize_email(self.cleaned_data.get("email"))
+        _validate_corporate_email(email)
+        if User.objects.filter(email__iexact=email).exists():
+            raise ValidationError("Пользователь с таким адресом почты уже зарегистрирован.")
+        return email
 
 
 class BackupImportForm(forms.Form):
@@ -71,30 +101,40 @@ class PostgresqlDumpImportForm(forms.Form):
 class PasswordResetRequestForm(forms.Form):
     email = forms.EmailField(
         label="Email",
-        widget=forms.EmailInput(attrs={"autocomplete": "email", "placeholder": "user@example.com"}),
+        widget=forms.EmailInput(
+            attrs={"autocomplete": "email", "placeholder": f"user@{REGISTRATION_EMAIL_DOMAIN}"},
+        ),
     )
 
     def __init__(self, *args, user=None, **kwargs):
         super().__init__(*args, **kwargs)
         self._request_user = user
+        if user and getattr(user, "is_authenticated", False) and (getattr(user, "email", None) or "").strip():
+            self.fields["email"].widget.attrs["readonly"] = True
 
     def clean_email(self):
-        email = (self.cleaned_data.get("email") or "").strip().lower()
+        email = _normalize_email(self.cleaned_data.get("email"))
         user = self._request_user
         if user and getattr(user, "is_authenticated", False):
             profile_email = (getattr(user, "email", None) or "").strip().lower()
             if profile_email:
                 if email != profile_email:
                     raise ValidationError("Введите email, указанный в вашем профиле.")
-            elif User.objects.filter(email__iexact=email).exclude(pk=user.pk).exists():
+                return email
+            _validate_corporate_email(email)
+            if User.objects.filter(email__iexact=email).exclude(pk=user.pk).exists():
                 raise ValidationError("Этот email уже используется другой учётной записью.")
+            return email
+        _validate_corporate_email(email)
         return email
 
 
 class PasswordResetConfirmForm(forms.Form):
     email = forms.EmailField(
         label="Email",
-        widget=forms.EmailInput(attrs={"autocomplete": "email", "placeholder": "user@example.com"}),
+        widget=forms.EmailInput(
+            attrs={"autocomplete": "email", "placeholder": f"user@{REGISTRATION_EMAIL_DOMAIN}"},
+        ),
     )
     code = forms.CharField(
         label="Код из письма",
@@ -112,6 +152,24 @@ class PasswordResetConfirmForm(forms.Form):
         strip=False,
         widget=forms.PasswordInput(attrs={"autocomplete": "new-password"}),
     )
+
+    def __init__(self, *args, user=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._request_user = user
+        if user and getattr(user, "is_authenticated", False) and (getattr(user, "email", None) or "").strip():
+            self.fields["email"].widget.attrs["readonly"] = True
+
+    def clean_email(self):
+        email = _normalize_email(self.cleaned_data.get("email"))
+        user = self._request_user
+        if user and getattr(user, "is_authenticated", False):
+            profile_email = (getattr(user, "email", None) or "").strip().lower()
+            if profile_email:
+                if email != profile_email:
+                    raise ValidationError("Введите email, указанный в вашем профиле.")
+                return email
+        _validate_corporate_email(email)
+        return email
 
     def clean_code(self):
         return (self.cleaned_data.get("code") or "").strip()
@@ -197,12 +255,6 @@ class UserPreferenceForm(forms.ModelForm):
             ("iso", t("ГГГГ-ММ-ДД ЧЧ:ММ", "YYYY-MM-DD HH:MM")),
             ("verbose", t("Развёрнутый локальный формат", "Verbose local format")),
         ]
-        self.fields["default_checkout_status"].label = t("Фильтр выдач по умолчанию", "Default checkout filter")
-        self.fields["default_checkout_status"].choices = [
-            ("", t("Все выдачи", "All checkouts")),
-            ("active", t("Активные выдачи", "Active checkouts")),
-            ("returned", t("Возвращённые выдачи", "Returned checkouts")),
-        ]
         self.fields["hotkeys_enabled"].label = t("Включить горячие клавиши", "Enable hotkeys")
         self.fields["show_hotkey_legend"].label = t("Показывать подсказку по горячим клавишам", "Show hotkey legend")
         self.fields["default_request_status"] = forms.ChoiceField(
@@ -271,7 +323,6 @@ class UserPreferenceForm(forms.ModelForm):
             "default_request_status",
             "default_request_kind",
             "default_usage_period_days",
-            "default_checkout_status",
             "hotkeys_enabled",
             "show_hotkey_legend",
         ]
@@ -298,7 +349,10 @@ class EquipmentRequestForm(forms.ModelForm):
         self.fields["quantity"].label = "Количество"
         self.fields["quantity"].help_text = "Укажите нужное количество для склада."
         self.fields["needed_by"].label = "Нужно до"
-        self.fields["needed_by"].help_text = "Необязательная плановая дата, когда материал желательно получить."
+        self.fields["needed_by"].required = True
+        self.fields["needed_by"].help_text = "Обязательная дата, к которой желательно получить материал (по умолчанию — сегодня)."
+        if not self.is_bound and not self.initial.get("needed_by") and not (self.instance and self.instance.pk):
+            self.initial["needed_by"] = timezone.localdate()
         self.fields["comment"].label = "Комментарий"
         self.fields["comment"].help_text = "Добавьте детали, которые помогут быстрее согласовать заявку."
 
@@ -347,102 +401,6 @@ class EquipmentRequestPhotoForm(forms.ModelForm):
     def clean_caption(self):
         caption = (self.cleaned_data.get("caption") or "").strip()
         return caption
-
-
-class MaterialUsageForm(forms.ModelForm):
-    class Meta:
-        model = MaterialUsage
-        fields = ["equipment", "workplace", "quantity", "related_request", "note"]
-        labels = {
-            "equipment": "Оборудование",
-            "workplace": "Рабочее место",
-            "quantity": "Количество",
-            "related_request": "Связанная заявка",
-            "note": "Комментарий",
-        }
-        widgets = {
-            "note": forms.Textarea(attrs={"rows": 4, "placeholder": "Необязательная причина или детали списания."}),
-        }
-
-    def __init__(self, *args, **kwargs):
-        initial_request_id = kwargs.pop("initial_request_id", None)
-        super().__init__(*args, **kwargs)
-        self.fields["equipment"].empty_label = "Выберите оборудование"
-        self.fields["workplace"].empty_label = "Выберите рабочее место"
-        request_base_qs = (
-            EquipmentRequest.objects.filter(status__in=[REQUEST_APPROVED, REQUEST_ISSUED, REQUEST_CLOSED])
-            .order_by("-requested_at")
-        )
-        self.fields["related_request"].queryset = request_base_qs.select_related("equipment", "requester")
-        self.fields["related_request"].label_from_instance = self._format_related_request_label
-        self.fields["related_request"].empty_label = "Без связанной заявки"
-        request_rows = request_base_qs.values("id", "quantity", "equipment_id", "workplace_id")
-        self.request_quantity_map = {str(item["id"]): item["quantity"] for item in request_rows}
-        request_rows = request_base_qs.values("id", "quantity", "equipment_id", "workplace_id")
-        self.request_equipment_map = {str(item["id"]): (item["equipment_id"] or "") for item in request_rows}
-        request_rows = request_base_qs.values("id", "quantity", "equipment_id", "workplace_id")
-        self.request_workplace_map = {str(item["id"]): (item["workplace_id"] or "") for item in request_rows}
-        if initial_request_id:
-            self.initial["related_request"] = initial_request_id
-        self.fields["quantity"].help_text = (
-            "Для расходуемого оборудования укажите объём выдачи. "
-            "Если выбрана заявка, количество автоматически берётся из неё."
-        )
-        self.fields["related_request"].help_text = (
-            "Необязательно. Если выбрана заявка, оборудование, рабочее место и количество подставятся автоматически."
-        )
-
-    @staticmethod
-    def _format_related_request_label(request_obj: EquipmentRequest) -> str:
-        requester = request_obj.requester.get_username() if request_obj.requester_id else "без заявителя"
-        equipment = str(request_obj.equipment) if request_obj.equipment_id else "без оборудования"
-        requested_dt = timezone.localtime(request_obj.requested_at).strftime("%d.%m.%Y %H:%M") if request_obj.requested_at else "-"
-        return (
-            f"#{request_obj.pk} | {request_obj.get_status_display()} | "
-            f"{requester} | {equipment} | кол-во: {request_obj.quantity} | {requested_dt}"
-        )
-
-    def clean_quantity(self):
-        quantity = self.cleaned_data.get("quantity") or 0
-        if quantity <= 0:
-            raise ValidationError("Количество должно быть положительным.")
-        if quantity > MAX_ALLOWED_QUANTITY:
-            raise ValidationError(f"Количество не должно превышать {MAX_ALLOWED_QUANTITY}.")
-        return quantity
-
-    def clean(self):
-        cleaned = super().clean()
-        related_request = cleaned.get("related_request")
-        equipment = cleaned.get("equipment")
-        workplace = cleaned.get("workplace")
-        quantity = cleaned.get("quantity") or 0
-        if related_request:
-            if related_request.status in {"pending", "rejected"}:
-                self.add_error("related_request", "Операция доступна только для обработанных заявок.")
-                return cleaned
-            if related_request.equipment_id:
-                cleaned["equipment"] = related_request.equipment
-                equipment = related_request.equipment
-            if related_request.workplace_id:
-                cleaned["workplace"] = related_request.workplace
-                workplace = related_request.workplace
-            quantity = related_request.quantity
-            cleaned["quantity"] = quantity
-        if equipment and not equipment.is_consumable:
-            note = (cleaned.get("note") or "").strip()
-            if not note:
-                self.add_error("note", "Для нерасходуемого оборудования укажите причину списания (например, сломано).")
-            if quantity != 1:
-                self.add_error("quantity", "Нерасходуемое оборудование списывается поштучно (количество = 1).")
-        if related_request and equipment and related_request.equipment_id and related_request.equipment_id != equipment.id:
-            self.add_error("equipment", "Оборудование должно совпадать с выбранной заявкой.")
-        if related_request and workplace and related_request.workplace_id and related_request.workplace_id != workplace.id:
-            self.add_error("workplace", "Рабочее место должно совпадать с выбранной заявкой.")
-        return cleaned
-
-    def clean_note(self):
-        note = (self.cleaned_data.get("note") or "").strip()
-        return note
 
 
 class InventoryAdjustmentForm(forms.ModelForm):

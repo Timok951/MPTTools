@@ -10,11 +10,12 @@ from django.db import models
 from django.db import IntegrityError
 from django.db.models import ProtectedError
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
 from django.utils.translation import gettext_lazy as _
 
 from assets.models import Equipment
-from core.models import Cabinet, EquipmentCategory, Workplace, WorkplaceMember
-from operations.models import EquipmentRequest, MaterialUsage, PeriodicMaterialUsageSchedule
+from core.models import Cabinet, EquipmentCategory, Workplace
+from operations.models import EquipmentRequest, PeriodicMaterialUsageSchedule
 from audit.models import AdminPortalLog
 from audit.portal_log import log_portal_action
 
@@ -26,16 +27,14 @@ from .portal_forms import (
     PortalEquipmentForm,
     PortalEquipmentRequestForm,
     PortalGroupForm,
-    PortalMaterialUsageForm,
     PortalPeriodicMaterialUsageScheduleForm,
     PortalUserForm,
     PortalWorkplaceForm,
-    PortalWorkplaceMemberForm,
     CloseStaleIssuedRequestsProcedureForm,
     RejectStaleRequestsProcedureForm,
     RestockLowStockConsumablesProcedureForm,
 )
-from .views import forbidden
+from .views import _get_user_preferences, _paginate, _with_page_context, forbidden
 
 
 @dataclass(frozen=True)
@@ -52,7 +51,6 @@ PORTAL_ENTITIES: tuple[PortalEntity, ...] = (
     PortalEntity("categories", EquipmentCategory, PortalEquipmentCategoryForm, ("name", "deleted_at"), "Категории"),
     PortalEntity("workplaces", Workplace, PortalWorkplaceForm, ("name", "location", "deleted_at"), "Рабочие места"),
     PortalEntity("cabinets", Cabinet, PortalCabinetForm, ("name", "workplace", "deleted_at"), "Кабинеты"),
-    PortalEntity("workplace-members", WorkplaceMember, PortalWorkplaceMemberForm, ("workplace", "user", "role", "deleted_at"), "Сотрудники"),
     PortalEntity(
         "requests",
         EquipmentRequest,
@@ -60,7 +58,6 @@ PORTAL_ENTITIES: tuple[PortalEntity, ...] = (
         ("requester", "equipment", "cabinet", "quantity", "status", "deleted_at"),
         "Заявки",
     ),
-    PortalEntity("usage", MaterialUsage, PortalMaterialUsageForm, ("equipment", "quantity", "used_by", "used_at", "deleted_at"), "Выдача расходуемого"),
     PortalEntity(
         "periodic-usage",
         PeriodicMaterialUsageSchedule,
@@ -78,10 +75,8 @@ PORTAL_ENTITY_CAPABILITIES: dict[str, tuple[str, ...]] = {
     "categories": ("warehouse_operations", "users_and_site_admin"),
     "workplaces": ("warehouse_operations", "users_and_site_admin"),
     "cabinets": ("warehouse_operations", "users_and_site_admin"),
-    "workplace-members": ("users_and_site_admin",),
     "requests": ("request_processing", "users_and_site_admin"),
-    "usage": ("usage_writeoff", "users_and_site_admin"),
-    "periodic-usage": ("usage_writeoff", "users_and_site_admin", "request_creation"),
+    "periodic-usage": ("usage_writeoff", "users_and_site_admin", "request_creation", "request_processing"),
     "users": ("users_and_site_admin",),
     "groups": ("users_and_site_admin",),
 }
@@ -100,10 +95,48 @@ def _portal_nav_context(user, current_slug: str | None = None):
     return {"entities": _visible_portal_entities(user), "current_entity_slug": current_slug}
 
 
+def _portal_section_list_url(entity_slug: str) -> str:
+    route = {
+        "equipment": "equipment_list",
+        "requests": "request_history",
+        "workplaces": "workplaces",
+        "cabinets": "cabinets",
+    }
+    name = route.get(entity_slug)
+    if name:
+        return reverse(name)
+    return reverse("portal_list", kwargs={"entity": entity_slug})
+
+
+def _redirect_to_portal_section_list(entity_slug: str):
+    route = {
+        "equipment": ("equipment_list", {}),
+        "requests": ("request_history", {}),
+        "workplaces": ("workplaces", {}),
+        "cabinets": ("cabinets", {}),
+    }
+    target = route.get(entity_slug)
+    if target:
+        return redirect(target[0], **target[1])
+    return redirect("portal_list", entity=entity_slug)
+
+
 def _portal_common_context(user, current_slug: str | None = None):
-    return {
+    ctx = {
         **_portal_nav_context(user, current_slug),
         "yandex_maps_api_key": getattr(settings, "YANDEX_MAPS_API_KEY", ""),
+    }
+    if current_slug and current_slug not in ("__home", "__logs"):
+        ctx["portal_back_url"] = _portal_section_list_url(current_slug)
+        ctx["portal_back_label"] = _("К списку")
+    return ctx
+
+
+def _portal_confirm_context(user, entity_slug: str):
+    return {
+        **_portal_nav_context(user, entity_slug),
+        "portal_back_url": _portal_section_list_url(entity_slug),
+        "portal_back_label": _("К списку"),
     }
 
 
@@ -173,11 +206,15 @@ def _friendly_integrity_message(exc: Exception) -> str:
 def portal_dashboard(request):
     if resp := _portal_guard(request):
         return resp
+    portal_sections = [
+        {"title": e.title, "url": _portal_section_list_url(e.slug)} for e in _visible_portal_entities(request.user)
+    ]
     return render(
         request,
         "inventory/portal/dashboard.html",
         {
             **_portal_nav_context(request.user, "__home"),
+            "portal_sections": portal_sections,
             "procedure_cards": _procedure_cards() if user_has_capability(request.user, "users_and_site_admin") else [],
         },
     )
@@ -203,10 +240,14 @@ def portal_list(request, entity: str):
     cfg = _get_entity_or_404(entity)
     if resp := _portal_guard(request, cfg.slug):
         return resp
-    if cfg.slug == "usage":
-        return redirect("usage_history")
+    if cfg.slug == "requests":
+        return redirect("request_history")
     if cfg.slug == "equipment":
         return redirect("equipment_list")
+    if cfg.slug == "workplaces":
+        return redirect("workplaces")
+    if cfg.slug == "cabinets":
+        return redirect("cabinets")
     show_deleted = bool(request.session.get("show_deleted_global", False))
     has_soft_delete = any(f.name == "deleted_at" for f in cfg.model._meta.fields)
     qs = _manager(cfg.model).all()
@@ -214,16 +255,20 @@ def portal_list(request, entity: str):
         qs = qs.filter(deleted_at__isnull=True)
     ordering = getattr(cfg.model._meta, "ordering", None) or ("-pk",)
     qs = qs.order_by(*ordering)
+    preferences = _get_user_preferences(request.user)
+    page_size = preferences.page_size if preferences else 25
+    page_obj = _paginate(request, qs, page_size)
     return render(
         request,
         "inventory/portal/object_list.html",
         {
             **_portal_nav_context(request.user, cfg.slug),
             "cfg": cfg,
-            "objects": qs,
+            "objects": page_obj.object_list,
             "show_deleted": show_deleted,
             "has_soft_delete": has_soft_delete,
             "list_headers": _list_headers(cfg.model, cfg.list_fields),
+            **_with_page_context(page_obj),
         },
     )
 
@@ -233,8 +278,6 @@ def portal_create(request, entity: str):
     cfg = _get_entity_or_404(entity)
     if resp := _portal_guard(request, cfg.slug):
         return resp
-    if cfg.slug == "usage":
-        return redirect("usage_history")
     Form = cfg.form_class
     if request.method == "POST":
         form = Form(request.POST, request.FILES)
@@ -250,7 +293,7 @@ def portal_create(request, entity: str):
                     form.save_m2m()
                 log_portal_action(request, "create", cfg.slug, obj=obj, meta={"pk": obj.pk})
                 messages.success(request, f"Запись добавлена: {cfg.title}.")
-                return redirect("portal_list", entity=cfg.slug)
+                return _redirect_to_portal_section_list(cfg.slug)
             except ValidationError as exc:
                 form.add_error(None, "; ".join(exc.messages))
             except IntegrityError as exc:
@@ -283,7 +326,7 @@ def portal_edit(request, entity: str, pk: int):
                     form.save_m2m()
                 log_portal_action(request, "update", cfg.slug, obj=saved, meta={"pk": saved.pk})
                 messages.success(request, f"Запись обновлена: {cfg.title}.")
-                return redirect("portal_list", entity=cfg.slug)
+                return _redirect_to_portal_section_list(cfg.slug)
             except ValidationError as exc:
                 form.add_error(None, "; ".join(exc.messages))
             except IntegrityError as exc:
@@ -305,7 +348,7 @@ def portal_delete(request, entity: str, pk: int):
     obj = get_object_or_404(_manager(cfg.model), pk=pk)
     if cfg.model is User and obj.pk == request.user.pk:
         messages.error(request, "Нельзя удалить собственную учётную запись.")
-        return redirect("portal_list", entity=cfg.slug)
+        return _redirect_to_portal_section_list(cfg.slug)
     if request.method == "POST":
         if hasattr(obj, "_actor"):
             obj._actor = request.user
@@ -315,11 +358,15 @@ def portal_delete(request, entity: str, pk: int):
             obj.delete()
             log_portal_action(request, "delete", cfg.slug, obj=obj_repr, meta={"pk": obj_pk})
             messages.success(request, f"Запись удалена: {cfg.title}.")
-            return redirect("portal_list", entity=cfg.slug)
+            return _redirect_to_portal_section_list(cfg.slug)
         except ProtectedError:
             messages.error(request, _("Эту запись нельзя удалить, потому что она используется связанными данными."))
-            return redirect("portal_list", entity=cfg.slug)
-    return render(request, "inventory/portal/object_confirm_delete.html", {**_portal_nav_context(request.user, cfg.slug), "cfg": cfg, "object": obj})
+            return _redirect_to_portal_section_list(cfg.slug)
+    return render(
+        request,
+        "inventory/portal/object_confirm_delete.html",
+        {**_portal_confirm_context(request.user, cfg.slug), "cfg": cfg, "object": obj},
+    )
 
 
 @login_required
@@ -336,8 +383,12 @@ def portal_restore(request, entity: str, pk: int):
         obj.restore()
         log_portal_action(request, "restore", cfg.slug, obj=obj, meta={"pk": obj.pk})
         messages.success(request, f"Запись восстановлена: {cfg.title}.")
-        return redirect("portal_list", entity=cfg.slug)
-    return render(request, "inventory/portal/object_confirm_restore.html", {**_portal_nav_context(request.user, cfg.slug), "cfg": cfg, "object": obj})
+        return _redirect_to_portal_section_list(cfg.slug)
+    return render(
+        request,
+        "inventory/portal/object_confirm_restore.html",
+        {**_portal_confirm_context(request.user, cfg.slug), "cfg": cfg, "object": obj},
+    )
 
 
 @login_required

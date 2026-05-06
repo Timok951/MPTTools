@@ -1,0 +1,92 @@
+{% extends "inventory/base.html" %}
+{% load i18n inventory_extras %}
+
+{% block content %}
+<div class="card equipment-detail-card">
+    <div class="card-header">
+        <div>
+            <div class="kicker">Оборудование #{{ item.pk }}</div>
+            <h2>{{ item.name }}</h2>
+            <p class="muted">
+                Инвентарный номер: {{ item.inventory_number }} |
+                Статус: <span class="{{ item.badge_class }}">{{ item.get_status_display }}</span>
+            </p>
+        </div>
+        <div class="actions">
+            <a class="secondary" href="{% url 'equipment_qr' equipment_id=item.pk %}" target="_blank" rel="noopener">QR</a>
+            {% if can_manage_equipment %}
+            <a href="{% url 'portal_edit' entity='equipment' pk=item.pk %}">Редактировать</a>
+            {% endif %}
+        </div>
+    </div>
+    <div class="equipment-detail-body">
+        <div class="equipment-detail-photo-col">
+            {% if item.photo %}
+            <button type="button" class="equipment-detail-photo-hit" id="equipment-photo-open" aria-haspopup="dialog" aria-controls="equipment-photo-zoom" aria-label="{% ui_text 'Открыть фото в полном размере' 'Open photo full size' %}">
+                <img src="{{ item.photo.url }}" alt="{{ item.name }}" loading="lazy" />
+            </button>
+            <p class="equipment-detail-photo-hint muted">{% ui_text "Нажмите на фото, чтобы рассмотреть крупнее" "Click the photo to zoom" %}</p>
+            {% else %}
+            <div class="equipment-detail-photo-placeholder">{% ui_text "Фото не добавлено" "No photo" %}</div>
+            {% endif %}
+        </div>
+        <div class="equipment-detail-fields">
+            <div class="split-layout">
+                <div class="field-list">
+                    <div class="aside-panel">
+                        <h3>Основные данные</h3>
+                        <ul>
+                            <li>Категория: {{ item.category|default:"—" }}</li>
+                            <li>Серийный номер: {{ item.serial_number|default:"—" }}</li>
+                            <li>Модель: {{ item.model|default:"—" }}</li>
+                            <li>Рабочее место: {{ item.workplace|default:"—" }}</li>
+                            <li>Расходник: {% if item.is_consumable %}Да{% else %}Нет{% endif %}</li>
+                        </ul>
+                    </div>
+                </div>
+                <div class="field-list">
+                    <div class="aside-panel">
+                        <h3>Остатки и сроки</h3>
+                        <ul>
+                            <li>Всего: {{ item.quantity_total }}</li>
+                            <li>Порог низкого остатка: {{ item.low_stock_threshold }}</li>
+                            <li>Дата покупки: {% if item.purchase_date %}{{ item.purchase_date|date:preferred_date_format }}{% else %}—{% endif %}</li>
+                            <li>Гарантия до: {% if item.warranty_end %}{{ item.warranty_end|date:preferred_date_format }}{% else %}—{% endif %}</li>
+                        </ul>
+                    </div>
+                    {% if item.notes %}
+                    <div class="aside-panel">
+                        <h3>Примечание</h3>
+                        <p>{{ item.notes }}</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% if item.photo %}
+<dialog id="equipment-photo-zoom" class="equipment-photo-dialog" aria-label="{% ui_text 'Фото оборудования' 'Equipment photo' %}">
+    <form method="dialog" class="equipment-photo-dialog-bar">
+        <button type="submit" class="btn secondary">{% ui_text "Закрыть" "Close" %}</button>
+    </form>
+    <div class="equipment-photo-dialog-body">
+        <img src="{{ item.photo.url }}" alt="{{ item.name }}" />
+    </div>
+</dialog>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+{% if item.photo %}
+<script>
+    (() => {
+        const dlg = document.getElementById("equipment-photo-zoom");
+        const openBtn = document.getElementById("equipment-photo-open");
+        if (!dlg || !openBtn) return;
+        openBtn.addEventListener("click", () => dlg.showModal());
+    })();
+</script>
+{% endif %}
+{% endblock %}

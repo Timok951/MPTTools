@@ -41,7 +41,6 @@
                             <li>Категория: {{ item.category|default:"—" }}</li>
                             <li>Серийный номер: {{ item.serial_number|default:"—" }}</li>
                             <li>Модель: {{ item.model|default:"—" }}</li>
-                            <li>Рабочее место: {{ item.workplace|default:"—" }}</li>
                             <li>Расходник: {% if item.is_consumable %}Да{% else %}Нет{% endif %}</li>
                         </ul>
                     </div>

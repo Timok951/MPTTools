@@ -984,7 +984,6 @@ def _equipment_list_filtered_queryset(request):
     query = request.GET.get("q", "").strip()
     status = request.GET.get("status", "").strip()
     category = request.GET.get("category", "").strip()
-    workplace = request.GET.get("workplace", "").strip()
     consumable = request.GET.get("consumable", "").strip()
     low_stock = request.GET.get("low_stock", "").strip()
 
@@ -1005,9 +1004,6 @@ def _equipment_list_filtered_queryset(request):
     if category:
         queryset = queryset.filter(category_id=category)
 
-    if workplace:
-        queryset = queryset.filter(workplace_id=workplace)
-
     if consumable:
         queryset = queryset.filter(is_consumable=consumable == "1")
 
@@ -1018,7 +1014,6 @@ def _equipment_list_filtered_queryset(request):
         "q": query,
         "status": status,
         "category": category,
-        "workplace": workplace,
         "consumable": consumable,
         "low_stock": low_stock,
         "show_deleted": "1" if show_deleted else "",
@@ -1039,7 +1034,6 @@ def equipment_export_csv(request):
             "serial_number",
             "model",
             "category",
-            "workplace",
             "status",
             "is_consumable",
             "quantity_total",
@@ -1057,7 +1051,6 @@ def equipment_export_csv(request):
                 eq.serial_number,
                 eq.model,
                 eq.category.name if eq.category_id else "",
-                eq.workplace.name if eq.workplace_id else "",
                 eq.get_status_display(),
                 "1" if eq.is_consumable else "0",
                 eq.quantity_total,
@@ -1158,7 +1151,6 @@ def equipment_list(request):
     query = list_filters["q"]
     status = list_filters["status"]
     category = list_filters["category"]
-    workplace = list_filters["workplace"]
     consumable = list_filters["consumable"]
 
     page_obj = _paginate(request, queryset, page_size)
@@ -1169,7 +1161,6 @@ def equipment_list(request):
     base_filters = {
         "q": query,
         "category": category,
-        "workplace": workplace,
         "consumable": consumable,
     }
     status_filter_links = []
@@ -1202,7 +1193,6 @@ def equipment_list(request):
     context = {
         "equipment": equipment_items,
         "categories": EquipmentCategory.objects.all(),
-        "workplaces": Workplace.objects.all(),
         "status_choices": [(value, status_label_map.get(value, value)) for value in VISIBLE_EQUIPMENT_STATUSES],
         "status_filter_links": status_filter_links,
         "can_manage_equipment": can_manage_equipment,

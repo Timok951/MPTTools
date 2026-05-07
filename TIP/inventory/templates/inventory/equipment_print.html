@@ -45,7 +45,6 @@
                 <th>{% trans "Serial" %}</th>
                 <th>{% trans "Model" %}</th>
                 <th>{% trans "Category" %}</th>
-                <th>{% trans "Workplace" %}</th>
                 <th>{% trans "Status" %}</th>
                 <th>{% ui_text "Расх." "Cons." %}</th>
                 <th>{% ui_text "Всего" "Total qty" %}</th>
@@ -60,13 +59,12 @@
                 <td>{{ item.serial_number|default:"—" }}</td>
                 <td>{{ item.model|default:"—" }}</td>
                 <td>{{ item.category|default:"—" }}</td>
-                <td>{{ item.workplace|default:"—" }}</td>
                 <td>{{ item.get_status_display }}</td>
                 <td>{% if item.is_consumable %}{% ui_text "Да" "Yes" %}{% else %}{% ui_text "Нет" "No" %}{% endif %}</td>
                 <td>{{ item.quantity_total }}</td>
             </tr>
             {% empty %}
-            <tr><td colspan="10" class="muted">{% trans "No equipment found." %}</td></tr>
+            <tr><td colspan="9" class="muted">{% trans "No equipment found." %}</td></tr>
             {% endfor %}
         </tbody>
     </table>

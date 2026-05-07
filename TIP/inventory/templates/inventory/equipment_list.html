@@ -42,15 +42,6 @@
             </select>
         </div>
         <div>
-            <label for="id_workplace">{% trans "Workplaces" %}</label>
-            <select id="id_workplace" name="workplace">
-                <option value="">{% trans "All" %}</option>
-                {% for item in workplaces %}
-                <option value="{{ item.id }}" {% if filters.workplace == item.id|stringformat:"s" %}selected{% endif %}>{{ item.name }}</option>
-                {% endfor %}
-            </select>
-        </div>
-        <div>
             <label for="id_consumable">{% trans "Consumable" %}</label>
             <select id="id_consumable" name="consumable">
                 <option value="">{% trans "All" %}</option>
@@ -98,10 +89,6 @@
                     <div class="equipment-card-row">
                         <span>{% ui_text "Статус" "Status" %}</span>
                         <strong>{{ item.get_status_display }}</strong>
-                    </div>
-                    <div class="equipment-card-row">
-                        <span>{% ui_text "Рабочее место" "Workplace" %}</span>
-                        <strong>{{ item.workplace|default:"-" }}</strong>
                     </div>
                     <div class="equipment-card-row">
                         <span>{% ui_text "Серийный номер" "Serial number" %}</span>

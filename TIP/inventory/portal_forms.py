@@ -41,13 +41,12 @@ class PortalEquipmentForm(forms.ModelForm):
 
     class Meta:
         model = Equipment
-        fields = _model_fields(Equipment, omit=("inventory_number",))
+        fields = _model_fields(Equipment, omit=("inventory_number", "workplace"))
         labels = {
             "name": "Название",
             "category": "Категория",
             "serial_number": "Серийный номер",
             "model": "Модель",
-            "workplace": "Рабочее место",
             "is_consumable": "Это расходник",
             "status": "Статус",
             "quantity_total": "Количество всего",

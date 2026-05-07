@@ -28,6 +28,7 @@ class PortalEquipmentForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        today = timezone.localdate()
         self.fields["status"].choices = self.VISIBLE_STATUS_CHOICES
         self.fields["serial_number"].required = True
         self.fields["quantity_available"].required = False
@@ -36,12 +37,13 @@ class PortalEquipmentForm(forms.ModelForm):
         self.fields["purchase_date"].localize = False
         self.fields["warranty_end"].localize = False
         if self.instance and self.instance.pk:
-            if self.instance.purchase_date:
-                self.initial["purchase_date"] = self.instance.purchase_date.isoformat()
-            if self.instance.warranty_end:
-                self.initial["warranty_end"] = self.instance.warranty_end.isoformat()
+            self.initial["purchase_date"] = (
+                self.instance.purchase_date.isoformat() if self.instance.purchase_date else today.isoformat()
+            )
+            self.initial["warranty_end"] = (
+                self.instance.warranty_end.isoformat() if self.instance.warranty_end else today.isoformat()
+            )
         else:
-            today = timezone.localdate()
             self.initial.setdefault("purchase_date", today.isoformat())
             self.initial.setdefault("warranty_end", (today + timedelta(days=365)).isoformat())
             self.initial.setdefault("is_consumable", True)

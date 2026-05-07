@@ -141,6 +141,17 @@ def notify_email_on_request_message(sender, instance, created, **kwargs):
         )
         if not req:
             return
+        participant_ids = list(
+            EquipmentRequestMessage.objects.filter(request_id=request_id)
+            .exclude(author_id=author_id)
+            .values_list("author_id", flat=True)
+            .distinct()
+        )
+        participant_users = []
+        if participant_ids:
+            participant_users = list(
+                msg.author.__class__.objects.filter(pk__in=participant_ids, is_active=True)
+            )
         raw_body = (msg.body or "").strip()
         has_photos = EquipmentRequestPhoto.objects.filter(message_id=message_pk).exists()
         display_body = raw_body
@@ -155,6 +166,7 @@ def notify_email_on_request_message(sender, instance, created, **kwargs):
             body=display_body,
             requester=req.requester,
             processed_by=req.processed_by,
+            participant_users=participant_users,
             automation_body=raw_body,
             equipment_name=req.equipment.name if req.equipment_id and req.equipment else None,
             needed_by=req.needed_by,

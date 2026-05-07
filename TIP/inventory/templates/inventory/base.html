@@ -2253,7 +2253,7 @@
             {% endif %}
             {% if is_off_duty_today %}
                 <div class="flash warning">
-                    {% ui_text "Сегодня у вас нерабочий день по графику. Просмотр доступен, изменения данных заблокированы." "Today is your off-duty day by schedule. Viewing is allowed, data changes are blocked." %}
+                    {% ui_text "Сегодня у вас нерабочий день по графику. Доступен только просмотр: создание, редактирование, удаление, смена статусов и отправка сообщений/фото заблокированы." "Today is your off-duty day by schedule. View-only mode is active: create, edit, delete, status changes, and sending messages/photos are blocked." %}
                 </div>
             {% endif %}
             {% if user.is_authenticated and show_hotkey_legend %}

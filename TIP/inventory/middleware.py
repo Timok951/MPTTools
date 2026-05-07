@@ -30,7 +30,11 @@ class WorkScheduleGuardMiddleware:
         ):
             messages.warning(
                 request,
-                "Сегодня по вашему графику нерабочий день. Изменения данных временно недоступны.",
+                (
+                    "Сегодня у вас нерабочий день по графику. "
+                    "Доступен только просмотр: создание, редактирование, удаление, "
+                    "смена статусов и отправка сообщений/фото временно заблокированы."
+                ),
             )
             return redirect(request.META.get("HTTP_REFERER") or reverse("about_site"))
         return self.get_response(request)

@@ -225,15 +225,19 @@ def notify_request_message_subscribers(
     body: str,
     requester: User | None,
     processed_by: User | None,
+    participant_users: list[User] | tuple[User, ...] | None = None,
     automation_body: str | None = None,
     equipment_name: str | None = None,
     needed_by = None,
     message_created_at = None,
 ) -> None:
-    """Уведомить заявителя и обработчика (если есть), исключая автора сообщения."""
+    """Уведомить участников заявки (заявитель, обработчик, авторы переписки), кроме автора сообщения."""
     skip_automation_body = automation_body if automation_body is not None else body
     seen: set[int] = set()
-    for user in (requester, processed_by):
+    recipient_pool: list[User | None] = [requester, processed_by]
+    if participant_users:
+        recipient_pool.extend(participant_users)
+    for user in recipient_pool:
         if user is None or user.pk == author_id or user.pk in seen:
             continue
         if (

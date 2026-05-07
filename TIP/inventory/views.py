@@ -52,6 +52,7 @@ from audit.models import AdminPortalLog, AuditLog
 from core.models import (
     Cabinet,
     DirectMessage,
+    EmployeeSchedule,
     EquipmentCategory,
     PasswordResetCode,
     UserPreference,
@@ -984,7 +985,6 @@ def equipment_list(request):
     show_deleted = bool(request.session.get("show_deleted_global", False))
     can_manage_equipment = (
         user_has_capability(request.user, "warehouse_operations")
-        or user_has_capability(request.user, "users_and_site_admin")
     )
 
     if request.method == "POST":
@@ -1094,7 +1094,6 @@ def equipment_detail(request, equipment_id: int):
     item = get_object_or_404(manager.select_related("category", "workplace"), pk=equipment_id)
     can_manage_equipment = (
         user_has_capability(request.user, "warehouse_operations")
-        or user_has_capability(request.user, "users_and_site_admin")
     )
     split_repair_max_qty = 0
     if can_manage_equipment and not item.is_consumable and item.quantity_total > 1:
@@ -1134,7 +1133,6 @@ def equipment_split_repair(request, equipment_id: int):
     item = get_object_or_404(manager.select_related("category", "workplace"), pk=equipment_id)
     can_manage = (
         user_has_capability(request.user, "warehouse_operations")
-        or user_has_capability(request.user, "users_and_site_admin")
     )
     if not can_manage:
         return forbidden(request, "Недостаточно прав для изменения складской позиции.")
@@ -1439,7 +1437,6 @@ def workplaces(request):
             "show_deleted": show_deleted,
             "can_manage_workplaces": (
                 user_has_capability(request.user, "warehouse_operations")
-                or user_has_capability(request.user, "users_and_site_admin")
             ),
         },
     )
@@ -1463,7 +1460,6 @@ def cabinets(request):
             "show_deleted": show_deleted,
             "can_manage_cabinets": (
                 user_has_capability(request.user, "warehouse_operations")
-                or user_has_capability(request.user, "users_and_site_admin")
             ),
         },
     )
@@ -1691,6 +1687,7 @@ def request_create(request):
         form = EquipmentRequestForm(initial={"needed_by": timezone.localdate()})
     equipment_photo_map = {}
     equipment_consumable_map = {}
+    can_quick_add_request_refs = user_has_capability(request.user, "warehouse_operations")
     equipment_qs = getattr(form.fields.get("equipment"), "queryset", Equipment.objects.none())
     for eq in equipment_qs:
         equipment_consumable_map[str(eq.pk)] = bool(eq.is_consumable)
@@ -1703,6 +1700,10 @@ def request_create(request):
             "form": form,
             "equipment_photo_map": equipment_photo_map,
             "equipment_consumable_map": equipment_consumable_map,
+            "can_quick_add_request_refs": can_quick_add_request_refs,
+            "workplace_add_url": reverse("portal_create", kwargs={"entity": "workplaces"}),
+            "cabinet_add_url": reverse("portal_create", kwargs={"entity": "cabinets"}),
+            "equipment_add_url": reverse("portal_create", kwargs={"entity": "equipment"}),
         },
     )
 
@@ -2406,6 +2407,17 @@ def register_view(request):
             user = form.save()
             default_group, _ = Group.objects.get_or_create(name=GROUP_TECHNICIAN)
             user.groups.add(default_group)
+            schedule_type = form.cleaned_data.get("schedule_type") or EmployeeSchedule.SCHEDULE_5_2
+            custom_weekdays = form.cleaned_data.get("custom_weekdays") or []
+            custom_workdays = ",".join(sorted(set(custom_weekdays))) if custom_weekdays else "0,1,2,3,4"
+            EmployeeSchedule.objects.get_or_create(
+                user=user,
+                defaults={
+                    "schedule_type": schedule_type,
+                    "custom_workdays": custom_workdays,
+                    "is_active": True,
+                },
+            )
             return redirect("login")
     else:
         form = RussianUserCreationForm()

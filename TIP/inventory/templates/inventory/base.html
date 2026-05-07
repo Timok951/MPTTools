@@ -877,13 +877,23 @@
         .request-history-table {
             min-width: 0;
             width: 100%;
-            table-layout: fixed;
+            table-layout: auto;
             font-size: 13px;
         }
         .request-history-table th,
         .request-history-table td {
             padding: 7px 6px;
-            word-break: break-word;
+            word-break: normal;
+        }
+        .request-history-table .badge {
+            white-space: nowrap;
+            display: inline-flex;
+        }
+        .request-status-cell {
+            min-width: 210px;
+        }
+        .request-quick-action-status {
+            margin-top: 6px;
         }
         .quick-role-grid {
             display: flex;
@@ -1940,7 +1950,7 @@
                                     <a href="{% url 'workplaces' %}">{% ui_text "Рабочие места" "Workplaces" %}</a>
                                     <a href="{% url 'cabinets' %}">{% ui_text "Кабинеты" "Cabinets" %}</a>
                                 </div>
-                                {% if user|has_capability:"warehouse_operations" or user|has_capability:"users_and_site_admin" %}
+                                {% if user|has_capability:"warehouse_operations" %}
                                 <div class="nav-panel-section">
                                     <div class="nav-panel-section-title">{% ui_text "Справочники" "Reference data" %}</div>
                                     <a href="{% url 'portal_list' entity='categories' %}">{% ui_text "Категории оборудования" "Equipment categories" %}</a>
@@ -1966,7 +1976,7 @@
                                     <a href="{% url 'request_create' %}">{% ui_text "Новая заявка" "New request" %}</a>
                                     {% endif %}
                                 </div>
-                                {% if user|has_capability:"request_creation" or user|has_capability:"request_processing" or user|has_capability:"usage_writeoff" or user|has_capability:"users_and_site_admin" %}
+                                {% if user|has_capability:"usage_writeoff" or user|has_capability:"warehouse_operations" or user|has_capability:"request_creation" or user|has_capability:"users_and_site_admin" %}
                                 <div class="nav-panel-section">
                                     <div class="nav-panel-section-title">{% ui_text "Периодические" "Periodic" %}</div>
                                     <a href="{% url 'portal_list' entity='periodic-usage' %}">{% ui_text "Периодический расход (расписание)" "Periodic usage (schedule)" %}</a>
@@ -2112,7 +2122,7 @@
                         <div class="hotkey-item"><code>G</code><code>R</code> {% ui_text "Журнал заявок" "Request log" %}</div>
                         <div class="hotkey-item"><code>G</code><code>S</code> {% ui_text "Поиск" "Search" %}</div>
                         <div class="hotkey-item"><code>N</code><code>R</code> {% ui_text "Новая заявка" "New request" %}</div>
-                        {% if user|has_capability:"request_creation" or user|has_capability:"request_processing" or user|has_capability:"usage_writeoff" or user|has_capability:"users_and_site_admin" %}
+                        {% if user|has_capability:"usage_writeoff" or user|has_capability:"warehouse_operations" or user|has_capability:"request_creation" or user|has_capability:"users_and_site_admin" %}
                         <div class="hotkey-item"><code>G</code><code>P</code> {% ui_text "Периодический расход" "Periodic usage" %}</div>
                         {% endif %}
                         <div class="hotkey-item"><code>?</code> {% ui_text "Показать или скрыть подсказку" "Show or hide help" %}</div>
@@ -2133,7 +2143,7 @@
                 "gr": "{% url 'request_history' %}",
                 "gs": "{% url 'inventory_search' %}",
                 "nr": "{% url 'request_create' %}",
-                {% if user|has_capability:"request_creation" or user|has_capability:"request_processing" or user|has_capability:"usage_writeoff" or user|has_capability:"users_and_site_admin" %}
+                {% if user|has_capability:"usage_writeoff" or user|has_capability:"warehouse_operations" or user|has_capability:"request_creation" or user|has_capability:"users_and_site_admin" %}
                 "gp": "{% url 'portal_list' entity='periodic-usage' %}",
                 {% endif %}
             };
@@ -2145,7 +2155,7 @@
                 KeyE: "e",
                 KeyR: "r",
                 KeyS: "s",
-                {% if user|has_capability:"request_creation" or user|has_capability:"request_processing" or user|has_capability:"usage_writeoff" or user|has_capability:"users_and_site_admin" %}
+                {% if user|has_capability:"usage_writeoff" or user|has_capability:"warehouse_operations" or user|has_capability:"request_creation" or user|has_capability:"users_and_site_admin" %}
                 KeyP: "p",
                 {% endif %}
             };

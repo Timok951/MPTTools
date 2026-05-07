@@ -8,8 +8,13 @@
 <div class="card">
     <div class="toolbar-spread" style="align-items:center; margin-bottom:12px;">
         <h2 style="margin:0;">{{ cfg.title }}</h2>
+        {% if not can_manage_entity %}
+        <span class="badge">Только просмотр</span>
+        {% endif %}
         <div class="actions">
+            {% if can_manage_entity %}
             <a class="btn" href="{% url 'portal_create' entity=cfg.slug %}">{% ui_text "Добавить" "Add" %}</a>
+            {% endif %}
         </div>
     </div>
     <table>
@@ -30,11 +35,15 @@
                     <td>{{ obj|get_attr:field }}</td>
                 {% endfor %}
                 <td class="actions">
+                    {% if can_manage_entity %}
                     <a href="{% url 'portal_edit' entity=cfg.slug pk=obj.pk %}">✏️</a>
                     {% if has_soft_delete and obj.deleted_at %}
                         <a class="secondary" href="{% url 'portal_restore' entity=cfg.slug pk=obj.pk %}">↩</a>
                     {% else %}
                         <a class="secondary" href="{% url 'portal_delete' entity=cfg.slug pk=obj.pk %}">🗑</a>
+                    {% endif %}
+                    {% else %}
+                        <span class="muted">—</span>
                     {% endif %}
                 </td>
             </tr>

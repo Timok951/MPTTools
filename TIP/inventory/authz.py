@@ -121,6 +121,7 @@ ROLE_SPECS: dict[str, RoleSpec] = {
             "view_cabinet",
         ),
         capabilities=(
+            "request_creation",
             "request_processing",
         ),
     ),

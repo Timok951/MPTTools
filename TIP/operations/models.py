@@ -172,9 +172,19 @@ class MaterialUsage(SoftDeleteModel):
 
 
 PERIODIC_USAGE_MONTHLY = "monthly"
+PERIODIC_USAGE_DAILY = "daily"
+PERIODIC_USAGE_WEEKLY = "weekly"
+PERIODIC_USAGE_BIWEEKLY = "biweekly"
+PERIODIC_USAGE_QUARTERLY = "quarterly"
+PERIODIC_USAGE_YEARLY = "yearly"
 
 PERIODIC_USAGE_FREQUENCY_CHOICES = [
+    (PERIODIC_USAGE_DAILY, "Каждый день"),
+    (PERIODIC_USAGE_WEEKLY, "Раз в неделю"),
+    (PERIODIC_USAGE_BIWEEKLY, "Раз в 2 недели"),
     (PERIODIC_USAGE_MONTHLY, "Раз в месяц"),
+    (PERIODIC_USAGE_QUARTERLY, "Раз в квартал"),
+    (PERIODIC_USAGE_YEARLY, "Раз в год"),
 ]
 
 

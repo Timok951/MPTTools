@@ -96,10 +96,10 @@
                 <td>{{ item.equipment }}</td>
                 <td>{{ item.cabinet|default:"—" }}</td>
                 <td>{{ item.quantity }}</td>
-                <td>
+                <td class="request-status-cell">
                     <span class="{{ item.badge_class }}">{{ item.get_status_display }}</span>
                     {% if can_quick_status %}
-                    <form method="post" action="{% url 'request_update_status' request_id=item.pk %}" class="request-quick-action" style="margin-top:6px;">
+                    <form method="post" action="{% url 'request_update_status' request_id=item.pk %}" class="request-quick-action request-quick-action-status">
                         {% csrf_token %}
                         <select name="status" class="request-status-select" aria-label="{% trans 'Status' %}">
                             {% for value, label in status_choices %}

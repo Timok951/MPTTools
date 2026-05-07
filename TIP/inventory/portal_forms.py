@@ -1,5 +1,7 @@
 from django import forms
 from django.contrib.auth.models import Group, User
+from django.contrib.auth.password_validation import validate_password
+from django.core.exceptions import ValidationError as DjangoValidationError
 from django.utils import timezone
 
 from assets.models import Equipment, EquipmentCheckout, InventoryAdjustment
@@ -396,7 +398,7 @@ class PortalPeriodicMaterialUsageScheduleForm(forms.ModelForm):
 
     class Meta:
         model = PeriodicMaterialUsageSchedule
-        fields = ["title", "equipment", "workplace", "quantity", "frequency", "next_run_on", "is_active"]
+        fields = ["title", "equipment", "workplace", "quantity", "frequency", "next_run_on"]
         labels = {
             "title": "Название",
             "equipment": "Расходник",
@@ -404,21 +406,33 @@ class PortalPeriodicMaterialUsageScheduleForm(forms.ModelForm):
             "quantity": "Количество за раз",
             "frequency": "Периодичность",
             "next_run_on": "Следующее выполнение",
-            "is_active": "Одобрена",
         }
         help_texts = {
             "title": "Например: «10 кабелей в месяц для лаборатории».",
-            "next_run_on": "В этот день (и далее каждый месяц) будет автоматически создан расход по заявке, пока заявка одобрена.",
+            "next_run_on": "В этот день (и далее каждый месяц) будет автоматически создана заявка на рассмотрение.",
         }
         widgets = {
             "next_run_on": forms.DateInput(attrs={"type": "date"}),
             "title": forms.TextInput(attrs={"placeholder": "Необязательно"}),
         }
 
+    def save(self, commit=True):
+        instance = super().save(commit=False)
+        instance.is_active = True
+        if commit:
+            instance.save()
+            self.save_m2m()
+        return instance
+
 
 class PortalUserForm(forms.ModelForm):
     password1 = forms.CharField(required=False, strip=False, widget=forms.PasswordInput(), label="Пароль")
     password2 = forms.CharField(required=False, strip=False, widget=forms.PasswordInput(), label="Подтверждение пароля")
+    confirm_risky_user_data = forms.BooleanField(
+        required=False,
+        label="Подтверждаю рискованное создание пользователя (только для отладки)",
+        help_text="Используйте только в debug-сценариях: слабый/пустой пароль, неполные ФИО или проблемная почта.",
+    )
 
     class Meta:
         model = User
@@ -429,9 +443,10 @@ class PortalUserForm(forms.ModelForm):
             "email",
             "is_active",
             "groups",
+            "confirm_risky_user_data",
         ]
         widgets = {
-            "groups": forms.SelectMultiple(attrs={"size": 8}),
+            "groups": forms.SelectMultiple(attrs={"size": 6}),
         }
         labels = {
             "username": "Имя пользователя",
@@ -455,11 +470,48 @@ class PortalUserForm(forms.ModelForm):
         cleaned = super().clean()
         p1 = cleaned.get("password1")
         p2 = cleaned.get("password2")
+        is_create = not (self.instance and self.instance.pk)
         if p1 or p2:
             if not p1:
-                self.add_error("password1", "Password is required.")
+                self.add_error("password1", "Укажите пароль.")
             if p1 != p2:
-                self.add_error("password2", "Passwords do not match.")
+                self.add_error("password2", "Пароли не совпадают.")
+
+        risk_reasons = []
+        if is_create and not p1:
+            risk_reasons.append("Пользователь создаётся без пароля.")
+        if p1:
+            probe_user = self.instance if (self.instance and self.instance.pk) else User(username=cleaned.get("username") or "")
+            try:
+                validate_password(p1, user=probe_user)
+            except DjangoValidationError as exc:
+                first_msg = (exc.messages or ["Слишком слабый пароль."])[0]
+                risk_reasons.append(f"Пароль слабый: {first_msg}")
+
+        first_name = (cleaned.get("first_name") or "").strip()
+        last_name = (cleaned.get("last_name") or "").strip()
+        if not first_name or not last_name:
+            risk_reasons.append("Не заполнены имя и/или фамилия.")
+
+        email = (cleaned.get("email") or "").strip()
+        if not email:
+            risk_reasons.append("Не указан email для связи и восстановления доступа.")
+        else:
+            duplicate_qs = User.objects.filter(email__iexact=email)
+            if self.instance and self.instance.pk:
+                duplicate_qs = duplicate_qs.exclude(pk=self.instance.pk)
+            if duplicate_qs.exists():
+                risk_reasons.append("Такой email уже используется другим пользователем.")
+
+        if risk_reasons and not cleaned.get("confirm_risky_user_data"):
+            self.add_error(
+                "confirm_risky_user_data",
+                "Подтвердите рискованное создание или исправьте данные.",
+            )
+            self.add_error(
+                None,
+                "Обнаружены риски: " + "; ".join(risk_reasons),
+            )
         return cleaned
 
     def clean_username(self):

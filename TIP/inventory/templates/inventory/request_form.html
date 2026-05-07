@@ -21,10 +21,10 @@
                 </div>
             {% endif %}
             <div class="form-grid">
-                {% include "inventory/_form_field.html" with field=form.workplace %}
-                {% include "inventory/_form_field.html" with field=form.cabinet %}
+                {% include "inventory/_form_field.html" with field=form.workplace add_url=workplace_add_url add_title="Добавить рабочее место" show_add_button=can_quick_add_request_refs %}
+                {% include "inventory/_form_field.html" with field=form.cabinet add_url=cabinet_add_url add_title="Добавить кабинет" show_add_button=can_quick_add_request_refs %}
                 {% include "inventory/_form_field.html" with field=form.request_kind %}
-                {% include "inventory/_form_field.html" with field=form.equipment %}
+                {% include "inventory/_form_field.html" with field=form.equipment add_url=equipment_add_url add_title="Добавить оборудование" show_add_button=can_quick_add_request_refs %}
                 <div id="non-consumable-status-wrap" style="display:none;">
                     {% include "inventory/_form_field.html" with field=form.non_consumable_target_status %}
                 </div>

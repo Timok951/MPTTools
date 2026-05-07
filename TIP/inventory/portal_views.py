@@ -93,12 +93,12 @@ _PORTAL_SLUGS_IN_MAIN_NAV = frozenset({"equipment", "requests", "workplaces", "c
 
 
 PORTAL_ENTITY_CAPABILITIES: dict[str, tuple[str, ...]] = {
-    "equipment": ("warehouse_operations", "users_and_site_admin"),
-    "categories": ("warehouse_operations", "users_and_site_admin"),
-    "workplaces": ("warehouse_operations", "users_and_site_admin"),
-    "cabinets": ("warehouse_operations", "users_and_site_admin"),
+    "equipment": ("warehouse_operations",),
+    "categories": ("warehouse_operations",),
+    "workplaces": ("warehouse_operations",),
+    "cabinets": ("warehouse_operations",),
     "requests": ("request_processing", "users_and_site_admin"),
-    "periodic-usage": ("usage_writeoff", "users_and_site_admin", "request_creation", "request_processing"),
+    "periodic-usage": ("usage_writeoff", "warehouse_operations", "request_creation", "users_and_site_admin"),
     "users": ("users_and_site_admin",),
     "groups": ("users_and_site_admin",),
     "registration-domains": ("users_and_site_admin",),
@@ -109,6 +109,17 @@ PORTAL_ENTITY_CAPABILITIES: dict[str, tuple[str, ...]] = {
 def _can_access_portal_entity(user, slug: str) -> bool:
     capabilities = PORTAL_ENTITY_CAPABILITIES.get(slug, ())
     return any(user_has_capability(user, capability) for capability in capabilities)
+
+
+def _can_modify_portal_entity(user, slug: str) -> bool:
+    # "Периодический расход" для админа показываем в режиме чтения.
+    if slug == "periodic-usage":
+        return (
+            user_has_capability(user, "usage_writeoff")
+            or user_has_capability(user, "warehouse_operations")
+            or user_has_capability(user, "request_creation")
+        )
+    return _can_access_portal_entity(user, slug)
 
 
 def _visible_portal_entities(user):
@@ -296,6 +307,7 @@ def portal_list(request, entity: str):
             **_portal_nav_context(request.user, cfg.slug),
             "cfg": cfg,
             "objects": page_obj.object_list,
+            "can_manage_entity": _can_modify_portal_entity(request.user, cfg.slug),
             "show_deleted": show_deleted,
             "has_soft_delete": has_soft_delete,
             "list_headers": _list_headers(cfg.model, cfg.list_fields),
@@ -309,6 +321,8 @@ def portal_create(request, entity: str):
     cfg = _get_entity_or_404(entity)
     if resp := _portal_guard(request, cfg.slug):
         return resp
+    if not _can_modify_portal_entity(request.user, cfg.slug):
+        return forbidden(request, "В этом разделе вам доступен только просмотр.")
     Form = cfg.form_class
     if request.method == "POST":
         form = Form(request.POST, request.FILES)
@@ -331,10 +345,17 @@ def portal_create(request, entity: str):
                 form.add_error(None, _friendly_integrity_message(exc))
     else:
         form = Form()
+    extra_context = {}
+    if cfg.slug == "periodic-usage":
+        extra_context["equipment_photo_map"] = {
+            str(eq.pk): eq.photo.url
+            for eq in Equipment.objects.filter(is_consumable=True, deleted_at__isnull=True).only("id", "photo")
+            if eq.photo
+        }
     return render(
         request,
         "inventory/portal/object_form.html",
-        {**_portal_common_context(request.user, cfg.slug), "cfg": cfg, "form": form, "is_edit": False},
+        {**_portal_common_context(request.user, cfg.slug), "cfg": cfg, "form": form, "is_edit": False, **extra_context},
     )
 
 
@@ -343,6 +364,8 @@ def portal_edit(request, entity: str, pk: int):
     cfg = _get_entity_or_404(entity)
     if resp := _portal_guard(request, cfg.slug):
         return resp
+    if not _can_modify_portal_entity(request.user, cfg.slug):
+        return forbidden(request, "В этом разделе вам доступен только просмотр.")
     obj = get_object_or_404(_manager(cfg.model), pk=pk)
     Form = cfg.form_class
     if request.method == "POST":
@@ -364,10 +387,24 @@ def portal_edit(request, entity: str, pk: int):
                 form.add_error(None, _friendly_integrity_message(exc))
     else:
         form = Form(instance=obj)
+    extra_context = {}
+    if cfg.slug == "periodic-usage":
+        extra_context["equipment_photo_map"] = {
+            str(eq.pk): eq.photo.url
+            for eq in Equipment.objects.filter(is_consumable=True, deleted_at__isnull=True).only("id", "photo")
+            if eq.photo
+        }
     return render(
         request,
         "inventory/portal/object_form.html",
-        {**_portal_common_context(request.user, cfg.slug), "cfg": cfg, "form": form, "is_edit": True, "object": obj},
+        {
+            **_portal_common_context(request.user, cfg.slug),
+            "cfg": cfg,
+            "form": form,
+            "is_edit": True,
+            "object": obj,
+            **extra_context,
+        },
     )
 
 
@@ -376,6 +413,8 @@ def portal_delete(request, entity: str, pk: int):
     cfg = _get_entity_or_404(entity)
     if resp := _portal_guard(request, cfg.slug):
         return resp
+    if not _can_modify_portal_entity(request.user, cfg.slug):
+        return forbidden(request, "В этом разделе вам доступен только просмотр.")
     obj = get_object_or_404(_manager(cfg.model), pk=pk)
     if cfg.model is User and obj.pk == request.user.pk:
         messages.error(request, "Нельзя удалить собственную учётную запись.")
@@ -405,6 +444,8 @@ def portal_restore(request, entity: str, pk: int):
     cfg = _get_entity_or_404(entity)
     if resp := _portal_guard(request, cfg.slug):
         return resp
+    if not _can_modify_portal_entity(request.user, cfg.slug):
+        return forbidden(request, "В этом разделе вам доступен только просмотр.")
     if not hasattr(cfg.model, "restore"):
         from django.http import Http404
 

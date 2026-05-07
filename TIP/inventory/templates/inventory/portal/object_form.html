@@ -13,7 +13,7 @@
             Создание: {{ cfg.title }}
         {% endif %}
     </h2>
-    <form method="post" class="form-shell" enctype="multipart/form-data">
+    <form method="post" class="form-shell {% if cfg.slug == 'users' %}portal-user-form{% endif %}" enctype="multipart/form-data">
         {% csrf_token %}
         {% if cfg.slug == "schedules" %}
         <div class="form-grid">
@@ -27,6 +27,24 @@
         <div class="form-grid single" style="margin-top:8px;">
             {% include "inventory/_form_field.html" with field=form.is_active %}
         </div>
+        {% elif cfg.slug == "users" %}
+            <div class="form-grid">
+                {% include "inventory/_form_field.html" with field=form.username %}
+                {% include "inventory/_form_field.html" with field=form.first_name %}
+                {% include "inventory/_form_field.html" with field=form.last_name %}
+                {% include "inventory/_form_field.html" with field=form.email %}
+            </div>
+            <div class="form-grid portal-user-credentials-grid" style="margin-top:8px; grid-template-columns: minmax(240px, 1fr) minmax(220px, 1fr) minmax(220px, 1fr);">
+                {% include "inventory/_form_field.html" with field=form.groups %}
+                {% include "inventory/_form_field.html" with field=form.password1 %}
+                {% include "inventory/_form_field.html" with field=form.password2 %}
+            </div>
+            <div class="form-grid" style="margin-top:8px;">
+                {% include "inventory/_form_field.html" with field=form.is_active %}
+            </div>
+            <div class="form-grid single" style="margin-top:8px;">
+                {% include "inventory/_form_field.html" with field=form.confirm_risky_user_data %}
+            </div>
         {% else %}
             <div class="form-grid">
                 {% for field in form %}
@@ -51,6 +69,17 @@
                     </div>
                 {% endfor %}
             </div>
+            {% if cfg.slug == "periodic-usage" %}
+            <div class="field-list">
+                <div class="aside-panel" id="periodic-equipment-preview-wrap" style="display:none; margin-top:8px;">
+                    <h3 style="margin-top:0;">Выбранное оборудование</h3>
+                    <div style="display:flex; align-items:center; gap:10px;">
+                        <img id="periodic-equipment-preview-img" src="" alt="periodic-equipment-preview" style="width:64px; height:64px; border-radius:10px; object-fit:cover; border:1px solid var(--border);" />
+                        <span class="muted">Фото выбранной позиции</span>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
         {% endif %}
         {% if cfg.slug == "workplaces" %}
         <div class="aside-panel">
@@ -75,6 +104,21 @@
 {% endblock %}
 
 {% block scripts %}
+{% if cfg.slug == "users" %}
+<style>
+    .portal-user-credentials-grid {
+        align-items: start;
+    }
+    .portal-user-form input[type="password"] {
+        min-height: 38px;
+        height: 38px;
+        max-height: 38px;
+    }
+    .portal-user-form select[multiple] {
+        min-height: 150px;
+    }
+</style>
+{% endif %}
 {% if cfg.slug == "workplaces" and yandex_maps_api_key %}
 <script>
 (() => {
@@ -208,6 +252,32 @@ if (window.ymaps && window.__initWorkplaceMap) {
     qtyTotal.addEventListener("input", () => {
         if (consumable.checked) qtyAvailable.value = qtyTotal.value || qtyAvailable.value;
     });
+    sync();
+})();
+</script>
+{% endif %}
+{% if cfg.slug == "periodic-usage" %}
+{{ equipment_photo_map|default:"{}"|json_script:"periodic-equipment-photo-map" }}
+<script>
+(() => {
+    const select = document.getElementById("id_equipment");
+    const wrap = document.getElementById("periodic-equipment-preview-wrap");
+    const img = document.getElementById("periodic-equipment-preview-img");
+    const payload = document.getElementById("periodic-equipment-photo-map");
+    if (!select || !wrap || !img || !payload) return;
+    const photoMap = JSON.parse(payload.textContent || "{}");
+    const sync = () => {
+        const val = select.value || "";
+        const src = photoMap[val];
+        if (!src) {
+            wrap.style.display = "none";
+            img.removeAttribute("src");
+        } else {
+            img.src = src;
+            wrap.style.display = "";
+        }
+    };
+    select.addEventListener("change", sync);
     sync();
 })();
 </script>

@@ -74,45 +74,6 @@
         {% endfor %}
     </div>
     {% endif %}
-    {% if can_update_equipment_condition %}
-    <div class="card" style="margin-top:10px; padding:12px;">
-        <h3 style="margin:0 0 8px 0;">Перевод нерасходуемого оборудования</h3>
-        <p class="muted" style="margin-top:0;">Можно перевести всю позицию целиком или выделить только часть в отдельную карточку.</p>
-        <form method="post" action="{% url 'request_update_equipment_condition' request_id=item.pk %}" class="filters" style="align-items:flex-end;">
-            {% csrf_token %}
-            <div>
-                <label for="id_condition_full">Куда перевести всю позицию</label>
-                <select id="id_condition_full" name="equipment_condition">
-                    <option value="in_stock">На склад</option>
-                    <option value="repair">В ремонт</option>
-                    <option value="retired">Списать из-за поломки</option>
-                </select>
-            </div>
-            <div><button class="btn secondary" type="submit">Применить к всей позиции</button></div>
-        </form>
-        <form method="post" action="{% url 'request_update_equipment_condition' request_id=item.pk %}" class="filters" style="align-items:flex-end; margin-top:8px;">
-            {% csrf_token %}
-            <div>
-                <label for="id_condition_partial">Куда перевести часть</label>
-                <select id="id_condition_partial" name="equipment_condition">
-                    <option value="repair">В ремонт</option>
-                    <option value="retired">Списать из-за поломки</option>
-                    <option value="in_stock">На склад (отдельной карточкой)</option>
-                </select>
-            </div>
-            <div>
-                <label for="id_condition_qty">Количество</label>
-                <input id="id_condition_qty" type="number" name="equipment_condition_qty" min="1" value="1" />
-            </div>
-            <div style="min-width:220px;">
-                <label for="id_condition_serial">Номер новой позиции (необязательно)</label>
-                <input id="id_condition_serial" type="text" name="equipment_condition_unit_serial" maxlength="100" placeholder="Можно оставить пустым — номер сгенерируется" />
-            </div>
-            <div><button class="btn secondary" type="submit">Выделить часть</button></div>
-        </form>
-        <p class="muted" style="margin-top:8px;">Как использовать: выберите статус, укажите количество, при необходимости номер новой позиции и нажмите «Выделить часть».</p>
-    </div>
-    {% endif %}
 </div>
 
 {% if photos %}

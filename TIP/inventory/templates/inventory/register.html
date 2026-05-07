@@ -39,3 +39,19 @@
     </div>
 </div>
 {% endblock %}
+
+{% block scripts %}
+<script>
+(() => {
+    const typeSelect = document.getElementById("id_schedule_type");
+    const weekdays = document.getElementById("id_custom_weekdays");
+    const weekdaysWrap = weekdays ? weekdays.closest("p") : null;
+    if (!typeSelect || !weekdaysWrap) return;
+    const sync = () => {
+        weekdaysWrap.style.display = typeSelect.value === "custom" ? "" : "none";
+    };
+    typeSelect.addEventListener("change", sync);
+    sync();
+})();
+</script>
+{% endblock %}

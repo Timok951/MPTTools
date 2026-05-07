@@ -6,7 +6,14 @@
         </label>
     {% else %}
         <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+        {% if add_url and show_add_button %}
+        <div class="inline-field-with-action">
+            {{ field }}
+            <a class="quick-add-btn" href="{{ add_url }}" title="{{ add_title|default:'Добавить' }}" aria-label="{{ add_title|default:'Добавить' }}">+</a>
+        </div>
+        {% else %}
         {{ field }}
+        {% endif %}
     {% endif %}
     {% if field.help_text %}
         <div class="field-help">{{ field.help_text }}</div>

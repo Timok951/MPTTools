@@ -5,10 +5,10 @@ from operations.periodic_usage import process_due_periodic_schedules
 
 class Command(BaseCommand):
     help = (
-        "Создаёт записи расхода (MaterialUsage) по одобренным расписаниям PeriodicMaterialUsageSchedule, "
+        "Создаёт заявки на рассмотрение (EquipmentRequest) по расписаниям PeriodicMaterialUsageSchedule, "
         "у которых наступила дата next_run_on. Запускайте по cron (например, ежедневно)."
     )
 
     def handle(self, *args, **options):
         n = process_due_periodic_schedules()
-        self.stdout.write(self.style.SUCCESS(f"Создано записей расхода: {n}"))
+        self.stdout.write(self.style.SUCCESS(f"Создано заявок по расписанию: {n}"))

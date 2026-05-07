@@ -351,7 +351,12 @@
             position: relative;
             display: inline-flex;
             align-items: center;
+            gap: 6px;
             flex-shrink: 0;
+        }
+        .notification-bell-wrap,
+        .notification-bell-wrap * {
+            cursor: pointer;
         }
         .notification-mega > summary {
             list-style: none;
@@ -359,6 +364,7 @@
             user-select: none;
             -webkit-user-select: none;
             -webkit-tap-highlight-color: transparent;
+            caret-color: transparent;
         }
         .notification-mega > summary::-webkit-details-marker {
             display: none;
@@ -402,6 +408,7 @@
             border-color: var(--accent);
             background: var(--surface-2, var(--panel));
             box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 35%, transparent);
+            animation: bellPulse 1.7s ease-in-out infinite;
         }
         body.theme-dark .notification-bell--active {
             background: color-mix(in srgb, var(--accent) 14%, var(--panel));
@@ -422,6 +429,34 @@
             align-items: center;
             justify-content: center;
             pointer-events: none;
+        }
+        .notification-count-inline {
+            font-size: 12px;
+            font-weight: 700;
+            color: var(--accent-2);
+            white-space: nowrap;
+            user-select: none;
+        }
+        .notification-count-inline.is-active {
+            color: var(--warn);
+            animation: bellCountBlink 1.3s ease-in-out infinite;
+        }
+        body.theme-dark .notification-count-inline {
+            color: var(--accent-3);
+        }
+        @keyframes bellPulse {
+            0%, 100% {
+                transform: scale(1);
+                box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 35%, transparent);
+            }
+            50% {
+                transform: scale(1.06);
+                box-shadow: 0 0 0 6px color-mix(in srgb, var(--accent) 22%, transparent);
+            }
+        }
+        @keyframes bellCountBlink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.62; }
         }
         .notification-panel {
             position: absolute;
@@ -2033,6 +2068,9 @@
                                     <path d="M10 19a2 2 0 0 0 4 0"></path>
                                 </svg>
                             </summary>
+                            <span class="notification-count-inline {% if notification_total_unread %}is-active{% endif %}" aria-hidden="true">
+                                {% if notification_total_unread %}{{ notification_total_unread }}{% else %}0{% endif %}
+                            </span>
                             {% if notification_total_unread %}
                             <span class="notification-bell-badge" aria-hidden="true">{% if notification_total_unread > 99 %}99+{% else %}{{ notification_total_unread }}{% endif %}</span>
                             {% endif %}
@@ -2373,6 +2411,22 @@
                     window.location.href = routes[combo];
                 }
             });
+        })();
+    </script>
+    {% endif %}
+    {% if user.is_authenticated and notification_total_unread %}
+    <script>
+        (() => {
+            const unreadCount = Number("{{ notification_total_unread|default:'0' }}") || 0;
+            if (!unreadCount) return;
+            const baseTitle = document.title || "MPT Tools";
+            let on = false;
+            const render = () => {
+                document.title = on ? `🔔 (${unreadCount}) ${baseTitle}` : `(${unreadCount}) ${baseTitle}`;
+                on = !on;
+            };
+            render();
+            window.setInterval(render, 1400);
         })();
     </script>
     {% endif %}

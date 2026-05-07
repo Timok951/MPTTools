@@ -7,9 +7,9 @@
     {% get_current_language as LANG %}
     <p class="muted">
         {% if LANG == 'en' %}
-        New users receive the default Worker role. Allowed corporate email domains:
+        New users receive the default Worker role and standard 5/2 schedule automatically. Allowed corporate email domains:
         {% else %}
-        Новые пользователи получают роль «Работник». Разрешённые корпоративные домены почты:
+        Новые пользователи автоматически получают роль «Работник» и стандартный график 5/2. Разрешённые корпоративные домены почты:
         {% endif %}
     </p>
     {% if registration_domains %}
@@ -40,18 +40,4 @@
 </div>
 {% endblock %}
 
-{% block scripts %}
-<script>
-(() => {
-    const typeSelect = document.getElementById("id_schedule_type");
-    const weekdays = document.getElementById("id_custom_weekdays");
-    const weekdaysWrap = weekdays ? weekdays.closest("p") : null;
-    if (!typeSelect || !weekdaysWrap) return;
-    const sync = () => {
-        weekdaysWrap.style.display = typeSelect.value === "custom" ? "" : "none";
-    };
-    typeSelect.addEventListener("change", sync);
-    sync();
-})();
-</script>
-{% endblock %}
+{% block scripts %}{% endblock %}

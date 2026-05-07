@@ -355,6 +355,10 @@
         }
         .notification-mega > summary {
             list-style: none;
+            cursor: pointer;
+            user-select: none;
+            -webkit-user-select: none;
+            -webkit-tap-highlight-color: transparent;
         }
         .notification-mega > summary::-webkit-details-marker {
             display: none;
@@ -370,13 +374,25 @@
             background: var(--panel);
             color: var(--ink);
             text-decoration: none;
-            font-size: 18px;
+            font-size: 16px;
             line-height: 1;
             box-shadow: var(--shadow);
+        }
+        .notification-bell svg {
+            width: 18px;
+            height: 18px;
+            display: block;
+            stroke: currentColor;
+            fill: none;
+            stroke-width: 1.9;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+            pointer-events: none;
         }
         .notification-bell:hover {
             border-color: var(--accent);
             color: var(--accent);
+            background: var(--surface);
         }
         .notification-bell:focus-visible {
             outline: 2px solid var(--ring);
@@ -2012,7 +2028,10 @@
                         {% if user.is_authenticated %}
                         <details class="notification-bell-wrap notification-mega">
                             <summary class="notification-bell {% if notification_total_unread %}notification-bell--active{% endif %}" title="{% ui_text 'Уведомления' 'Notifications' %}" aria-label="{% ui_text 'Уведомления' 'Notifications' %}{% if notification_total_unread %}: {{ notification_total_unread }}{% endif %}">
-                                <span aria-hidden="true">🔔</span>
+                                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                                    <path d="M15 17h5l-1.4-1.4A2 2 0 0 1 18 14.2V11a6 6 0 1 0-12 0v3.2a2 2 0 0 1-.6 1.4L4 17h11Z"></path>
+                                    <path d="M10 19a2 2 0 0 0 4 0"></path>
+                                </svg>
                             </summary>
                             {% if notification_total_unread %}
                             <span class="notification-bell-badge" aria-hidden="true">{% if notification_total_unread > 99 %}99+{% else %}{{ notification_total_unread }}{% endif %}</span>

@@ -14,7 +14,7 @@ from core.registration_domains import (
     registration_email_placeholder,
     validate_corporate_registration_email,
 )
-from core.models import DirectMessage, EmployeeSchedule, UserPreference, Workplace
+from core.models import DirectMessage, UserPreference, Workplace
 from operations.models import (
     EquipmentRequest,
     EquipmentRequestMessage,
@@ -68,19 +68,6 @@ class RussianUserCreationForm(UserCreationForm):
         widget=forms.PasswordInput(attrs={"autocomplete": "new-password"}),
         help_text="Введите пароль ещё раз для проверки.",
     )
-    schedule_type = forms.ChoiceField(
-        label="График работы",
-        choices=EmployeeSchedule.SCHEDULE_CHOICES,
-        initial=EmployeeSchedule.SCHEDULE_5_2,
-    )
-    custom_weekdays = forms.MultipleChoiceField(
-        label="Рабочие дни для кастомного графика",
-        choices=EmployeeSchedule.WEEKDAY_CHOICES,
-        required=False,
-        widget=forms.CheckboxSelectMultiple,
-        help_text="Нужно только для режима «Кастомный».",
-    )
-
     class Meta(UserCreationForm.Meta):
         fields = (*UserCreationForm.Meta.fields, "email")
 
@@ -101,15 +88,6 @@ class RussianUserCreationForm(UserCreationForm):
         if User.objects.filter(email__iexact=email).exists():
             raise ValidationError("Пользователь с таким адресом почты уже зарегистрирован.")
         return email
-
-    def clean(self):
-        cleaned = super().clean()
-        schedule_type = cleaned.get("schedule_type")
-        custom_weekdays = cleaned.get("custom_weekdays") or []
-        if schedule_type == EmployeeSchedule.SCHEDULE_CUSTOM and not custom_weekdays:
-            self.add_error("custom_weekdays", "Для кастомного графика выберите хотя бы один рабочий день.")
-        return cleaned
-
 
 class BackupImportForm(forms.Form):
     backup_file = forms.FileField(label=_("JSON резервная копия"))

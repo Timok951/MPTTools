@@ -2605,14 +2605,11 @@ def register_view(request):
             user = form.save()
             default_group, _ = Group.objects.get_or_create(name=GROUP_TECHNICIAN)
             user.groups.add(default_group)
-            schedule_type = form.cleaned_data.get("schedule_type") or EmployeeSchedule.SCHEDULE_5_2
-            custom_weekdays = form.cleaned_data.get("custom_weekdays") or []
-            custom_workdays = ",".join(sorted(set(custom_weekdays))) if custom_weekdays else "0,1,2,3,4"
             EmployeeSchedule.objects.get_or_create(
                 user=user,
                 defaults={
-                    "schedule_type": schedule_type,
-                    "custom_workdays": custom_workdays,
+                    "schedule_type": EmployeeSchedule.SCHEDULE_5_2,
+                    "custom_workdays": "0,1,2,3,4",
                     "is_active": True,
                 },
             )

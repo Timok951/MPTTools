@@ -99,8 +99,18 @@ class EquipmentRequest(SoftDeleteModel):
         return f"Request #{self.pk} by {self.requester}"
 
     def clean(self) -> None:
-        if self.quantity <= 0:
-            raise ValidationError("Количество должно быть положительным.")
+        if self.quantity < 0:
+            raise ValidationError("Количество не может быть отрицательным.")
+        if self.quantity == 0:
+            is_set_in_stock_without_delta = (
+                self.request_kind == REQUEST_KIND_RESTOCK
+                and self.equipment_id
+                and self.equipment is not None
+                and not self.equipment.is_consumable
+                and self.restock_non_consumable_action == RESTOCK_NON_CONSUMABLE_SET_IN_STOCK
+            )
+            if not is_set_in_stock_without_delta:
+                raise ValidationError("Количество должно быть положительным.")
 
 
 class EquipmentRequestMessage(models.Model):

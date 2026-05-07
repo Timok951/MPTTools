@@ -2,6 +2,7 @@ from django import forms
 from django.contrib.auth.models import Group, User
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError as DjangoValidationError
+from datetime import timedelta
 from django.utils import timezone
 
 from assets.models import Equipment, EquipmentCheckout, InventoryAdjustment
@@ -29,6 +30,7 @@ class PortalEquipmentForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
         self.fields["status"].choices = self.VISIBLE_STATUS_CHOICES
         self.fields["serial_number"].required = True
+        self.fields["quantity_available"].required = False
         self.fields["purchase_date"].input_formats = ["%Y-%m-%d"]
         self.fields["warranty_end"].input_formats = ["%Y-%m-%d"]
         self.fields["purchase_date"].localize = False
@@ -38,6 +40,11 @@ class PortalEquipmentForm(forms.ModelForm):
                 self.initial["purchase_date"] = self.instance.purchase_date.isoformat()
             if self.instance.warranty_end:
                 self.initial["warranty_end"] = self.instance.warranty_end.isoformat()
+        else:
+            today = timezone.localdate()
+            self.initial.setdefault("purchase_date", today.isoformat())
+            self.initial.setdefault("warranty_end", (today + timedelta(days=365)).isoformat())
+            self.initial.setdefault("is_consumable", True)
 
     class Meta:
         model = Equipment
@@ -120,6 +127,20 @@ class PortalEquipmentForm(forms.ModelForm):
 
     def clean(self):
         cleaned = super().clean()
+        is_consumable = bool(cleaned.get("is_consumable"))
+        qty_total = cleaned.get("quantity_total")
+        qty_available = cleaned.get("quantity_available")
+        if is_consumable and qty_total is not None:
+            cleaned["quantity_available"] = qty_total
+        if not is_consumable and qty_available is None and qty_total is not None:
+            # При переключении с расходника на нерасходник поле могло быть отключено в браузере.
+            # Подставляем разумное значение автоматически вместо тихого отказа сохранения.
+            cleaned["quantity_available"] = qty_total
+            qty_available = qty_total
+        if not is_consumable and qty_available is None:
+            self.add_error("quantity_available", "Укажите количество доступно.")
+        if qty_total is not None and qty_available is not None and qty_available > qty_total:
+            self.add_error("quantity_available", "Количество доступно не может быть больше общего количества.")
         purchase_date = cleaned.get("purchase_date")
         warranty_end = cleaned.get("warranty_end")
         if purchase_date and warranty_end and warranty_end < purchase_date:
@@ -128,6 +149,8 @@ class PortalEquipmentForm(forms.ModelForm):
 
     def save(self, commit=True):
         instance = super().save(commit=False)
+        # Явно фиксируем переключение флага туда/обратно.
+        instance.is_consumable = bool(self.cleaned_data.get("is_consumable"))
         serial_number = (self.cleaned_data.get("serial_number") or "").strip()
         instance.serial_number = serial_number
         # Keep legacy unique field in sync while UI uses serial number only.

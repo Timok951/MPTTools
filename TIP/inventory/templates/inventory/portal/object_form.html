@@ -13,6 +13,13 @@
             Создание: {{ cfg.title }}
         {% endif %}
     </h2>
+    {% if form.non_field_errors %}
+    <div class="form-errors" style="margin-bottom:10px;">
+        {% for err in form.non_field_errors %}
+            <div>{{ err }}</div>
+        {% endfor %}
+    </div>
+    {% endif %}
     <form method="post" class="form-shell {% if cfg.slug == 'users' %}portal-user-form{% endif %}" enctype="multipart/form-data">
         {% csrf_token %}
         {% if cfg.slug == "schedules" %}
@@ -44,6 +51,26 @@
             </div>
             <div class="form-grid single" style="margin-top:8px;">
                 {% include "inventory/_form_field.html" with field=form.confirm_risky_user_data %}
+            </div>
+        {% elif cfg.slug == "equipment" %}
+            <div class="form-grid">
+                {% include "inventory/_form_field.html" with field=form.name %}
+                {% include "inventory/_form_field.html" with field=form.category add_url=equipment_category_add_url add_title="Добавить категорию" show_add_button=can_quick_add_equipment_refs %}
+                {% include "inventory/_form_field.html" with field=form.serial_number %}
+                {% include "inventory/_form_field.html" with field=form.model %}
+                {% include "inventory/_form_field.html" with field=form.status %}
+                {% include "inventory/_form_field.html" with field=form.is_consumable %}
+                {% include "inventory/_form_field.html" with field=form.quantity_total %}
+                {% include "inventory/_form_field.html" with field=form.quantity_available %}
+                {% include "inventory/_form_field.html" with field=form.low_stock_threshold %}
+                {% include "inventory/_form_field.html" with field=form.purchase_date %}
+                {% include "inventory/_form_field.html" with field=form.warranty_end %}
+            </div>
+            <div class="form-grid single" style="margin-top:8px;">
+                {% include "inventory/_form_field.html" with field=form.notes %}
+            </div>
+            <div class="form-grid single" style="margin-top:8px;">
+                {% include "inventory/_form_field.html" with field=form.photo %}
             </div>
         {% else %}
             <div class="form-grid">

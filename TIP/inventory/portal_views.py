@@ -352,6 +352,9 @@ def portal_create(request, entity: str):
             for eq in Equipment.objects.filter(is_consumable=True, deleted_at__isnull=True).only("id", "photo")
             if eq.photo
         }
+    if cfg.slug == "equipment":
+        extra_context["can_quick_add_equipment_refs"] = user_has_capability(request.user, "warehouse_operations")
+        extra_context["equipment_category_add_url"] = reverse("portal_create", kwargs={"entity": "categories"})
     return render(
         request,
         "inventory/portal/object_form.html",
@@ -394,6 +397,9 @@ def portal_edit(request, entity: str, pk: int):
             for eq in Equipment.objects.filter(is_consumable=True, deleted_at__isnull=True).only("id", "photo")
             if eq.photo
         }
+    if cfg.slug == "equipment":
+        extra_context["can_quick_add_equipment_refs"] = user_has_capability(request.user, "warehouse_operations")
+        extra_context["equipment_category_add_url"] = reverse("portal_create", kwargs={"entity": "categories"})
     return render(
         request,
         "inventory/portal/object_form.html",

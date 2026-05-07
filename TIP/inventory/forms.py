@@ -448,8 +448,8 @@ class EquipmentRequestForm(forms.ModelForm):
 
     def clean_quantity(self):
         quantity = self.cleaned_data.get("quantity") or 0
-        if quantity <= 0:
-            raise ValidationError("Количество должно быть положительным.")
+        if quantity < 0:
+            raise ValidationError("Количество не может быть отрицательным.")
         if quantity > MAX_ALLOWED_QUANTITY:
             raise ValidationError(f"Количество не должно превышать {MAX_ALLOWED_QUANTITY}.")
         return quantity
@@ -490,9 +490,18 @@ class EquipmentRequestForm(forms.ModelForm):
         request_kind = (cleaned.get("request_kind") or "").strip()
         if equipment:
             if request_kind == REQUEST_KIND_RESTOCK:
-                if quantity <= 0:
+                action = (cleaned.get("restock_non_consumable_action") or "").strip()
+                allow_zero = bool(
+                    quantity == 0
+                    and equipment is not None
+                    and not equipment.is_consumable
+                    and action == RESTOCK_NON_CONSUMABLE_SET_IN_STOCK
+                )
+                if quantity < 0 or (quantity == 0 and not allow_zero):
                     self.add_error("quantity", "Для пополнения укажите количество больше нуля.")
                 return cleaned
+            if quantity <= 0:
+                self.add_error("quantity", "Количество должно быть положительным.")
             allowed_qty = equipment.quantity_total if equipment.is_consumable else equipment.quantity_available
             if quantity > allowed_qty:
                 self.add_error("quantity", f"Доступно только {allowed_qty} шт. по выбранной позиции.")

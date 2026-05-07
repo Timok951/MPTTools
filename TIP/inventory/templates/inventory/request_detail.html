@@ -2,6 +2,51 @@
 {% load i18n %}
 
 {% block content %}
+<style>
+    .request-chat-thread {
+        margin-top: 12px;
+        max-height: 520px;
+        overflow: auto;
+        padding: 4px 4px 0 0;
+    }
+    .request-chat-row {
+        display: flex;
+        margin-bottom: 12px;
+    }
+    .request-chat-row.incoming {
+        justify-content: flex-start;
+    }
+    .request-chat-row.outgoing {
+        justify-content: flex-end;
+    }
+    .request-chat-bubble {
+        width: min(88%, 680px);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        background: var(--surface);
+        padding: 8px 10px;
+    }
+    .request-chat-row.outgoing .request-chat-bubble {
+        background: rgba(76, 103, 255, 0.08);
+        border-color: color-mix(in srgb, var(--accent) 45%, var(--border));
+    }
+    .request-chat-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        font-size: 12px;
+    }
+    .request-chat-time {
+        color: var(--muted);
+        font-size: 11px;
+        white-space: nowrap;
+    }
+    .request-chat-body {
+        margin-top: 6px;
+        white-space: pre-wrap;
+    }
+</style>
 <div class="card">
     <div class="card-header">
         <div>
@@ -94,7 +139,7 @@
     <div class="card">
         <h3>Сообщения</h3>
         {% if can_add_request_content %}
-        <form method="post" class="form-shell">
+        <form method="post" class="form-shell" style="margin-bottom: 4px;">
             {% csrf_token %}
             <input type="hidden" name="action" value="add_message" />
             <input type="hidden" name="parent_id" id="id_parent_id" value="" />
@@ -108,16 +153,18 @@
         {% else %}
         <p class="muted">Отправка сообщений для одобренной заявки отключена.</p>
         {% endif %}
-        <div class="timeline">
+        <div class="request-chat-thread" id="request-chat-thread">
             {% for msg in messages_list %}
-            <div class="timeline-item" style="margin-left: calc({{ msg.thread_depth|default:0 }} * 18px);">
-                <div class="timeline-time">{{ msg.created_at|date:preferred_datetime_format }}</div>
-                <div class="timeline-body">
-                    <strong>{{ msg.author }}</strong>
+            <div class="request-chat-row {% if msg.author_id == user.id %}outgoing{% else %}incoming{% endif %}" style="padding-left: calc({{ msg.thread_depth|default:0 }} * 12px);">
+                <div class="request-chat-bubble">
+                    <div class="request-chat-head">
+                        <strong>{{ msg.author }}</strong>
+                        <span class="request-chat-time">{{ msg.created_at|date:preferred_datetime_format }}</span>
+                    </div>
                     {% if msg.parent_id %}
-                    <span class="muted">ответ на #{{ msg.parent_id }}</span>
+                    <div class="muted" style="margin-top:4px;">ответ на #{{ msg.parent_id }}</div>
                     {% endif %}
-                    <div>{{ msg.body }}</div>
+                    <div class="request-chat-body">{{ msg.body }}</div>
                     <div class="actions" style="margin-top:6px;">
                         {% if can_add_request_content %}
                             <button
@@ -130,7 +177,7 @@
                                 Ответить
                             </button>
                         {% endif %}
-                        {% if can_delete_messages %}
+                        {% if can_delete_messages and can_delete_foreign_messages or can_delete_messages and msg.author_id == user.id %}
                         <form method="post" style="display:inline;" onsubmit="return confirm('Удалить это сообщение? Ответы к нему тоже будут удалены.');">
                             {% csrf_token %}
                             <input type="hidden" name="action" value="delete_message" />
@@ -215,6 +262,11 @@
         });
     });
     clearButton.addEventListener("click", () => setReplyTarget("", ""));
+
+    const thread = document.getElementById("request-chat-thread");
+    if (thread) {
+        thread.scrollTop = thread.scrollHeight;
+    }
 })();
 </script>
 {% endblock %}

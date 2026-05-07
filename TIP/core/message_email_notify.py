@@ -9,6 +9,7 @@ from django.conf import settings
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.core.validators import validate_email
+from django.utils import timezone
 
 from core.mail_out import send_multipart_email
 from operations.models import REQUEST_APPROVED, REQUEST_STATUS_CHOICES
@@ -37,6 +38,16 @@ def _truncate(text: str, max_len: int = 800) -> str:
     if len(s) <= max_len:
         return s
     return s[: max_len - 1] + "…"
+
+
+def _fmt_dt(dt) -> str:
+    if not dt:
+        return "—"
+    try:
+        local_dt = timezone.localtime(dt)
+    except Exception:
+        local_dt = dt
+    return local_dt.strftime("%d.%m.%Y %H:%M")
 
 
 def _send_to_user(*, user: User, subject: str, plain_body: str, html_body: str) -> None:
@@ -104,6 +115,9 @@ def notify_request_approved_email(
     *,
     request_id: int,
     approver_username: str | None,
+    equipment_name: str | None = None,
+    needed_by = None,
+    processed_at = None,
 ) -> None:
     """Письмо заявителю при переходе заявки в статус «Одобрена»."""
     if not getattr(settings, "MESSAGE_EMAIL_ENABLED", True):
@@ -119,6 +133,9 @@ def notify_request_approved_email(
     plain = (
         "Здравствуйте!\n\n"
         f"Ваша заявка #{request_id} одобрена.\n\n"
+        f"Оборудование: {equipment_name or '—'}\n"
+        f"Нужно до: {needed_by.strftime('%d.%m.%Y') if needed_by else '—'}\n"
+        f"Дата изменения: {_fmt_dt(processed_at)}\n\n"
         f"{approver_line}"
         f"{plain_link}"
     )
@@ -131,6 +148,11 @@ def notify_request_approved_email(
         "<!DOCTYPE html><html><body style=\"font-family:system-ui,sans-serif;line-height:1.5;color:#1f2a44;\">"
         "<p>Здравствуйте!</p>"
         f"<p>Ваша заявка <strong>#{request_id}</strong> одобрена.</p>"
+        "<p>"
+        f"Оборудование: <strong>{html_escape(equipment_name or '—')}</strong><br/>"
+        f"Нужно до: <strong>{html_escape(needed_by.strftime('%d.%m.%Y') if needed_by else '—')}</strong><br/>"
+        f"Дата изменения: <strong>{html_escape(_fmt_dt(processed_at))}</strong>"
+        "</p>"
         f"{html_approver}"
         f"{html_link}"
         "</body></html>"
@@ -151,6 +173,9 @@ def notify_request_message_email(
     request_id: int,
     author_username: str,
     body: str,
+    equipment_name: str | None = None,
+    needed_by = None,
+    message_created_at = None,
 ) -> None:
     """Письмо участнику заявки о новом комментарии (кроме автора комментария)."""
     if not getattr(settings, "MESSAGE_EMAIL_ENABLED", True):
@@ -161,6 +186,9 @@ def notify_request_message_email(
     plain = (
         f"Здравствуйте!\n\n"
         f"По заявке #{request_id} пользователь «{author_username}» оставил сообщение:\n\n"
+        f"Оборудование: {equipment_name or '—'}\n"
+        f"Нужно до: {needed_by.strftime('%d.%m.%Y') if needed_by else '—'}\n"
+        f"Дата сообщения: {_fmt_dt(message_created_at)}\n\n"
         f"{preview}\n\n"
         f"{plain_link}"
     )
@@ -170,6 +198,11 @@ def notify_request_message_email(
         "<!DOCTYPE html><html><body style=\"font-family:system-ui,sans-serif;line-height:1.5;color:#1f2a44;\">"
         "<p>Здравствуйте!</p>"
         f"<p>По заявке <strong>#{request_id}</strong> пользователь <strong>{safe_author}</strong> оставил сообщение:</p>"
+        "<p>"
+        f"Оборудование: <strong>{html_escape(equipment_name or '—')}</strong><br/>"
+        f"Нужно до: <strong>{html_escape(needed_by.strftime('%d.%m.%Y') if needed_by else '—')}</strong><br/>"
+        f"Дата сообщения: <strong>{html_escape(_fmt_dt(message_created_at))}</strong>"
+        "</p>"
         f"<blockquote style=\"border-left:3px solid #4c67ff;padding-left:12px;margin:12px 0;\">{safe_preview}</blockquote>"
         f"{html_link}"
         "</body></html>"
@@ -193,6 +226,9 @@ def notify_request_message_subscribers(
     requester: User | None,
     processed_by: User | None,
     automation_body: str | None = None,
+    equipment_name: str | None = None,
+    needed_by = None,
+    message_created_at = None,
 ) -> None:
     """Уведомить заявителя и обработчика (если есть), исключая автора сообщения."""
     skip_automation_body = automation_body if automation_body is not None else body
@@ -212,4 +248,7 @@ def notify_request_message_subscribers(
             request_id=request_id,
             author_username=author_username,
             body=body,
+            equipment_name=equipment_name,
+            needed_by=needed_by,
+            message_created_at=message_created_at,
         )

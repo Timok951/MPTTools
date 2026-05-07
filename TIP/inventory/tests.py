@@ -19,12 +19,15 @@ from audit.models import AdminPortalLog
 from core.models import DirectMessage, EquipmentCategory, PasswordResetCode, UserPreference, Workplace
 from inventory.backup_utils import PostgreSQLBackupConfig, create_postgresql_backup, get_postgresql_backup_config
 from inventory.authz import GROUP_FIRST_LINE_SUPPORT
+from inventory.notification_utils import unread_request_message_count
 from inventory.portal_forms import PortalUserForm
 from operations.models import (
     REQUEST_APPROVED,
     REQUEST_KIND_BUILDER,
+    REQUEST_KIND_WRITEOFF,
     REQUEST_PENDING,
     EquipmentRequest,
+    EquipmentRequestMessage,
     MaterialUsage,
 )
 
@@ -1516,3 +1519,51 @@ class RequestEquipmentConditionSplitTests(TestCase):
         self.assertEqual(retired_row.status, STATUS_RETIRED)
         self.assertEqual(retired_row.quantity_total, 1)
         self.assertEqual(retired_row.quantity_available, 0)
+
+
+class NotificationBellTests(TestCase):
+    def setUp(self):
+        self.password = "secret123"
+        self.requester = User.objects.create_user(username="bell_requester", password=self.password)
+        self.processor = User.objects.create_user(username="bell_processor", password=self.password)
+        self.workplace = Workplace.objects.create(name="Bell workshop")
+        self.category = EquipmentCategory.objects.create(name="Bell cat")
+        self.equipment = Equipment.objects.create(
+            name="Bell tool",
+            inventory_number="INV-BELL-01",
+            category=self.category,
+            workplace=self.workplace,
+            quantity_total=5,
+            quantity_available=5,
+            is_consumable=True,
+            status=STATUS_IN_STOCK,
+        )
+
+    def test_request_thread_unread_for_requester_cleared_after_opening_detail(self):
+        req = EquipmentRequest.objects.create(
+            requester=self.requester,
+            workplace=self.workplace,
+            equipment=self.equipment,
+            quantity=1,
+            request_kind=REQUEST_KIND_WRITEOFF,
+            status=REQUEST_PENDING,
+            processed_by=self.processor,
+        )
+        EquipmentRequestMessage.objects.create(request=req, author=self.processor, body="Здравствуйте")
+        self.assertEqual(unread_request_message_count(self.requester), 1)
+        self.assertEqual(unread_request_message_count(self.processor), 0)
+
+        self.client.force_login(self.requester)
+        response = self.client.get(reverse("request_detail", kwargs={"request_id": req.pk}))
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(unread_request_message_count(self.requester), 0)
+
+    def test_notifications_page_requires_login(self):
+        response = self.client.get(reverse("notifications"))
+        self.assertEqual(response.status_code, 302)
+
+    def test_notifications_page_renders_for_authenticated_user(self):
+        self.client.force_login(self.requester)
+        response = self.client.get(reverse("notifications"))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Уведомления")

@@ -2,6 +2,97 @@
 {% load inventory_extras %}
 
 {% block content %}
+<style>
+    .dm-layout {
+        display: grid;
+        gap: 14px;
+        grid-template-columns: minmax(260px, 0.95fr) minmax(0, 1.35fr);
+    }
+    .dm-conversations-list {
+        max-height: 520px;
+        overflow: auto;
+        padding-right: 4px;
+    }
+    .dm-chat-thread {
+        max-height: 460px;
+        overflow: auto;
+        padding-right: 4px;
+    }
+    .dm-chat-row {
+        display: flex;
+        margin-bottom: 10px;
+    }
+    .dm-chat-row.incoming {
+        justify-content: flex-start;
+    }
+    .dm-chat-row.outgoing {
+        justify-content: flex-end;
+    }
+    .dm-chat-bubble {
+        width: min(82%, 560px);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        background: var(--surface);
+        padding: 8px 10px;
+    }
+    .dm-chat-row.outgoing .dm-chat-bubble {
+        background: rgba(76, 103, 255, 0.08);
+        border-color: color-mix(in srgb, var(--accent) 45%, var(--border));
+    }
+    .dm-chat-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        font-size: 12px;
+    }
+    .dm-chat-time {
+        color: var(--muted);
+        font-size: 11px;
+        white-space: nowrap;
+    }
+    .dm-chat-body {
+        margin-top: 6px;
+        white-space: pre-wrap;
+    }
+    @media (max-width: 960px) {
+        .dm-layout {
+            grid-template-columns: 1fr;
+        }
+    }
+    .dm-moderation-feed {
+        max-height: 62vh;
+        overflow: auto;
+        display: grid;
+        gap: 8px;
+        padding-right: 4px;
+    }
+    .dm-moderation-item {
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        background: var(--surface);
+        padding: 10px 12px;
+    }
+    .dm-moderation-head {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 8px;
+        font-size: 12px;
+        color: var(--muted);
+    }
+    .dm-moderation-body {
+        margin-top: 6px;
+        white-space: pre-wrap;
+    }
+    .dm-moderation-dialogs {
+        max-height: 62vh;
+        overflow: auto;
+        display: grid;
+        gap: 8px;
+        padding-right: 4px;
+    }
+</style>
 <div class="card">
     <div class="card-header">
         <div>
@@ -21,53 +112,66 @@
     </div>
 </div>
 
-{% if dm_moderation_mode and all_direct_messages %}
+{% if dm_moderation_mode %}
 <div class="card">
     <h3>{% ui_text "Все сообщения в системе" "All messages in the system" %}</h3>
-    <p class="muted">{% ui_text "Последние 500 сообщений. Удаление доступно только администраторам портала." "Latest 500 messages. Deletion is limited to portal administrators." %}</p>
-    <div class="table-scroll">
-        <table class="dm-moderation-table">
-            <thead>
-                <tr>
-                    <th>{% ui_text "Время" "Time" %}</th>
-                    <th>{% ui_text "От" "From" %}</th>
-                    <th>{% ui_text "Кому" "To" %}</th>
-                    <th>{% ui_text "Текст" "Text" %}</th>
-                    <th></th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for row in all_direct_messages %}
-                <tr>
-                    <td>{{ row.created_at|date:preferred_datetime_format }}</td>
-                    <td>{{ row.sender.username }}</td>
-                    <td>{{ row.recipient.username }}</td>
-                    <td style="white-space: pre-wrap; max-width: 28rem;">{{ row.body }}</td>
-                    <td>
-                        <form method="post" style="display:inline;" onsubmit="return confirm('{% ui_text "Удалить это сообщение?" "Delete this message?" %}');">
+    <p class="muted">{% ui_text "Выберите диалог и удаляйте сообщения внутри него. Так удобнее, чем общая таблица на 500 строк." "Pick a conversation and remove messages inside it. This is easier than one 500-row table." %}</p>
+    <div class="dm-layout">
+        <div>
+            <h4 style="margin-top:0;">{% ui_text "Диалоги" "Conversations" %}</h4>
+            <div class="dm-moderation-dialogs">
+                {% for conv in moderation_conversations %}
+                <a
+                    href="{% url 'direct_messages' %}?moderation=1&a={{ conv.a_id }}&b={{ conv.b_id }}"
+                    class="secondary"
+                    style="display:block; text-decoration:none; {% if selected_mod_pair and selected_mod_pair.0 == conv.a_id and selected_mod_pair.1 == conv.b_id %}border-color:var(--accent); background:rgba(76,103,255,0.08);{% endif %}"
+                >
+                    <strong>{{ conv.user_a.username }} ↔ {{ conv.user_b.username }}</strong>
+                    <div class="muted" style="margin-top:4px;">{{ conv.last_message|truncatechars:80 }}</div>
+                    <div class="toolbar-spread" style="margin-top:6px;">
+                        <span class="muted">{{ conv.last_at|date:preferred_datetime_format }}</span>
+                        <span class="badge">{{ conv.count }}</span>
+                    </div>
+                </a>
+                {% empty %}
+                <div class="muted">{% ui_text "Диалогов пока нет." "No conversations yet." %}</div>
+                {% endfor %}
+            </div>
+        </div>
+        <div>
+            <h4 style="margin-top:0;">{% ui_text "Сообщения выбранного диалога" "Messages in selected conversation" %}</h4>
+            <div class="dm-moderation-feed">
+                {% for row in moderation_messages %}
+                <article class="dm-moderation-item">
+                    <div class="dm-moderation-head">
+                        <span>
+                            {{ row.created_at|date:preferred_datetime_format }} •
+                            <strong>{{ row.sender.username }}</strong> → <strong>{{ row.recipient.username }}</strong>
+                        </span>
+                        <form method="post" style="display:inline;">
                             {% csrf_token %}
                             <input type="hidden" name="action" value="delete_direct_message" />
                             <input type="hidden" name="message_id" value="{{ row.pk }}" />
-                            <input type="hidden" name="next" value="{% url 'direct_messages' %}?moderation=1" />
-                            <button class="btn secondary" type="submit" style="padding:6px 10px;">{% ui_text "Удалить" "Delete" %}</button>
+                            <input type="hidden" name="next" value="{% url 'direct_messages' %}?moderation=1{% if selected_mod_pair %}&a={{ selected_mod_pair.0 }}&b={{ selected_mod_pair.1 }}{% endif %}" />
+                            <button class="btn secondary" type="submit" style="padding:4px 8px;">{% ui_text "Удалить" "Delete" %}</button>
                         </form>
-                    </td>
-                </tr>
+                    </div>
+                    <div class="dm-moderation-body">{{ row.body }}</div>
+                </article>
+                {% empty %}
+                <div class="muted">{% ui_text "Выберите диалог слева." "Choose a conversation on the left." %}</div>
                 {% endfor %}
-            </tbody>
-        </table>
+            </div>
+        </div>
     </div>
-</div>
-{% elif dm_moderation_mode %}
-<div class="card">
-    <p class="muted">{% ui_text "Сообщений пока нет." "There are no messages yet." %}</p>
 </div>
 {% endif %}
 
-<div class="split-layout">
+{% if not dm_moderation_mode %}
+<div class="dm-layout">
     <div class="card">
         <h3>{% ui_text "Диалоги" "Conversations" %}</h3>
-        <div class="timeline">
+        <div class="timeline dm-conversations-list">
             {% for item in conversations %}
             <a href="{% url 'direct_messages' %}?user={{ item.user.pk }}" class="secondary" style="display:block; text-decoration:none;">
                 <strong>{{ item.user.username }}</strong>
@@ -105,13 +209,15 @@
             </div>
         </form>
 
-        <div class="timeline">
+        <div class="dm-chat-thread">
             {% for item in conversation_messages %}
-            <div class="timeline-item">
-                <div class="timeline-time">{{ item.created_at|date:preferred_datetime_format }}</div>
-                <div class="timeline-body">
-                    <strong>{{ item.sender.username }}</strong>
-                    <div style="margin-top: 8px; white-space: pre-wrap;">{{ item.body }}</div>
+            <div class="dm-chat-row {% if item.sender_id == user.id %}outgoing{% else %}incoming{% endif %}">
+                <div class="dm-chat-bubble">
+                    <div class="dm-chat-head">
+                        <strong>{{ item.sender.username }}</strong>
+                        <span class="dm-chat-time">{{ item.created_at|date:preferred_datetime_format }}</span>
+                    </div>
+                    <div class="dm-chat-body">{{ item.body }}</div>
                 </div>
             </div>
             {% empty %}
@@ -120,4 +226,21 @@
         </div>
     </div>
 </div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+    (function () {
+        const recipientSelect = document.getElementById("id_recipient");
+        if (!recipientSelect) return;
+        recipientSelect.addEventListener("change", function () {
+            const value = (recipientSelect.value || "").trim();
+            if (!value) return;
+            const url = new URL(window.location.href);
+            url.searchParams.set("user", value);
+            window.location.href = url.toString();
+        });
+    })();
+</script>
 {% endblock %}

@@ -7,6 +7,7 @@ urlpatterns = [
     path("show-deleted/toggle/", views.toggle_show_deleted, name="toggle_show_deleted"),
     path("accounts/preferences/", views.user_preferences_view, name="user_preferences"),
     path("messages/", views.direct_messages_view, name="direct_messages"),
+    path("notifications/", views.notifications_view, name="notifications"),
     path("about/", views.about_site, name="about_site"),
     path("api/docs/", views.api_docs, name="api_docs"),
     path("api/token/", views.api_token_view, name="api_token"),

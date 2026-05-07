@@ -118,6 +118,7 @@ TEMPLATES = [
                 'django.contrib.messages.context_processors.messages',
                 'django.template.context_processors.i18n',
                 'inventory.context_processors.user_preferences',
+                'inventory.context_processors.notification_counts',
             ],
         },
     },

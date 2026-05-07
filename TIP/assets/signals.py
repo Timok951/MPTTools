@@ -3,7 +3,7 @@ from django.db.models.functions import Greatest
 from django.db.models.signals import post_save, pre_save
 from django.dispatch import receiver
 
-from operations.models import REQUEST_CLOSED, REQUEST_ISSUED, EquipmentRequest
+from operations.models import REQUEST_APPROVED, EquipmentRequest
 
 from .models import EquipmentCheckout, InventoryAdjustment, STATUS_IN_STOCK, STATUS_RETIRED
 
@@ -41,7 +41,7 @@ def apply_checkout_effect(sender, instance, created, **kwargs):
             quantity_available=Greatest(F("quantity_available") - instance.quantity, Value(0)),
         )
         if instance.related_request_id:
-            EquipmentRequest.objects.filter(pk=instance.related_request_id).update(status=REQUEST_ISSUED)
+            EquipmentRequest.objects.filter(pk=instance.related_request_id).update(status=REQUEST_APPROVED)
         return
     prev = getattr(instance, "_prev_state", None)
     if prev and not prev.returned_at and instance.returned_at:
@@ -49,5 +49,3 @@ def apply_checkout_effect(sender, instance, created, **kwargs):
         sender_equipment.objects.filter(pk=instance.equipment_id).update(
             quantity_available=F("quantity_available") + prev.quantity,
         )
-        if instance.related_request_id:
-            EquipmentRequest.objects.filter(pk=instance.related_request_id).update(status=REQUEST_CLOSED)

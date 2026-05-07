@@ -301,8 +301,6 @@ class UserPreferenceForm(forms.ModelForm):
                 ("pending", t("На рассмотрении", "Pending")),
                 ("approved", t("Одобрена", "Approved")),
                 ("rejected", t("Отклонена", "Rejected")),
-                ("issued", t("Выдана", "Issued")),
-                ("closed", t("Закрыта", "Closed")),
             ],
             initial=self.instance.default_request_status if self.instance and self.instance.pk else "pending",
         )

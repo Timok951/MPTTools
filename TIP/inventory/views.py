@@ -9,12 +9,15 @@ import random
 import secrets
 import tempfile
 import zipfile
+import math
 from urllib.parse import urlencode
 
 import qrcode
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4, landscape
 from reportlab.lib.styles import getSampleStyleSheet
+from reportlab.graphics.charts.barcharts import VerticalBarChart
+from reportlab.graphics.shapes import Drawing, String
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
@@ -66,8 +69,6 @@ from operations.models import (
     REQUEST_KIND_RESTOCK,
     REQUEST_KIND_WRITEOFF,
     REQUEST_APPROVED,
-    REQUEST_CLOSED,
-    REQUEST_ISSUED,
     REQUEST_REJECTED,
     RESTOCK_NON_CONSUMABLE_INCREASE,
     RESTOCK_NON_CONSUMABLE_SET_IN_STOCK,
@@ -105,6 +106,11 @@ from .forms import (
     UserPreferenceForm,
 )
 from .quality_report import generate_quality_report, load_quality_report
+from .notification_utils import (
+    mark_equipment_request_thread_read,
+    unread_direct_message_count,
+    unread_request_notification_groups,
+)
 
 try:
     from anymail.exceptions import AnymailError
@@ -128,29 +134,17 @@ REQUEST_STATUS_HELPERS = {
     REQUEST_APPROVED: {
         "badge_class": "badge badge-approved",
         "quick_actions": [
-            {"value": REQUEST_ISSUED, "label": "Отметить как выданную"},
             {"value": REQUEST_REJECTED, "label": "Отклонить"},
-            {"value": REQUEST_CLOSED, "label": "Закрыть"},
         ],
     },
-    REQUEST_ISSUED: {
-        "badge_class": "badge badge-issued",
-        "quick_actions": [
-            {"value": REQUEST_CLOSED, "label": "Закрыть"},
-        ],
-    },
+    "issued": {"badge_class": "badge badge-issued", "quick_actions": []},
     REQUEST_REJECTED: {
         "badge_class": "badge badge-rejected",
         "quick_actions": [
             {"value": REQUEST_PENDING, "label": "Вернуть на рассмотрение"},
         ],
     },
-    REQUEST_CLOSED: {
-        "badge_class": "badge badge-closed",
-        "quick_actions": [
-            {"value": REQUEST_PENDING, "label": "Переоткрыть"},
-        ],
-    },
+    "closed": {"badge_class": "badge badge-closed", "quick_actions": []},
 }
 
 EQUIPMENT_STATUS_HELPERS = {
@@ -168,7 +162,7 @@ def _request_status_choices_without_closed():
     return [
         (value, label)
         for value, label in EquipmentRequest._meta.get_field("status").choices
-        if value != REQUEST_CLOSED
+        if value not in {"closed", "issued"}
     ]
 
 
@@ -233,6 +227,15 @@ def _can_delete_request_messages(user) -> bool:
     return user_has_capability(user, "request_processing") or user_has_capability(
         user, "users_and_site_admin"
     )
+
+
+def _can_delete_specific_request_message(user, msg: EquipmentRequestMessage) -> bool:
+    if not _can_delete_request_messages(user):
+        return False
+    # Главный техник может удалять только свои сообщения.
+    if user_in_group(user, GROUP_SENIOR_TECHNICIAN) and not user_has_capability(user, "users_and_site_admin"):
+        return msg.author_id == user.pk
+    return True
 
 
 def _can_access_requests_module(user) -> bool:
@@ -486,9 +489,7 @@ def _request_history_filtered_queryset(request):
     if view_mode == "mine":
         requests_qs = requests_qs.filter(requester=request.user)
     elif view_mode == "processing":
-        requests_qs = requests_qs.filter(status__in=[REQUEST_PENDING, REQUEST_APPROVED, REQUEST_ISSUED])
-        if _can_process_request_status(request.user):
-            requests_qs = requests_qs.exclude(processed_by=request.user, status=REQUEST_ISSUED)
+        requests_qs = requests_qs.filter(status__in=[REQUEST_PENDING, REQUEST_APPROVED])
     # view=all или пусто (у ролей без обработки): без доп. отбора по режиму просмотра
 
     if status:
@@ -696,6 +697,149 @@ def _pdf_table_response(*, title: str, headers: list[str], rows: list[list], fil
     return response
 
 
+def _build_vertical_bar_chart(
+    *,
+    title: str,
+    categories: list[str],
+    data_series: list[list[float]],
+    series_colors: list,
+    width: int,
+    height: int,
+    font_name: str,
+) -> Drawing:
+    drawing = Drawing(width, height)
+    drawing.add(String(8, height - 14, title, fontName=font_name, fontSize=10, fillColor=colors.HexColor("#1f2a44")))
+
+    chart = VerticalBarChart()
+    chart.x = 36
+    chart.y = 32
+    chart.width = width - 52
+    chart.height = height - 56
+    chart.data = data_series or [[0]]
+    chart.categoryAxis.categoryNames = categories or ["—"]
+    chart.categoryAxis.labels.boxAnchor = "ne"
+    chart.categoryAxis.labels.angle = 25
+    chart.categoryAxis.labels.fontName = font_name
+    chart.categoryAxis.labels.fontSize = 7
+    chart.valueAxis.labels.fontName = font_name
+    chart.valueAxis.labels.fontSize = 7
+    chart.valueAxis.valueMin = 0
+    max_value = 0
+    for row in chart.data:
+        if row:
+            max_value = max(max_value, max(row))
+    chart.valueAxis.valueMax = max(1, int(math.ceil(max_value * 1.2)))
+    chart.valueAxis.valueStep = max(1, int(math.ceil(chart.valueAxis.valueMax / 5)))
+    for idx, row in enumerate(chart.data):
+        if idx < len(series_colors):
+            chart.bars[idx].fillColor = series_colors[idx]
+    drawing.add(chart)
+    return drawing
+
+
+def _analytics_pdf_with_charts(ctx: dict) -> HttpResponse:
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=landscape(A4),
+        leftMargin=20,
+        rightMargin=20,
+        topMargin=20,
+        bottomMargin=20,
+    )
+    font_name = "Helvetica"
+    try:
+        windows_font = Path("C:/Windows/Fonts/arial.ttf")
+        if windows_font.exists():
+            pdfmetrics.registerFont(TTFont("ArialUnicode", str(windows_font)))
+            font_name = "ArialUnicode"
+    except Exception:
+        font_name = "Helvetica"
+
+    styles = getSampleStyleSheet()
+    title_style = styles["Heading3"].clone("analytics_pdf_title")
+    title_style.fontName = font_name
+    body_style = styles["BodyText"].clone("analytics_pdf_body")
+    body_style.fontName = font_name
+
+    kpi_rows = [
+        ["Всего оборудования", ctx["equipment_total"]],
+        ["Расходники", ctx["consumables_total"]],
+        ["Низкий остаток", ctx["low_stock_total"]],
+        ["Ожидают обработки", ctx["requests_pending"]],
+        ["Операции расхода за 30 дней", ctx["usage_records_30d"]],
+    ]
+    kpi_table = Table([["Показатель", "Значение"], *kpi_rows], repeatRows=1, colWidths=[340, 120])
+    kpi_table.setStyle(
+        TableStyle(
+            [
+                ("FONTNAME", (0, 0), (-1, -1), font_name),
+                ("FONTSIZE", (0, 0), (-1, -1), 9),
+                ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#eef2ff")),
+                ("GRID", (0, 0), (-1, -1), 0.4, colors.HexColor("#cbd5e1")),
+                ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+            ]
+        )
+    )
+
+    equipment_categories = [str(row["status"]) for row in ctx.get("equipment_by_status", [])]
+    equipment_values = [int(row["count"]) for row in ctx.get("equipment_by_status", [])]
+    request_categories = [str(row["status"]) for row in ctx.get("requests_by_status", [])]
+    request_values = [int(row["count"]) for row in ctx.get("requests_by_status", [])]
+    day_labels = [str(v)[5:] for v in ctx.get("day_labels", [])[-10:]]
+    req_daily = [int(v) for v in ctx.get("requests_daily", [])[-10:]]
+    usage_c_daily = [int(v) for v in ctx.get("usage_consumable_daily", [])[-10:]]
+    usage_nc_daily = [int(v) for v in ctx.get("usage_non_consumable_daily", [])[-10:]]
+
+    chart_equipment = _build_vertical_bar_chart(
+        title="Оборудование по статусам",
+        categories=equipment_categories,
+        data_series=[equipment_values],
+        series_colors=[colors.HexColor("#748cab")],
+        width=360,
+        height=190,
+        font_name=font_name,
+    )
+    chart_requests = _build_vertical_bar_chart(
+        title="Заявки по статусам",
+        categories=request_categories,
+        data_series=[request_values],
+        series_colors=[colors.HexColor("#d4572a")],
+        width=360,
+        height=190,
+        font_name=font_name,
+    )
+    chart_activity = _build_vertical_bar_chart(
+        title="Активность за 10 дней (заявки / расходники / нерасходуемое)",
+        categories=day_labels,
+        data_series=[req_daily, usage_c_daily, usage_nc_daily],
+        series_colors=[colors.HexColor("#d4572a"), colors.HexColor("#0f5e4b"), colors.HexColor("#748cab")],
+        width=760,
+        height=230,
+        font_name=font_name,
+    )
+
+    chart_row = Table([[chart_equipment, chart_requests]], colWidths=[370, 370])
+    chart_row.setStyle(TableStyle([("VALIGN", (0, 0), (-1, -1), "TOP")]))
+
+    elements = [
+        Paragraph("Аналитика: сводка и графики", title_style),
+        Spacer(1, 8),
+        kpi_table,
+        Spacer(1, 10),
+        chart_row,
+        Spacer(1, 10),
+        chart_activity,
+        Spacer(1, 8),
+        Paragraph("Сформировано системой MPT Tools.", body_style),
+    ]
+    doc.build(elements)
+    pdf_bytes = buffer.getvalue()
+    response = HttpResponse(pdf_bytes, content_type="application/pdf")
+    response["Content-Disposition"] = 'attachment; filename="analytics-summary-charts.pdf"'
+    return response
+
+
 @login_required
 def analytics(request):
     if not _can_access_analytics_dashboard(request.user):
@@ -828,19 +972,7 @@ def analytics_print(request):
         )
     ctx["activity_table_rows"] = activity_rows
     if request.GET.get("download") == "1":
-        rows = [
-            ["Всего оборудования", ctx["equipment_total"]],
-            ["Расходники", ctx["consumables_total"]],
-            ["Низкий остаток", ctx["low_stock_total"]],
-            ["Ожидают обработки", ctx["requests_pending"]],
-            ["Операции расхода за 30 дней", ctx["usage_records_30d"]],
-        ]
-        return _pdf_table_response(
-            title="Аналитика: ключевые показатели",
-            headers=["Показатель", "Значение"],
-            rows=rows,
-            filename="analytics-summary.pdf",
-        )
+        return _analytics_pdf_with_charts(ctx)
     return render(request, "inventory/analytics_print.html", ctx)
 
 
@@ -1724,6 +1856,7 @@ def request_detail(request, request_id: int):
     if not can_access:
         return forbidden(request, "Просмотр этой заявки недоступен.")
     _decorate_request(item)
+    mark_equipment_request_thread_read(request.user, item)
     is_approved_locked = item.status == REQUEST_APPROVED
 
     message_form = EquipmentRequestMessageForm()
@@ -1757,14 +1890,14 @@ def request_detail(request, request_id: int):
                 messages.success(request, "Фото добавлено.")
                 return redirect("request_detail", request_id=item.pk)
         elif action == "delete_message":
-            if not _can_delete_request_messages(request.user):
-                return forbidden(request, "Удаление сообщений по заявке недоступно.")
             raw_mid = (request.POST.get("message_id") or "").strip()
             if raw_mid.isdigit():
                 msg = EquipmentRequestMessage.objects.filter(
                     pk=int(raw_mid), request_id=item.pk
                 ).first()
                 if msg:
+                    if not _can_delete_specific_request_message(request.user, msg):
+                        return forbidden(request, "Удаление чужих сообщений по заявке недоступно.")
                     msg.delete()
                     messages.success(request, "Сообщение удалено.")
                 else:
@@ -1789,6 +1922,11 @@ def request_detail(request, request_id: int):
             "can_quick_status": _can_process_request_status(request.user) and not is_approved_locked,
             "status_choices": _request_status_choices_without_closed(),
             "can_delete_messages": _can_delete_request_messages(request.user) and not is_approved_locked,
+            "can_delete_foreign_messages": (
+                _can_delete_request_messages(request.user)
+                and not is_approved_locked
+                and not user_in_group(request.user, GROUP_SENIOR_TECHNICIAN)
+            ),
             "can_add_request_content": not is_approved_locked,
             "is_approved_locked": is_approved_locked,
             "can_update_equipment_condition": bool(
@@ -1847,18 +1985,19 @@ def request_update_status(request, request_id: int):
                     f"Пополнение расходника: +{item.quantity} шт. (оборудование #{item.equipment.pk})."
                 )
             else:
-                action = item.restock_non_consumable_action or RESTOCK_NON_CONSUMABLE_SET_IN_STOCK
-                if action == RESTOCK_NON_CONSUMABLE_INCREASE:
-                    InventoryAdjustment.objects.create(
-                        equipment=item.equipment,
-                        delta=item.quantity,
-                        reason=f"Пополнение нерасходника по одобренной заявке #{item.pk}",
-                        created_by=request.user,
-                    )
-                    note_lines.append(
-                        f"Пополнение нерасходника: +{item.quantity} шт. (оборудование #{item.equipment.pk})."
-                    )
-                else:
+                # Для пополнения нерасходников всегда увеличиваем количество.
+                # Опция "Перевести на склад" дополнительно выставляет статус "На складе".
+                action = item.restock_non_consumable_action or RESTOCK_NON_CONSUMABLE_INCREASE
+                InventoryAdjustment.objects.create(
+                    equipment=item.equipment,
+                    delta=item.quantity,
+                    reason=f"Пополнение нерасходника по одобренной заявке #{item.pk}",
+                    created_by=request.user,
+                )
+                note_lines.append(
+                    f"Пополнение нерасходника: +{item.quantity} шт. (оборудование #{item.equipment.pk})."
+                )
+                if action == RESTOCK_NON_CONSUMABLE_SET_IN_STOCK:
                     if item.equipment.status != STATUS_IN_STOCK:
                         item.equipment.status = STATUS_IN_STOCK
                         item.equipment._actor = request.user
@@ -2205,6 +2344,23 @@ def quality_report_view(request):
 
 
 @login_required
+def notifications_view(request):
+    dm_unread_total = unread_direct_message_count(request.user)
+    conversations = _message_conversation_summaries(request.user)
+    dm_with_unread = [c for c in conversations if c["unread_count"] > 0]
+    request_groups = unread_request_notification_groups(request.user)
+    return render(
+        request,
+        "inventory/notifications.html",
+        {
+            "dm_unread_total": dm_unread_total,
+            "dm_conversations_unread": dm_with_unread,
+            "request_notification_groups": request_groups,
+        },
+    )
+
+
+@login_required
 def direct_messages_view(request):
     is_dm_moderator = user_has_capability(request.user, "users_and_site_admin")
     dm_moderation_mode = bool(is_dm_moderator and request.GET.get("moderation") == "1")
@@ -2222,6 +2378,7 @@ def direct_messages_view(request):
         return redirect(request.POST.get("next") or reverse("direct_messages"))
 
     selected_user = None
+    selected_mod_pair = None
     selected_user_id = request.GET.get("user") or request.POST.get("recipient")
     if selected_user_id:
         selected_user = get_object_or_404(User.objects.filter(is_active=True), pk=selected_user_id)
@@ -2271,12 +2428,61 @@ def direct_messages_view(request):
             .order_by("created_at", "id")
         )
 
-    all_direct_messages = []
+    moderation_conversations = []
+    moderation_messages = []
     if dm_moderation_mode:
+        raw_a = (request.GET.get("a") or "").strip()
+        raw_b = (request.GET.get("b") or "").strip()
+        selected_a = int(raw_a) if raw_a.isdigit() else None
+        selected_b = int(raw_b) if raw_b.isdigit() else None
+
+        # Ограничиваем расчёт «всех диалогов» последними сообщениями,
+        # чтобы страница модерации оставалась быстрой.
         all_direct_messages = list(
             DirectMessage.objects.select_related("sender", "recipient")
-            .order_by("-created_at", "-id")[:500]
+            .order_by("-created_at", "-id")[:4000]
         )
+        by_pair = {}
+        for row in all_direct_messages:
+            a_id, b_id = sorted((row.sender_id, row.recipient_id))
+            rec = by_pair.get((a_id, b_id))
+            if rec is None:
+                user_a = row.sender if row.sender_id == a_id else row.recipient
+                user_b = row.recipient if row.recipient_id == b_id else row.sender
+                rec = {
+                    "a_id": a_id,
+                    "b_id": b_id,
+                    "user_a": user_a,
+                    "user_b": user_b,
+                    "last_message": row.body,
+                    "last_at": row.created_at,
+                    "count": 0,
+                }
+                by_pair[(a_id, b_id)] = rec
+            rec["count"] += 1
+        moderation_conversations = sorted(
+            by_pair.values(),
+            key=lambda x: x["last_at"],
+            reverse=True,
+        )[:500]
+        if moderation_conversations:
+            if selected_a is None or selected_b is None:
+                selected_mod_pair = (
+                    moderation_conversations[0]["a_id"],
+                    moderation_conversations[0]["b_id"],
+                )
+            else:
+                selected_mod_pair = tuple(sorted((selected_a, selected_b)))
+            moderation_messages = list(
+                DirectMessage.objects.select_related("sender", "recipient")
+                .filter(
+                    (
+                        Q(sender_id=selected_mod_pair[0], recipient_id=selected_mod_pair[1])
+                        | Q(sender_id=selected_mod_pair[1], recipient_id=selected_mod_pair[0])
+                    )
+                )
+                .order_by("created_at", "id")
+            )
 
     return render(
         request,
@@ -2288,7 +2494,9 @@ def direct_messages_view(request):
             "form": form,
             "is_dm_moderator": is_dm_moderator,
             "dm_moderation_mode": dm_moderation_mode,
-            "all_direct_messages": all_direct_messages,
+            "moderation_conversations": moderation_conversations,
+            "moderation_messages": moderation_messages,
+            "selected_mod_pair": selected_mod_pair,
         },
     )
 

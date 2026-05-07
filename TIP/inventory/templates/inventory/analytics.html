@@ -7,6 +7,7 @@
         <a class="secondary" href="{% url 'analytics_export_csv_zip' %}">{% ui_text "Таблицы CSV (ZIP)" "Tables CSV (ZIP)" %}</a>
         <a class="secondary" href="{% url 'analytics_print' %}" target="_blank" rel="noopener noreferrer">{% ui_text "Таблицы PDF (печать)" "Tables PDF (print)" %}</a>
         <a class="secondary" href="{% url 'analytics_print' %}?download=1">{% ui_text "Скачать PDF" "Download PDF" %}</a>
+        <button type="button" class="secondary" id="downloadChartsFromPageBtn">{% ui_text "Скачать PDF (графики как на сайте)" "Download PDF (charts as on page)" %}</button>
     </div>
     <h2>{% trans "Analytics" %}</h2>
     <div class="kpi-grid">
@@ -175,6 +176,7 @@
 
 {% block scripts %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script>
     const equipmentData = JSON.parse(document.getElementById("equipmentStatusData").textContent || "[]");
     const requestData = JSON.parse(document.getElementById("requestStatusData").textContent || "[]");
@@ -306,6 +308,67 @@
                 responsive: true,
                 plugins: { legend: { display: false } },
             },
+        });
+    }
+
+    async function exportChartsFromCurrentPage() {
+        const jsPdfApi = window.jspdf;
+        if (!jsPdfApi || !jsPdfApi.jsPDF) {
+            alert("{% ui_text 'Не удалось загрузить модуль PDF. Обновите страницу и попробуйте ещё раз.' 'PDF module was not loaded. Refresh and try again.' %}");
+            return;
+        }
+        const { jsPDF } = jsPdfApi;
+        const pdf = new jsPDF({ orientation: "landscape", unit: "pt", format: "a4" });
+        const pageWidth = pdf.internal.pageSize.getWidth();
+        const pageHeight = pdf.internal.pageSize.getHeight();
+        const margin = 28;
+        const maxW = pageWidth - margin * 2;
+        const maxH = pageHeight - margin * 2 - 24;
+        const blocks = [
+            { id: "equipmentStatusChart", title: "{% trans 'Equipment by status' %}" },
+            { id: "requestStatusChart", title: "{% trans 'Requests by status' %}" },
+            { id: "categoryStockChart", title: "{% trans 'Stock by category' %}" },
+            { id: "activityChart", title: "{% ui_text 'Активность за 30 дней' 'Activity last 30 days' %}" },
+            { id: "usageTypeQtyChart", title: "{% ui_text 'Объём уменьшения остатка по типу (30 дней)' 'Stock decrease volume by type (30 days)' %}" },
+            { id: "topConsumablesChart", title: "{% ui_text 'Топ расходников по количеству (30 дней)' 'Top consumables by quantity (30 days)' %}" },
+        ];
+
+        let pageIndex = 0;
+        for (const block of blocks) {
+            const canvas = document.getElementById(block.id);
+            if (!canvas || canvas.width <= 0 || canvas.height <= 0) continue;
+            if (pageIndex > 0) pdf.addPage();
+            pageIndex += 1;
+
+            pdf.setFont("helvetica", "bold");
+            pdf.setFontSize(12);
+            pdf.text(block.title, margin, margin);
+
+            const img = canvas.toDataURL("image/png", 1.0);
+            const scale = Math.min(maxW / canvas.width, maxH / canvas.height);
+            const w = canvas.width * scale;
+            const h = canvas.height * scale;
+            const x = (pageWidth - w) / 2;
+            const y = margin + 16 + Math.max(0, (maxH - h) / 2);
+            pdf.addImage(img, "PNG", x, y, w, h, undefined, "FAST");
+        }
+        if (pageIndex === 0) {
+            alert("{% ui_text 'На странице не найдено графиков для экспорта.' 'No charts found on page for export.' %}");
+            return;
+        }
+        pdf.save("analytics-charts-from-page.pdf");
+    }
+
+    const exportBtn = document.getElementById("downloadChartsFromPageBtn");
+    if (exportBtn) {
+        exportBtn.addEventListener("click", () => {
+            exportBtn.disabled = true;
+            exportBtn.textContent = "{% ui_text 'Подготовка PDF...' 'Preparing PDF...' %}";
+            Promise.resolve(exportChartsFromCurrentPage())
+                .finally(() => {
+                    exportBtn.disabled = false;
+                    exportBtn.textContent = "{% ui_text 'Скачать PDF (графики как на сайте)' 'Download PDF (charts as on page)' %}";
+                });
         });
     }
 </script>

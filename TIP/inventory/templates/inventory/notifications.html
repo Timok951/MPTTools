@@ -1,0 +1,65 @@
+{% extends "inventory/base.html" %}
+{% load inventory_extras %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header">
+        <div>
+            <div class="kicker">{% ui_text "Центр уведомлений" "Notification center" %}</div>
+            <h2>{% ui_text "Уведомления" "Notifications" %}</h2>
+            <p class="muted">
+                {% ui_text "Непрочитанные сообщения в чате и новые ответы по вашим заявкам (как заявитель или как обработчик)." "Unread chat messages and new replies on requests where you are the requester or assigned processor." %}
+            </p>
+        </div>
+        <div class="actions">
+            <a class="btn secondary" href="{% url 'direct_messages' %}">{% ui_text "Открыть чат" "Open chat" %}</a>
+            <a class="btn secondary" href="{% url 'request_history' %}">{% ui_text "Журнал заявок" "Request log" %}</a>
+        </div>
+    </div>
+</div>
+
+<div class="split-layout">
+    <div class="card">
+        <h3>{% ui_text "Сообщения в чате" "Direct messages" %}</h3>
+        {% if dm_unread_total %}
+        <p class="muted">{% ui_text "Непрочитано:" "Unread:" %} <strong>{{ dm_unread_total }}</strong></p>
+        <div class="timeline">
+            {% for item in dm_conversations_unread %}
+            <a href="{% url 'direct_messages' %}?user={{ item.user.pk }}" class="secondary" style="display:block; text-decoration:none;">
+                <strong>{{ item.user.username }}</strong>
+                <div class="muted" style="margin-top: 4px;">{{ item.last_message|truncatechars:120 }}</div>
+                <div class="toolbar-spread" style="margin-top: 8px;">
+                    <span class="muted">{{ item.last_message_at|date:preferred_datetime_format }}</span>
+                    <span class="badge warn">{{ item.unread_count }}</span>
+                </div>
+            </a>
+            {% endfor %}
+        </div>
+        {% else %}
+        <p class="muted">{% ui_text "Новых личных сообщений нет." "No new direct messages." %}</p>
+        {% endif %}
+    </div>
+
+    <div class="card">
+        <h3>{% ui_text "Заявки" "Requests" %}</h3>
+        {% if request_notification_groups %}
+        <div class="timeline">
+            {% for g in request_notification_groups %}
+            <a href="{% url 'request_detail' request_id=g.request.pk %}" class="secondary" style="display:block; text-decoration:none;">
+                <strong>{% ui_text "Заявка" "Request" %} #{{ g.request.pk }}</strong>
+                {% if g.count > 1 %}
+                <span class="badge warn" style="margin-left:6px;">{{ g.count }}</span>
+                {% endif %}
+                <div class="muted" style="margin-top: 4px;">
+                    {{ g.latest.author.username }}: {{ g.latest.body|default:"(без текста)"|truncatechars:100 }}
+                </div>
+                <div class="muted" style="margin-top: 6px;">{{ g.latest.created_at|date:preferred_datetime_format }}</div>
+            </a>
+            {% endfor %}
+        </div>
+        {% else %}
+        <p class="muted">{% ui_text "Нет непрочитанных сообщений по заявкам." "No unread request thread messages." %}</p>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

@@ -326,6 +326,14 @@ class PortalEquipmentRequestForm(forms.ModelForm):
             choices = list(self.fields["non_consumable_target_status"].choices)
             if choices and choices[0][0] != "":
                 self.fields["non_consumable_target_status"].choices = [("", "—")] + choices
+        if "restock_non_consumable_action" in self.fields:
+            self.fields["restock_non_consumable_action"].label = "Действие для пополнения нерасходуемого"
+            self.fields["restock_non_consumable_action"].help_text = (
+                "По умолчанию увеличивает количество. "
+                "Используйте «Перевести на склад», только если нужно сменить статус без увеличения."
+            )
+            if is_new:
+                self.fields["restock_non_consumable_action"].initial = "increase"
 
     def clean_quantity(self):
         value = self.cleaned_data.get("quantity")
@@ -339,8 +347,15 @@ class PortalEquipmentRequestForm(forms.ModelForm):
     def clean(self):
         cleaned = super().clean()
         equipment = cleaned.get("equipment")
+        request_kind = (cleaned.get("request_kind") or "").strip()
         if equipment is not None and equipment.is_consumable:
             cleaned["non_consumable_target_status"] = ""
+        if request_kind != "restock":
+            cleaned["restock_non_consumable_action"] = ""
+        elif equipment is not None and not equipment.is_consumable:
+            action = (cleaned.get("restock_non_consumable_action") or "").strip()
+            if action not in {"increase", "set_in_stock"}:
+                cleaned["restock_non_consumable_action"] = "increase"
         return cleaned
 
     def save(self, commit=True):

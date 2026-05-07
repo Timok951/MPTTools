@@ -9,8 +9,9 @@ from core.models import Cabinet, SoftDeleteModel, Workplace
 REQUEST_PENDING = "pending"
 REQUEST_APPROVED = "approved"
 REQUEST_REJECTED = "rejected"
-REQUEST_ISSUED = "issued"
-REQUEST_CLOSED = "closed"
+# Legacy aliases kept for backward compatibility with older imports.
+REQUEST_ISSUED = REQUEST_APPROVED
+REQUEST_CLOSED = REQUEST_REJECTED
 
 
 def default_needed_by_date():
@@ -21,8 +22,6 @@ REQUEST_STATUS_CHOICES = [
     (REQUEST_PENDING, "На рассмотрении"),
     (REQUEST_APPROVED, "Одобрена"),
     (REQUEST_REJECTED, "Отклонена"),
-    (REQUEST_ISSUED, "Выдана"),
-    (REQUEST_CLOSED, "Закрыта"),
 ]
 
 REQUEST_KIND_RESTOCK = "restock"
@@ -122,6 +121,33 @@ class EquipmentRequestMessage(models.Model):
 
     def __str__(self) -> str:
         return f"Request message #{self.pk} for request #{self.request_id}"
+
+
+class EquipmentRequestThreadRead(models.Model):
+    """Отметка прочтения переписки по заявке (для заявителя и назначенного обработчика)."""
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="equipment_request_thread_reads",
+    )
+    equipment_request = models.ForeignKey(
+        EquipmentRequest,
+        on_delete=models.CASCADE,
+        related_name="thread_reads",
+    )
+    last_read_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["user", "equipment_request"],
+                name="ops_equipmentrequestthreadread_user_req_uniq",
+            )
+        ]
+
+    def __str__(self) -> str:
+        return f"Thread read user={self.user_id} request={self.equipment_request_id}"
 
 
 class EquipmentRequestPhoto(models.Model):

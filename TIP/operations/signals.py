@@ -68,6 +68,9 @@ def notify_email_on_request_approved(sender, instance, created, **kwargs):
             instance.requester,
             request_id=instance.pk,
             approver_username=approver_username,
+            equipment_name=instance.equipment.name if instance.equipment_id and instance.equipment else None,
+            needed_by=instance.needed_by,
+            processed_at=instance.processed_at,
         )
     )
 
@@ -153,6 +156,9 @@ def notify_email_on_request_message(sender, instance, created, **kwargs):
             requester=req.requester,
             processed_by=req.processed_by,
             automation_body=raw_body,
+            equipment_name=req.equipment.name if req.equipment_id and req.equipment else None,
+            needed_by=req.needed_by,
+            message_created_at=msg.created_at,
         )
 
     transaction.on_commit(lambda: run_in_background(_notify))

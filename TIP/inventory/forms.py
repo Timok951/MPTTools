@@ -5,6 +5,8 @@ from django.core.exceptions import ValidationError
 from django.db.models import Q
 from django.utils.translation import gettext_lazy as _
 from django.utils import timezone
+import re
+from datetime import timedelta
 
 from assets.models import Equipment, EquipmentCheckout, InventoryAdjustment
 from django.contrib.auth.models import User
@@ -31,6 +33,8 @@ from operations.models import (
 
 MAX_ALLOWED_QUANTITY = 1000
 MAX_ALLOWED_ADJUSTMENT_DELTA = 1000
+MAX_REQUEST_FUTURE_DAYS = 365
+MAX_REQUEST_COMMENT_LENGTH = 500
 
 
 def _normalize_email(email: str | None) -> str:
@@ -43,6 +47,30 @@ def _validate_corporate_email(email: str) -> str:
 
 def _lang_label(ru_text: str, en_text: str, language_code: str) -> str:
     return en_text if str(language_code).lower().startswith("en") else ru_text
+
+
+def _has_meaningful_chars(value: str) -> bool:
+    return bool(re.search(r"[0-9A-Za-zА-Яа-яЁё]", value or ""))
+
+
+USERNAME_ALLOWED_RE = re.compile(r"^[0-9A-Za-zА-Яа-яЁё._-]+$")
+
+
+def _has_excessive_repetition(value: str, *, max_same_in_row: int = 4) -> bool:
+    if not value:
+        return False
+    return bool(re.search(rf"(.)\1{{{max_same_in_row},}}", value))
+
+
+def _validate_meaningful_text(value: str | None, *, field_label: str, required: bool = False) -> str:
+    text = (value or "").strip()
+    if not text:
+        if required:
+            raise ValidationError(f"Поле «{field_label}» не может состоять только из пробелов.")
+        return ""
+    if not _has_meaningful_chars(text):
+        raise ValidationError(f"Поле «{field_label}» должно содержать буквы или цифры, а не только символы.")
+    return text
 
 
 class RussianAuthenticationForm(AuthenticationForm):
@@ -88,6 +116,16 @@ class RussianUserCreationForm(UserCreationForm):
         if User.objects.filter(email__iexact=email).exists():
             raise ValidationError("Пользователь с таким адресом почты уже зарегистрирован.")
         return email
+
+    def clean_username(self):
+        value = (self.cleaned_data.get("username") or "").strip()
+        if not value:
+            raise ValidationError("Имя пользователя не может быть пустым.")
+        if not USERNAME_ALLOWED_RE.fullmatch(value):
+            raise ValidationError("Имя пользователя: допустимы буквы, цифры, а также . _ -")
+        if _has_excessive_repetition(value):
+            raise ValidationError("Имя пользователя содержит слишком много одинаковых символов подряд.")
+        return value
 
 class BackupImportForm(forms.Form):
     backup_file = forms.FileField(label=_("JSON резервная копия"))
@@ -203,6 +241,10 @@ class DirectMessageForm(forms.ModelForm):
     class Meta:
         model = DirectMessage
         fields = ["recipient", "body"]
+        labels = {
+            "recipient": "Пользователь",
+            "body": "Сообщение",
+        }
         widgets = {
             "body": forms.Textarea(attrs={"rows": 4, "placeholder": "Напишите сообщение пользователю."}),
         }
@@ -222,10 +264,7 @@ class DirectMessageForm(forms.ModelForm):
         return recipient
 
     def clean_body(self):
-        body = (self.cleaned_data.get("body") or "").strip()
-        if not body:
-            raise ValidationError("Сообщение не может состоять только из пробелов.")
-        return body
+        return _validate_meaningful_text(self.cleaned_data.get("body"), field_label="Сообщение", required=True)
 
 
 class UserPreferenceForm(forms.ModelForm):
@@ -451,14 +490,19 @@ class EquipmentRequestForm(forms.ModelForm):
         return equipment
 
     def clean_comment(self):
-        comment = (self.cleaned_data.get("comment") or "").strip()
-        return comment
+        value = _validate_meaningful_text(self.cleaned_data.get("comment"), field_label="Комментарий")
+        if value and len(value) > MAX_REQUEST_COMMENT_LENGTH:
+            raise ValidationError(f"Комментарий слишком длинный (максимум {MAX_REQUEST_COMMENT_LENGTH} символов).")
+        return value
 
     def clean_needed_by(self):
         # Если поле оставили пустым, считаем, что выбран текущий день.
-        needed_by = self.cleaned_data.get("needed_by") or timezone.localdate()
-        if needed_by < timezone.localdate():
+        today = timezone.localdate()
+        needed_by = self.cleaned_data.get("needed_by") or today
+        if needed_by < today:
             raise ValidationError("Дата «Нужно до» не может быть раньше сегодняшнего дня.")
+        if needed_by > today + timedelta(days=MAX_REQUEST_FUTURE_DAYS):
+            raise ValidationError(f"Дата «Нужно до» слишком далеко в будущем (максимум +{MAX_REQUEST_FUTURE_DAYS} дней).")
         return needed_by
 
     def clean(self):
@@ -500,15 +544,15 @@ class EquipmentRequestMessageForm(forms.ModelForm):
     class Meta:
         model = EquipmentRequestMessage
         fields = ["body"]
+        labels = {
+            "body": "Сообщение",
+        }
         widgets = {
             "body": forms.Textarea(attrs={"rows": 3, "placeholder": "Добавьте сообщение по заявке."}),
         }
 
     def clean_body(self):
-        body = (self.cleaned_data.get("body") or "").strip()
-        if not body:
-            raise ValidationError("Сообщение не может состоять только из пробелов.")
-        return body
+        return _validate_meaningful_text(self.cleaned_data.get("body"), field_label="Сообщение", required=True)
 
 
 class EquipmentRequestPhotoForm(forms.ModelForm):
@@ -520,8 +564,7 @@ class EquipmentRequestPhotoForm(forms.ModelForm):
         }
 
     def clean_caption(self):
-        caption = (self.cleaned_data.get("caption") or "").strip()
-        return caption
+        return _validate_meaningful_text(self.cleaned_data.get("caption"), field_label="Подпись к фото")
 
 
 class InventoryAdjustmentForm(forms.ModelForm):
@@ -557,10 +600,7 @@ class InventoryAdjustmentForm(forms.ModelForm):
         return cleaned
 
     def clean_reason(self):
-        reason = (self.cleaned_data.get("reason") or "").strip()
-        if not reason:
-            raise ValidationError("Укажите причину корректировки.")
-        return reason
+        return _validate_meaningful_text(self.cleaned_data.get("reason"), field_label="Причина", required=True)
 
 
 class EquipmentCheckoutForm(forms.ModelForm):
@@ -629,5 +669,4 @@ class EquipmentCheckoutForm(forms.ModelForm):
         return cleaned
 
     def clean_note(self):
-        note = (self.cleaned_data.get("note") or "").strip()
-        return note
+        return _validate_meaningful_text(self.cleaned_data.get("note"), field_label="Примечание")

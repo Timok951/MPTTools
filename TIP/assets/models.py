@@ -2,6 +2,8 @@ from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import models
 from django.utils import timezone
+from datetime import date, timedelta
+import re
 
 from core.models import Cabinet, EquipmentCategory, SoftDeleteModel, Workplace
 
@@ -18,6 +20,11 @@ EQUIPMENT_STATUS_CHOICES = [
     (STATUS_REPAIR, "В ремонте"),
     (STATUS_RETIRED, "Закончилось"),
 ]
+
+MIN_REASONABLE_DATE = date(2000, 1, 1)
+MAX_WARRANTY_FUTURE_DAYS = 3650
+SERIAL_ALLOWED_RE = re.compile(r"^[0-9A-Za-zА-Яа-яЁё\-_\/]+$")
+MODEL_ALLOWED_RE = re.compile(r"^[0-9A-Za-zА-Яа-яЁё\-_\/\s]+$")
 
 
 class Equipment(SoftDeleteModel):
@@ -52,6 +59,38 @@ class Equipment(SoftDeleteModel):
     def clean(self) -> None:
         if self.quantity_available > self.quantity_total:
             raise ValidationError("Доступное количество не может превышать общее количество.")
+        serial = (self.serial_number or "").strip()
+        if serial and not SERIAL_ALLOWED_RE.fullmatch(serial):
+            raise ValidationError(
+                {"serial_number": "Серийный номер может содержать только буквы, цифры и символы - _ /"}
+            )
+        model = (self.model or "").strip()
+        if model and not MODEL_ALLOWED_RE.fullmatch(model):
+            raise ValidationError({"model": "Модель может содержать только буквы, цифры, пробел и символы - _ /"})
+        if self.purchase_date:
+            if self.purchase_date < MIN_REASONABLE_DATE:
+                raise ValidationError(
+                    {"purchase_date": f"Дата покупки не может быть раньше {MIN_REASONABLE_DATE.strftime('%d.%m.%Y')}."}
+                )
+            if self.purchase_date > timezone.localdate():
+                raise ValidationError({"purchase_date": "Дата покупки не может быть в будущем."})
+        if self.warranty_end:
+            if self.warranty_end < MIN_REASONABLE_DATE:
+                raise ValidationError(
+                    {"warranty_end": f"Дата гарантии не может быть раньше {MIN_REASONABLE_DATE.strftime('%d.%m.%Y')}."}
+                )
+            max_warranty = timezone.localdate() + timedelta(days=MAX_WARRANTY_FUTURE_DAYS)
+            if self.warranty_end > max_warranty:
+                raise ValidationError(
+                    {
+                        "warranty_end": (
+                            f"Дата гарантии слишком далеко в будущем "
+                            f"(максимум до {max_warranty.strftime('%d.%m.%Y')})."
+                        )
+                    }
+                )
+            if self.purchase_date and self.warranty_end < self.purchase_date:
+                raise ValidationError({"warranty_end": "Гарантия не может заканчиваться раньше даты покупки."})
 
 
 class InventoryAdjustment(SoftDeleteModel):

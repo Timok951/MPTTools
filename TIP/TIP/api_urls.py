@@ -6,12 +6,19 @@ from rest_framework.schemas import get_schema_view
 from inventory.api.auth_views import TokenRevokeView
 from inventory.api.viewsets import (
     CabinetViewSet,
+    DirectMessageViewSet,
+    EmployeeScheduleViewSet,
     EquipmentCategoryViewSet,
     EquipmentCheckoutViewSet,
     InventoryAdjustmentViewSet,
+    EquipmentRequestMessageViewSet,
+    EquipmentRequestPhotoViewSet,
     EquipmentRequestViewSet,
     EquipmentViewSet,
     MaterialUsageViewSet,
+    PeriodicMaterialUsageScheduleViewSet,
+    RegistrationAllowedEmailDomainViewSet,
+    UserPreferenceViewSet,
     WorkplaceViewSet,
 )
 
@@ -24,6 +31,13 @@ router.register("requests", EquipmentRequestViewSet, basename="api-request")
 router.register("usage", MaterialUsageViewSet, basename="api-usage")
 router.register("adjustments", InventoryAdjustmentViewSet, basename="api-adjustment")
 router.register("checkouts", EquipmentCheckoutViewSet, basename="api-checkout")
+router.register("direct-messages", DirectMessageViewSet, basename="api-direct-message")
+router.register("request-messages", EquipmentRequestMessageViewSet, basename="api-request-message")
+router.register("request-photos", EquipmentRequestPhotoViewSet, basename="api-request-photo")
+router.register("periodic-usage", PeriodicMaterialUsageScheduleViewSet, basename="api-periodic-usage")
+router.register("employee-schedules", EmployeeScheduleViewSet, basename="api-employee-schedule")
+router.register("user-preferences", UserPreferenceViewSet, basename="api-user-preference")
+router.register("registration-domains", RegistrationAllowedEmailDomainViewSet, basename="api-registration-domain")
 
 schema_view = get_schema_view(
     title="TIP Inventory API",

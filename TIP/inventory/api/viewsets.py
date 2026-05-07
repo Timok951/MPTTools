@@ -1,13 +1,21 @@
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import transaction
-from django.db.models import F
+from django.db.models import F, Q
 from django.utils import timezone
 from rest_framework import viewsets
 from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.response import Response
 
 from assets.models import Equipment, EquipmentCheckout, InventoryAdjustment
-from core.models import Cabinet, EquipmentCategory, Workplace
+from core.models import (
+    Cabinet,
+    DirectMessage,
+    EmployeeSchedule,
+    EquipmentCategory,
+    RegistrationAllowedEmailDomain,
+    UserPreference,
+    Workplace,
+)
 from inventory.authz import (
     GROUP_ADMIN,
     GROUP_BUILDER,
@@ -23,7 +31,10 @@ from operations.models import (
     REQUEST_KIND_SYSADMIN,
     REQUEST_PENDING,
     EquipmentRequest,
+    EquipmentRequestMessage,
+    EquipmentRequestPhoto,
     MaterialUsage,
+    PeriodicMaterialUsageSchedule,
 )
 
 from .permissions import ALL_API_ROLES, CanAccessInventoryApi
@@ -32,9 +43,16 @@ from .serializers import (
     EquipmentCategorySerializer,
     EquipmentCheckoutSerializer,
     InventoryAdjustmentSerializer,
+    DirectMessageSerializer,
+    EmployeeScheduleSerializer,
+    EquipmentRequestMessageSerializer,
+    EquipmentRequestPhotoSerializer,
     EquipmentRequestSerializer,
     EquipmentSerializer,
     MaterialUsageSerializer,
+    PeriodicMaterialUsageScheduleSerializer,
+    RegistrationAllowedEmailDomainSerializer,
+    UserPreferenceSerializer,
     WorkplaceSerializer,
 )
 
@@ -358,4 +376,197 @@ class EquipmentCheckoutViewSet(InventoryModelViewSet):
                     req.save(update_fields=["status"])
             super().perform_destroy(instance)
 
+
+class DirectMessageViewSet(InventoryModelViewSet):
+    queryset = DirectMessage.objects.select_related("sender", "recipient").order_by("-created_at")
+    serializer_class = DirectMessageSerializer
+    role_matrix = {
+        "read": ALL_API_ROLES,
+        "create": ALL_API_ROLES,
+        "update": ALL_API_ROLES,
+        "delete": (GROUP_ADMIN,),
+    }
+    privileged_read_roles = (GROUP_ADMIN, GROUP_WAREHOUSE, GROUP_FIRST_LINE_SUPPORT, GROUP_ROLE_ADMIN)
+    privileged_update_roles = (GROUP_ADMIN, GROUP_WAREHOUSE, GROUP_FIRST_LINE_SUPPORT, GROUP_ROLE_ADMIN)
+    owner_field = "sender"
+    owner_read_roles = ALL_API_ROLES
+    owner_update_roles = ALL_API_ROLES
+    owner_delete_roles = ()
+
+    def scope_queryset_for_user(self, queryset):
+        return queryset.filter(Q(sender=self.request.user) | Q(recipient=self.request.user))
+
+    def has_api_object_access(self, user, api_action, obj):
+        if user_in_group(user, GROUP_ADMIN):
+            return True
+        if api_action == "read":
+            return obj.sender_id == user.pk or obj.recipient_id == user.pk
+        if api_action == "update":
+            return obj.recipient_id == user.pk
+        return super().has_api_object_access(user, api_action, obj)
+
+    def perform_create(self, serializer):
+        self._save_with_actor(serializer, sender=self.request.user)
+
+    def perform_update(self, serializer):
+        changed_fields = set(serializer.validated_data.keys())
+        if changed_fields - {"read_at"}:
+            raise PermissionDenied("Через API для личных сообщений можно обновлять только поле read_at.")
+        if serializer.instance.recipient_id != self.request.user.pk:
+            raise PermissionDenied("Отмечать прочитанность может только получатель сообщения.")
+        self._save_with_actor(serializer)
+
+
+class EquipmentRequestMessageViewSet(InventoryModelViewSet):
+    queryset = EquipmentRequestMessage.objects.select_related("request", "author", "parent").order_by("-created_at")
+    serializer_class = EquipmentRequestMessageSerializer
+    role_matrix = {
+        "read": ALL_API_ROLES,
+        "create": ALL_API_ROLES,
+        "update": ALL_API_ROLES,
+        "delete": ALL_API_ROLES,
+    }
+    privileged_read_roles = (GROUP_ADMIN, GROUP_WAREHOUSE, GROUP_FIRST_LINE_SUPPORT, GROUP_ROLE_ADMIN)
+    owner_field = "author"
+    owner_read_roles = ALL_API_ROLES
+    owner_update_roles = ALL_API_ROLES
+    owner_delete_roles = ALL_API_ROLES
+
+    def scope_queryset_for_user(self, queryset):
+        return queryset.filter(
+            Q(request__requester=self.request.user) | Q(request__processed_by=self.request.user) | Q(author=self.request.user)
+        )
+
+    def perform_create(self, serializer):
+        self._save_with_actor(serializer, author=self.request.user)
+
+    def perform_update(self, serializer):
+        if serializer.instance.author_id != self.request.user.pk:
+            raise PermissionDenied("Редактировать сообщение в заявке может только его автор.")
+        self._save_with_actor(serializer)
+
+
+class EquipmentRequestPhotoViewSet(InventoryModelViewSet):
+    queryset = EquipmentRequestPhoto.objects.select_related("request", "message", "uploaded_by").order_by("-uploaded_at")
+    serializer_class = EquipmentRequestPhotoSerializer
+    role_matrix = {
+        "read": ALL_API_ROLES,
+        "create": ALL_API_ROLES,
+        "update": ALL_API_ROLES,
+        "delete": ALL_API_ROLES,
+    }
+    privileged_read_roles = (GROUP_ADMIN, GROUP_WAREHOUSE, GROUP_FIRST_LINE_SUPPORT, GROUP_ROLE_ADMIN)
+    owner_field = "uploaded_by"
+    owner_read_roles = ALL_API_ROLES
+    owner_update_roles = ALL_API_ROLES
+    owner_delete_roles = ALL_API_ROLES
+
+    def scope_queryset_for_user(self, queryset):
+        return queryset.filter(
+            Q(request__requester=self.request.user)
+            | Q(request__processed_by=self.request.user)
+            | Q(uploaded_by=self.request.user)
+            | Q(message__author=self.request.user)
+        )
+
+    def perform_create(self, serializer):
+        self._save_with_actor(serializer, uploaded_by=self.request.user)
+
+    def perform_update(self, serializer):
+        if serializer.instance.uploaded_by_id != self.request.user.pk:
+            raise PermissionDenied("Редактировать фото заявки может только загрузивший пользователь.")
+        self._save_with_actor(serializer)
+
+
+class PeriodicMaterialUsageScheduleViewSet(InventoryModelViewSet):
+    queryset = PeriodicMaterialUsageSchedule.objects.select_related("equipment", "workplace", "created_by").order_by(
+        "next_run_on", "pk"
+    )
+    serializer_class = PeriodicMaterialUsageScheduleSerializer
+    role_matrix = {
+        "read": ALL_API_ROLES,
+        "create": (GROUP_ADMIN, GROUP_WAREHOUSE, GROUP_SYSADMIN, GROUP_FIRST_LINE_SUPPORT),
+        "update": (GROUP_ADMIN, GROUP_WAREHOUSE, GROUP_SYSADMIN, GROUP_FIRST_LINE_SUPPORT),
+        "delete": (GROUP_ADMIN, GROUP_WAREHOUSE),
+    }
+    privileged_read_roles = (GROUP_ADMIN, GROUP_WAREHOUSE, GROUP_FIRST_LINE_SUPPORT, GROUP_ROLE_ADMIN)
+    owner_field = "created_by"
+    owner_read_roles = (GROUP_SYSADMIN,)
+    owner_update_roles = (GROUP_SYSADMIN,)
+
+    def scope_queryset_for_user(self, queryset):
+        return queryset.filter(created_by=self.request.user)
+
+    def perform_create(self, serializer):
+        self._save_with_actor(serializer, created_by=self.request.user)
+
+    def perform_update(self, serializer):
+        self._save_with_actor(serializer)
+
+
+class EmployeeScheduleViewSet(InventoryModelViewSet):
+    queryset = EmployeeSchedule.objects.select_related("user").order_by("user__username")
+    serializer_class = EmployeeScheduleSerializer
+    role_matrix = {
+        "read": ALL_API_ROLES,
+        "create": (GROUP_ADMIN, GROUP_WAREHOUSE, GROUP_ROLE_ADMIN),
+        "update": (GROUP_ADMIN, GROUP_WAREHOUSE, GROUP_ROLE_ADMIN),
+        "delete": (GROUP_ADMIN, GROUP_ROLE_ADMIN),
+    }
+    privileged_read_roles = (GROUP_ADMIN, GROUP_WAREHOUSE, GROUP_ROLE_ADMIN)
+    owner_field = "user"
+    owner_read_roles = ALL_API_ROLES
+    owner_update_roles = ()
+    owner_delete_roles = ()
+
+    def scope_queryset_for_user(self, queryset):
+        return queryset.filter(user=self.request.user)
+
+    def perform_update(self, serializer):
+        if serializer.instance.user_id == self.request.user.pk and not self._request_user_has_any_role(
+            (GROUP_ADMIN, GROUP_WAREHOUSE, GROUP_ROLE_ADMIN)
+        ):
+            raise PermissionDenied("Изменение своего графика через API ограничено. Обратитесь к администратору.")
+        self._save_with_actor(serializer)
+
+
+class UserPreferenceViewSet(InventoryModelViewSet):
+    queryset = UserPreference.objects.select_related("user").order_by("user__username")
+    serializer_class = UserPreferenceSerializer
+    role_matrix = {
+        "read": ALL_API_ROLES,
+        "create": ALL_API_ROLES,
+        "update": ALL_API_ROLES,
+        "delete": (GROUP_ADMIN,),
+    }
+    privileged_read_roles = (GROUP_ADMIN, GROUP_WAREHOUSE, GROUP_ROLE_ADMIN)
+    privileged_update_roles = (GROUP_ADMIN, GROUP_WAREHOUSE, GROUP_ROLE_ADMIN)
+    owner_field = "user"
+    owner_read_roles = ALL_API_ROLES
+    owner_update_roles = ALL_API_ROLES
+
+    def scope_queryset_for_user(self, queryset):
+        return queryset.filter(user=self.request.user)
+
+    def perform_create(self, serializer):
+        self._save_with_actor(serializer, user=self.request.user)
+
+    def perform_update(self, serializer):
+        if serializer.instance.user_id != self.request.user.pk and not self._request_user_has_any_role(
+            (GROUP_ADMIN, GROUP_WAREHOUSE, GROUP_ROLE_ADMIN)
+        ):
+            raise PermissionDenied("Можно изменять только собственные пользовательские настройки.")
+        self._save_with_actor(serializer)
+
+
+class RegistrationAllowedEmailDomainViewSet(InventoryModelViewSet):
+    queryset = RegistrationAllowedEmailDomain.objects.order_by("domain")
+    serializer_class = RegistrationAllowedEmailDomainSerializer
+    role_matrix = {
+        "read": ALL_API_ROLES,
+        "create": (GROUP_ADMIN, GROUP_ROLE_ADMIN),
+        "update": (GROUP_ADMIN, GROUP_ROLE_ADMIN),
+        "delete": (GROUP_ADMIN, GROUP_ROLE_ADMIN),
+    }
+    privileged_read_roles = (GROUP_ADMIN, GROUP_ROLE_ADMIN)
 

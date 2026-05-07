@@ -85,6 +85,16 @@ class Cabinet(SoftDeleteModel):
     class Meta:
         ordering = ["name"]
 
+    def clean(self) -> None:
+        name = (self.name or "").strip()
+        if not name:
+            raise ValidationError("Название кабинета не может быть пустым.")
+        if not name.isdigit():
+            raise ValidationError("Название кабинета должно содержать только цифры (например: 101).")
+        floor = (self.floor or "").strip()
+        if floor and not floor.isdigit():
+            raise ValidationError("Этаж должен содержать только цифры.")
+
     def __str__(self) -> str:
         return self.name
 

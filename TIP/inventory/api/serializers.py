@@ -1,17 +1,48 @@
+from django.core.exceptions import ValidationError as DjangoValidationError
 from django.utils import timezone
 from rest_framework import serializers
+from rest_framework.exceptions import ValidationError
 
 from assets.models import Equipment, EquipmentCheckout, InventoryAdjustment
-from core.models import Cabinet, EquipmentCategory, Workplace
-from operations.models import REQUEST_PENDING, EquipmentRequest, MaterialUsage
+from core.models import (
+    Cabinet,
+    DirectMessage,
+    EmployeeSchedule,
+    EquipmentCategory,
+    RegistrationAllowedEmailDomain,
+    UserPreference,
+    Workplace,
+)
+from operations.models import (
+    REQUEST_PENDING,
+    EquipmentRequest,
+    EquipmentRequestMessage,
+    EquipmentRequestPhoto,
+    MaterialUsage,
+    PeriodicMaterialUsageSchedule,
+)
 
 
 class AuditActorModelSerializer(serializers.ModelSerializer):
+    def _full_clean_instance(self, instance, *, partial: bool = False):
+        # Для partial update не валидируем поля, которые не передавали в payload.
+        exclude = None
+        if partial and hasattr(self, "initial_data"):
+            model_fields = {f.name for f in instance._meta.fields}
+            provided = {k for k in self.initial_data.keys() if k in model_fields}
+            exclude = list(model_fields - provided)
+        try:
+            instance.full_clean(exclude=exclude)
+        except DjangoValidationError as exc:
+            payload = getattr(exc, "message_dict", None) or {"non_field_errors": list(exc.messages)}
+            raise ValidationError(payload)
+
     def create(self, validated_data):
         actor = validated_data.pop("_actor", None)
         instance = self.Meta.model(**validated_data)
         if actor is not None:
             instance._actor = actor
+        self._full_clean_instance(instance, partial=False)
         instance.save()
         return instance
 
@@ -21,6 +52,7 @@ class AuditActorModelSerializer(serializers.ModelSerializer):
             setattr(instance, attr, value)
         if actor is not None:
             instance._actor = actor
+        self._full_clean_instance(instance, partial=getattr(self, "partial", False))
         instance.save()
         return instance
 
@@ -192,4 +224,142 @@ class EquipmentCheckoutSerializer(AuditActorModelSerializer):
         ]
         read_only_fields = ["taken_by", "deleted_at"]
 
+
+class DirectMessageSerializer(AuditActorModelSerializer):
+    sender_username = serializers.CharField(source="sender.username", read_only=True)
+    recipient_username = serializers.CharField(source="recipient.username", read_only=True)
+
+    class Meta:
+        model = DirectMessage
+        fields = [
+            "id",
+            "sender",
+            "sender_username",
+            "recipient",
+            "recipient_username",
+            "body",
+            "created_at",
+            "read_at",
+        ]
+        read_only_fields = ["sender", "created_at"]
+
+
+class EquipmentRequestMessageSerializer(AuditActorModelSerializer):
+    author_username = serializers.CharField(source="author.username", read_only=True)
+
+    class Meta:
+        model = EquipmentRequestMessage
+        fields = [
+            "id",
+            "request",
+            "author",
+            "author_username",
+            "parent",
+            "body",
+            "created_at",
+        ]
+        read_only_fields = ["author", "created_at"]
+
+
+class EquipmentRequestPhotoSerializer(AuditActorModelSerializer):
+    uploaded_by_username = serializers.CharField(source="uploaded_by.username", read_only=True)
+    image_url = serializers.SerializerMethodField()
+
+    def get_image_url(self, obj):
+        request = self.context.get("request")
+        if not obj.image:
+            return ""
+        if request:
+            return request.build_absolute_uri(obj.image.url)
+        return obj.image.url
+
+    class Meta:
+        model = EquipmentRequestPhoto
+        fields = [
+            "id",
+            "request",
+            "message",
+            "image",
+            "image_url",
+            "caption",
+            "uploaded_by",
+            "uploaded_by_username",
+            "uploaded_at",
+        ]
+        read_only_fields = ["uploaded_by", "uploaded_at"]
+
+
+class PeriodicMaterialUsageScheduleSerializer(AuditActorModelSerializer):
+    equipment_name = serializers.CharField(source="equipment.name", read_only=True)
+    workplace_name = serializers.CharField(source="workplace.name", read_only=True)
+    created_by_username = serializers.CharField(source="created_by.username", read_only=True)
+
+    class Meta:
+        model = PeriodicMaterialUsageSchedule
+        fields = [
+            "id",
+            "title",
+            "equipment",
+            "equipment_name",
+            "workplace",
+            "workplace_name",
+            "quantity",
+            "frequency",
+            "next_run_on",
+            "is_active",
+            "created_by",
+            "created_by_username",
+            "last_run_at",
+            "created_at",
+            "deleted_at",
+        ]
+        read_only_fields = ["created_by", "last_run_at", "created_at", "deleted_at"]
+
+
+class EmployeeScheduleSerializer(AuditActorModelSerializer):
+    user_username = serializers.CharField(source="user.username", read_only=True)
+
+    class Meta:
+        model = EmployeeSchedule
+        fields = [
+            "id",
+            "user",
+            "user_username",
+            "schedule_type",
+            "cycle_start_date",
+            "custom_workdays",
+            "is_active",
+            "updated_at",
+        ]
+        read_only_fields = ["updated_at"]
+
+
+class UserPreferenceSerializer(AuditActorModelSerializer):
+    user_username = serializers.CharField(source="user.username", read_only=True)
+
+    class Meta:
+        model = UserPreference
+        fields = [
+            "id",
+            "user",
+            "user_username",
+            "theme_variant",
+            "page_size",
+            "preferred_language",
+            "date_display_format",
+            "default_request_status",
+            "default_request_kind",
+            "default_usage_period_days",
+            "default_checkout_status",
+            "hotkeys_enabled",
+            "show_hotkey_legend",
+            "updated_at",
+        ]
+        read_only_fields = ["updated_at"]
+
+
+class RegistrationAllowedEmailDomainSerializer(AuditActorModelSerializer):
+    class Meta:
+        model = RegistrationAllowedEmailDomain
+        fields = ["id", "domain", "is_active", "notes"]
 

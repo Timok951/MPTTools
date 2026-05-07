@@ -2276,6 +2276,13 @@ def api_docs(request):
                 "/api/v1/usage/",
                 "/api/v1/adjustments/",
                 "/api/v1/checkouts/",
+                "/api/v1/direct-messages/",
+                "/api/v1/request-messages/",
+                "/api/v1/request-photos/",
+                "/api/v1/periodic-usage/",
+                "/api/v1/employee-schedules/",
+                "/api/v1/user-preferences/",
+                "/api/v1/registration-domains/",
             ]
         },
     )

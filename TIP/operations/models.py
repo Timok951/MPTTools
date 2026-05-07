@@ -1,3 +1,5 @@
+from datetime import timedelta
+import re
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import models
@@ -16,6 +18,10 @@ REQUEST_CLOSED = REQUEST_REJECTED
 
 def default_needed_by_date():
     return timezone.localdate()
+
+
+MAX_REQUEST_FUTURE_DAYS = 365
+MAX_REQUEST_COMMENT_LENGTH = 500
 
 
 REQUEST_STATUS_CHOICES = [
@@ -111,6 +117,29 @@ class EquipmentRequest(SoftDeleteModel):
             )
             if not is_set_in_stock_without_delta:
                 raise ValidationError("Количество должно быть положительным.")
+        if self.needed_by:
+            today = timezone.localdate()
+            if self.needed_by < today:
+                raise ValidationError({"needed_by": "Дата «Нужно до» не может быть раньше сегодняшнего дня."})
+            if self.needed_by > today + timedelta(days=MAX_REQUEST_FUTURE_DAYS):
+                raise ValidationError(
+                    {
+                        "needed_by": (
+                            f"Дата «Нужно до» слишком далеко в будущем "
+                            f"(максимум +{MAX_REQUEST_FUTURE_DAYS} дней)."
+                        )
+                    }
+                )
+        comment = (self.comment or "").strip()
+        if comment:
+            if len(comment) > MAX_REQUEST_COMMENT_LENGTH:
+                raise ValidationError(
+                    {"comment": f"Комментарий слишком длинный (максимум {MAX_REQUEST_COMMENT_LENGTH} символов)."}
+                )
+            if not re.search(r"[0-9A-Za-zА-Яа-яЁё]", comment):
+                raise ValidationError(
+                    {"comment": "Комментарий должен содержать буквы или цифры, а не только символы."}
+                )
 
 
 class EquipmentRequestMessage(models.Model):

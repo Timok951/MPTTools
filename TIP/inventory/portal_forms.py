@@ -2,7 +2,8 @@ from django import forms
 from django.contrib.auth.models import Group, User
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError as DjangoValidationError
-from datetime import timedelta
+from datetime import date, timedelta
+import re
 from django.utils import timezone
 
 from assets.models import Equipment, EquipmentCheckout, InventoryAdjustment
@@ -12,11 +13,43 @@ from .authz import ROLE_ALIASES
 
 MAX_ALLOWED_QUANTITY = 1000
 MAX_ALLOWED_ADJUSTMENT_DELTA = 1000
+MAX_REQUEST_FUTURE_DAYS = 365
+MIN_REASONABLE_DATE = date(2000, 1, 1)
+MAX_WARRANTY_FUTURE_DAYS = 3650
+MAX_REQUEST_COMMENT_LENGTH = 500
+SERIAL_ALLOWED_RE = re.compile(r"^[0-9A-Za-zА-Яа-яЁё\-_\/]+$")
+MODEL_ALLOWED_RE = re.compile(r"^[0-9A-Za-zА-Яа-яЁё\-_\/\s]+$")
+USERNAME_ALLOWED_RE = re.compile(r"^[0-9A-Za-zА-Яа-яЁё._-]+$")
 
 
 def _model_fields(model, omit=()):
     blocked = {"deleted_at", *omit}
     return [f.name for f in model._meta.fields if f.editable and f.name not in blocked]
+
+
+def _normalize_text(value: str | None) -> str:
+    return (value or "").strip()
+
+
+def _has_meaningful_chars(value: str) -> bool:
+    # Считаем "осмысленным" текст, где есть буквы/цифры (рус/лат) хотя бы один символ.
+    return bool(re.search(r"[0-9A-Za-zА-Яа-яЁё]", value or ""))
+
+
+def _validate_meaningful_text(value: str | None, *, field_label: str) -> str:
+    text = _normalize_text(value)
+    if not text:
+        return text
+    if not _has_meaningful_chars(text):
+        raise forms.ValidationError(f"Поле «{field_label}» должно содержать буквы или цифры, а не только символы.")
+    return text
+
+
+def _has_excessive_repetition(value: str, *, max_same_in_row: int = 4) -> bool:
+    if not value:
+        return False
+    # Например: "aaaaa", ".....", "-----"
+    return bool(re.search(rf"(.)\1{{{max_same_in_row},}}", value))
 
 
 class PortalEquipmentForm(forms.ModelForm):
@@ -75,9 +108,12 @@ class PortalEquipmentForm(forms.ModelForm):
         }
 
     def clean_serial_number(self):
-        value = (self.cleaned_data.get("serial_number") or "").strip()
+        value = _normalize_text(self.cleaned_data.get("serial_number"))
         if not value:
             raise forms.ValidationError("Укажите серийный номер.")
+        value = _validate_meaningful_text(value, field_label="Серийный номер")
+        if not SERIAL_ALLOWED_RE.fullmatch(value):
+            raise forms.ValidationError("Серийный номер: допустимы только буквы, цифры и символы - _ /")
         qs = Equipment.all_objects.filter(inventory_number=value)
         if self.instance and self.instance.pk:
             qs = qs.exclude(pk=self.instance.pk)
@@ -86,16 +122,22 @@ class PortalEquipmentForm(forms.ModelForm):
         return value
 
     def clean_name(self):
-        value = (self.cleaned_data.get("name") or "").strip()
+        value = _normalize_text(self.cleaned_data.get("name"))
         if not value:
             raise forms.ValidationError("Название не может состоять только из пробелов.")
+        value = _validate_meaningful_text(value, field_label="Название")
+        if _has_excessive_repetition(value):
+            raise forms.ValidationError("Название содержит слишком много одинаковых символов подряд.")
         return value
 
     def clean_model(self):
-        return (self.cleaned_data.get("model") or "").strip()
+        value = _validate_meaningful_text(self.cleaned_data.get("model"), field_label="Модель")
+        if value and not MODEL_ALLOWED_RE.fullmatch(value):
+            raise forms.ValidationError("Модель: допустимы только буквы, цифры, пробел и символы - _ /")
+        return value
 
     def clean_notes(self):
-        return (self.cleaned_data.get("notes") or "").strip()
+        return _validate_meaningful_text(self.cleaned_data.get("notes"), field_label="Примечание")
 
     def clean_quantity_total(self):
         value = self.cleaned_data.get("quantity_total")
@@ -117,12 +159,23 @@ class PortalEquipmentForm(forms.ModelForm):
 
     def clean_purchase_date(self):
         value = self.cleaned_data.get("purchase_date")
+        if value and value < MIN_REASONABLE_DATE:
+            raise forms.ValidationError(f"Дата покупки не может быть раньше {MIN_REASONABLE_DATE.strftime('%d.%m.%Y')}.")
         if value and value > timezone.localdate():
             raise forms.ValidationError("Дата покупки не может быть в будущем.")
         return value
 
     def clean_warranty_end(self):
         value = self.cleaned_data.get("warranty_end")
+        if value and value < MIN_REASONABLE_DATE:
+            raise forms.ValidationError(
+                f"Дата окончания гарантии не может быть раньше {MIN_REASONABLE_DATE.strftime('%d.%m.%Y')}."
+            )
+        max_warranty = timezone.localdate() + timedelta(days=MAX_WARRANTY_FUTURE_DAYS)
+        if value and value > max_warranty:
+            raise forms.ValidationError(
+                f"Дата окончания гарантии слишком далеко в будущем (максимум до {max_warranty.strftime('%d.%m.%Y')})."
+            )
         if value and value < timezone.localdate():
             raise forms.ValidationError("Дата окончания гарантии не может быть в прошлом.")
         return value
@@ -168,13 +221,14 @@ class PortalEquipmentForm(forms.ModelForm):
 
 class PortalEquipmentCategoryForm(forms.ModelForm):
     def clean_name(self):
-        value = (self.cleaned_data.get("name") or "").strip()
+        value = _normalize_text(self.cleaned_data.get("name"))
         if not value:
             raise forms.ValidationError("Название не может состоять только из пробелов.")
+        value = _validate_meaningful_text(value, field_label="Название")
         return value
 
     def clean_description(self):
-        return (self.cleaned_data.get("description") or "").strip()
+        return _validate_meaningful_text(self.cleaned_data.get("description"), field_label="Описание")
 
     class Meta:
         model = EquipmentCategory
@@ -218,13 +272,14 @@ class PortalWorkplaceForm(forms.ModelForm):
         return cleaned
 
     def clean_name(self):
-        value = (self.cleaned_data.get("name") or "").strip()
+        value = _normalize_text(self.cleaned_data.get("name"))
         if not value:
             raise forms.ValidationError("Название не может состоять только из пробелов.")
+        value = _validate_meaningful_text(value, field_label="Название")
         return value
 
     def clean_description(self):
-        return (self.cleaned_data.get("description") or "").strip()
+        return _validate_meaningful_text(self.cleaned_data.get("description"), field_label="Описание")
 
     def save(self, commit=True):
         instance = super().save(commit=False)
@@ -237,9 +292,11 @@ class PortalWorkplaceForm(forms.ModelForm):
 
 class PortalCabinetForm(forms.ModelForm):
     def clean_name(self):
-        value = (self.cleaned_data.get("name") or "").strip()
+        value = _normalize_text(self.cleaned_data.get("name"))
         if not value:
             raise forms.ValidationError("Название не может состоять только из пробелов.")
+        if not value.isdigit():
+            raise forms.ValidationError("Кабинет должен содержать только цифры (например: 101).")
         qs = Cabinet.all_objects.filter(code=value)
         if self.instance and self.instance.pk:
             qs = qs.exclude(pk=self.instance.pk)
@@ -248,10 +305,13 @@ class PortalCabinetForm(forms.ModelForm):
         return value
 
     def clean_floor(self):
-        return (self.cleaned_data.get("floor") or "").strip()
+        value = _normalize_text(self.cleaned_data.get("floor"))
+        if value and not re.fullmatch(r"\d+", value):
+            raise forms.ValidationError("Этаж должен содержать только цифры.")
+        return value
 
     def clean_description(self):
-        return (self.cleaned_data.get("description") or "").strip()
+        return _validate_meaningful_text(self.cleaned_data.get("description"), field_label="Описание")
 
     def save(self, commit=True):
         instance = super().save(commit=False)
@@ -283,9 +343,10 @@ class PortalInventoryAdjustmentForm(forms.ModelForm):
         return value
 
     def clean_reason(self):
-        value = (self.cleaned_data.get("reason") or "").strip()
+        value = _normalize_text(self.cleaned_data.get("reason"))
         if not value:
             raise forms.ValidationError("Причина не может состоять только из пробелов.")
+        value = _validate_meaningful_text(value, field_label="Причина")
         return value
 
     class Meta:
@@ -302,7 +363,18 @@ class PortalEquipmentCheckoutForm(forms.ModelForm):
         return value
 
     def clean_note(self):
-        return (self.cleaned_data.get("note") or "").strip()
+        return _validate_meaningful_text(self.cleaned_data.get("note"), field_label="Примечание")
+
+    def clean(self):
+        cleaned = super().clean()
+        taken_at = cleaned.get("taken_at")
+        due_at = cleaned.get("due_at")
+        returned_at = cleaned.get("returned_at")
+        if taken_at and due_at and due_at < taken_at:
+            self.add_error("due_at", "Срок возврата не может быть раньше даты выдачи.")
+        if taken_at and returned_at and returned_at < taken_at:
+            self.add_error("returned_at", "Дата возврата не может быть раньше даты выдачи.")
+        return cleaned
 
     class Meta:
         model = EquipmentCheckout
@@ -366,7 +438,25 @@ class PortalEquipmentRequestForm(forms.ModelForm):
         return value
 
     def clean_comment(self):
-        return (self.cleaned_data.get("comment") or "").strip()
+        value = _validate_meaningful_text(self.cleaned_data.get("comment"), field_label="Комментарий")
+        if value and len(value) > MAX_REQUEST_COMMENT_LENGTH:
+            raise forms.ValidationError(
+                f"Комментарий слишком длинный (максимум {MAX_REQUEST_COMMENT_LENGTH} символов)."
+            )
+        return value
+
+    def clean_needed_by(self):
+        value = self.cleaned_data.get("needed_by")
+        if not value:
+            return value
+        today = timezone.localdate()
+        if value < today:
+            raise forms.ValidationError("Дата «Нужно до» не может быть раньше сегодняшнего дня.")
+        if value > today + timedelta(days=MAX_REQUEST_FUTURE_DAYS):
+            raise forms.ValidationError(
+                f"Дата «Нужно до» слишком далеко в будущем (максимум +{MAX_REQUEST_FUTURE_DAYS} дней)."
+            )
+        return value
 
     def clean(self):
         cleaned = super().clean()
@@ -434,6 +524,9 @@ class PortalPeriodicMaterialUsageScheduleForm(forms.ModelForm):
         if eq is not None and not eq.is_consumable:
             raise forms.ValidationError("Выберите позицию с флагом «расходник».")
         return eq
+
+    def clean_title(self):
+        return _validate_meaningful_text(self.cleaned_data.get("title"), field_label="Название")
 
     class Meta:
         model = PeriodicMaterialUsageSchedule
@@ -554,16 +647,27 @@ class PortalUserForm(forms.ModelForm):
         return cleaned
 
     def clean_username(self):
-        value = (self.cleaned_data.get("username") or "").strip()
+        value = _normalize_text(self.cleaned_data.get("username"))
         if not value:
             raise forms.ValidationError("Имя пользователя не может состоять только из пробелов.")
+        value = _validate_meaningful_text(value, field_label="Имя пользователя")
+        if not USERNAME_ALLOWED_RE.fullmatch(value):
+            raise forms.ValidationError("Имя пользователя: допустимы буквы, цифры, а также . _ -")
+        if _has_excessive_repetition(value):
+            raise forms.ValidationError("Имя пользователя содержит слишком много одинаковых символов подряд.")
         return value
 
     def clean_first_name(self):
-        return (self.cleaned_data.get("first_name") or "").strip()
+        value = _validate_meaningful_text(self.cleaned_data.get("first_name"), field_label="Имя")
+        if value and _has_excessive_repetition(value):
+            raise forms.ValidationError("Имя содержит слишком много одинаковых символов подряд.")
+        return value
 
     def clean_last_name(self):
-        return (self.cleaned_data.get("last_name") or "").strip()
+        value = _validate_meaningful_text(self.cleaned_data.get("last_name"), field_label="Фамилия")
+        if value and _has_excessive_repetition(value):
+            raise forms.ValidationError("Фамилия содержит слишком много одинаковых символов подряд.")
+        return value
 
     def clean_email(self):
         return (self.cleaned_data.get("email") or "").strip()
@@ -580,9 +684,14 @@ class PortalUserForm(forms.ModelForm):
 
 class PortalGroupForm(forms.ModelForm):
     def clean_name(self):
-        value = (self.cleaned_data.get("name") or "").strip()
+        value = _normalize_text(self.cleaned_data.get("name"))
         if not value:
             raise forms.ValidationError("Название группы не может состоять только из пробелов.")
+        value = _validate_meaningful_text(value, field_label="Название")
+        if not USERNAME_ALLOWED_RE.fullmatch(value):
+            raise forms.ValidationError("Название группы: допустимы буквы, цифры, а также . _ -")
+        if _has_excessive_repetition(value):
+            raise forms.ValidationError("Название группы содержит слишком много одинаковых символов подряд.")
         return value
 
     class Meta:
@@ -619,7 +728,7 @@ class PortalRegistrationAllowedEmailDomainForm(forms.ModelForm):
         return d
 
     def clean_notes(self):
-        return (self.cleaned_data.get("notes") or "").strip()
+        return _validate_meaningful_text(self.cleaned_data.get("notes"), field_label="Заметка")
 
 
 class PortalEmployeeScheduleForm(forms.ModelForm):
@@ -664,6 +773,11 @@ class PortalEmployeeScheduleForm(forms.ModelForm):
         cycle_start = cleaned.get("cycle_start_date")
         if cycle_start and cycle_start > timezone.localdate():
             self.add_error("cycle_start_date", "Дата начала цикла не может быть в будущем.")
+        if cycle_start and cycle_start < MIN_REASONABLE_DATE:
+            self.add_error(
+                "cycle_start_date",
+                f"Дата начала цикла не может быть раньше {MIN_REASONABLE_DATE.strftime('%d.%m.%Y')}.",
+            )
         if schedule_type != EmployeeSchedule.SCHEDULE_CUSTOM and not weekdays:
             if self.instance and self.instance.pk and self.instance.custom_workdays:
                 weekdays = [part for part in self.instance.custom_workdays.split(",") if part]

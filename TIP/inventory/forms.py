@@ -2,39 +2,43 @@ from django import forms
 from django.contrib.auth.forms import AuthenticationForm, UserCreationForm
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
+from django.db.models import Q
 from django.utils.translation import gettext_lazy as _
 from django.utils import timezone
 
 from assets.models import Equipment, EquipmentCheckout, InventoryAdjustment
 from django.contrib.auth.models import User
 
+from core.registration_domains import (
+    get_registration_email_domains,
+    registration_email_placeholder,
+    validate_corporate_registration_email,
+)
 from core.models import DirectMessage, UserPreference, Workplace
 from operations.models import (
     EquipmentRequest,
     EquipmentRequestMessage,
     EquipmentRequestPhoto,
+    NON_CONSUMABLE_TARGET_REPAIR,
+    NON_CONSUMABLE_TARGET_RETIRED,
+    REQUEST_KIND_RESTOCK,
+    REQUEST_KIND_WRITEOFF,
+    RESTOCK_NON_CONSUMABLE_ACTION_CHOICES,
+    RESTOCK_NON_CONSUMABLE_INCREASE,
+    RESTOCK_NON_CONSUMABLE_SET_IN_STOCK,
     REQUEST_APPROVED,
 )
 
 MAX_ALLOWED_QUANTITY = 1000
 MAX_ALLOWED_ADJUSTMENT_DELTA = 1000
 
-# Корпоративная почта: регистрация и восстановление пароля (гостевой сценарий).
-REGISTRATION_EMAIL_DOMAIN = "mpt.ru"
-
 
 def _normalize_email(email: str | None) -> str:
     return (email or "").strip().lower()
 
 
-def _email_has_allowed_domain(email: str) -> bool:
-    return email.endswith(f"@{REGISTRATION_EMAIL_DOMAIN}")
-
-
 def _validate_corporate_email(email: str) -> str:
-    if not _email_has_allowed_domain(email):
-        raise ValidationError(f"Разрешены адреса только на домене @{REGISTRATION_EMAIL_DOMAIN}.")
-    return email
+    return validate_corporate_registration_email(email)
 
 
 def _lang_label(ru_text: str, en_text: str, language_code: str) -> str:
@@ -53,8 +57,7 @@ class RussianUserCreationForm(UserCreationForm):
     email = forms.EmailField(
         label="Электронная почта",
         required=True,
-        help_text=f"Обязательно. Только корпоративный адрес @{REGISTRATION_EMAIL_DOMAIN}.",
-        widget=forms.EmailInput(attrs={"autocomplete": "email", "placeholder": f"user@{REGISTRATION_EMAIL_DOMAIN}"}),
+        widget=forms.EmailInput(attrs={"autocomplete": "email"}),
     )
     password1 = forms.CharField(
         label="Пароль", strip=False, widget=forms.PasswordInput(attrs={"autocomplete": "new-password"})
@@ -69,6 +72,17 @@ class RussianUserCreationForm(UserCreationForm):
     class Meta(UserCreationForm.Meta):
         fields = (*UserCreationForm.Meta.fields, "email")
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        domains = get_registration_email_domains()
+        if domains:
+            self.fields["email"].help_text = "Обязательно. Выберите адрес на разрешённом домене."
+        else:
+            self.fields["email"].help_text = (
+                "Регистрация недоступна: администратор не включил ни одного разрешённого домена почты."
+            )
+        self.fields["email"].widget.attrs.setdefault("placeholder", registration_email_placeholder())
+
     def clean_email(self):
         email = _normalize_email(self.cleaned_data.get("email"))
         _validate_corporate_email(email)
@@ -78,23 +92,23 @@ class RussianUserCreationForm(UserCreationForm):
 
 
 class BackupImportForm(forms.Form):
-    backup_file = forms.FileField(label=_("JSON backup"))
+    backup_file = forms.FileField(label=_("JSON резервная копия"))
 
     def clean_backup_file(self):
         backup_file = self.cleaned_data["backup_file"]
         if not backup_file.name.lower().endswith(".json"):
-            raise ValidationError(_("Upload a JSON backup file."))
+            raise ValidationError(_("Загрузите файл резервной копии в формате JSON."))
         return backup_file
 
 
 class PostgresqlDumpImportForm(forms.Form):
-    dump_file = forms.FileField(label=_("PostgreSQL dump (.dump, custom format)"))
+    dump_file = forms.FileField(label=_("Дамп PostgreSQL (.dump, custom format)"))
 
     def clean_dump_file(self):
         f = self.cleaned_data["dump_file"]
         name = (f.name or "").lower()
         if not name.endswith(".dump"):
-            raise ValidationError(_("Upload a .dump file (pg_dump -Fc)."))
+            raise ValidationError(_("Загрузите файл .dump (pg_dump -Fc)."))
         return f
 
 
@@ -102,12 +116,13 @@ class PasswordResetRequestForm(forms.Form):
     email = forms.EmailField(
         label="Email",
         widget=forms.EmailInput(
-            attrs={"autocomplete": "email", "placeholder": f"user@{REGISTRATION_EMAIL_DOMAIN}"},
+            attrs={"autocomplete": "email"},
         ),
     )
 
     def __init__(self, *args, user=None, **kwargs):
         super().__init__(*args, **kwargs)
+        self.fields["email"].widget.attrs.setdefault("placeholder", registration_email_placeholder())
         self._request_user = user
         if user and getattr(user, "is_authenticated", False) and (getattr(user, "email", None) or "").strip():
             self.fields["email"].widget.attrs["readonly"] = True
@@ -133,7 +148,7 @@ class PasswordResetConfirmForm(forms.Form):
     email = forms.EmailField(
         label="Email",
         widget=forms.EmailInput(
-            attrs={"autocomplete": "email", "placeholder": f"user@{REGISTRATION_EMAIL_DOMAIN}"},
+            attrs={"autocomplete": "email"},
         ),
     )
     code = forms.CharField(
@@ -156,6 +171,7 @@ class PasswordResetConfirmForm(forms.Form):
     def __init__(self, *args, user=None, **kwargs):
         super().__init__(*args, **kwargs)
         self._request_user = user
+        self.fields["email"].widget.attrs.setdefault("placeholder", registration_email_placeholder())
         if user and getattr(user, "is_authenticated", False) and (getattr(user, "email", None) or "").strip():
             self.fields["email"].widget.attrs["readonly"] = True
 
@@ -277,12 +293,12 @@ class UserPreferenceForm(forms.ModelForm):
             initial=self.instance.default_request_kind if self.instance and self.instance.pk else "",
         )
         self.fields["default_usage_period_days"].label = t(
-            "Период истории списаний по умолчанию",
-            "Default usage history period",
+            "Период истории расхода материалов по умолчанию",
+            "Default material usage history period",
         )
         self.fields["default_usage_period_days"].help_text = t(
-            "Автоматически подставлять период истории списаний от текущей даты.",
-            "Automatically prefill the usage history period from the current date.",
+            "Автоматически подставлять период журнала расхода от текущей даты (если раздел включён).",
+            "Automatically prefill the usage history window from today (when that section is enabled).",
         )
         self.fields["hotkeys_enabled"].help_text = t(
             "Включить глобальные горячие клавиши вне полей формы.",
@@ -329,6 +345,29 @@ class UserPreferenceForm(forms.ModelForm):
 
 
 class EquipmentRequestForm(forms.ModelForm):
+    initial_photo = forms.ImageField(
+        required=False,
+        label="Фото к заявке",
+        help_text="Необязательно: снимок проблемы, этикетки или комплектации.",
+    )
+    non_consumable_target_status = forms.ChoiceField(
+        required=False,
+        label="Статус для нерасходуемого оборудования",
+        choices=(
+            (NON_CONSUMABLE_TARGET_REPAIR, "В ремонте"),
+            (NON_CONSUMABLE_TARGET_RETIRED, "Закончилось"),
+        ),
+        help_text="Применяется только к нерасходуемым позициям.",
+        initial=NON_CONSUMABLE_TARGET_REPAIR,
+    )
+    restock_non_consumable_action = forms.ChoiceField(
+        required=False,
+        label="Пополнение нерасходника",
+        choices=RESTOCK_NON_CONSUMABLE_ACTION_CHOICES,
+        initial=RESTOCK_NON_CONSUMABLE_INCREASE,
+        help_text="Для типа заявки «Пополнение»: вернуть на склад или увеличить количество.",
+    )
+
     class Meta:
         model = EquipmentRequest
         fields = ["workplace", "cabinet", "equipment", "quantity", "request_kind", "needed_by", "comment"]
@@ -339,22 +378,55 @@ class EquipmentRequestForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        today = timezone.localdate()
+        selected_kind = ""
+        if self.is_bound:
+            selected_kind = (self.data.get(self.add_prefix("request_kind")) or "").strip()
+        elif self.initial.get("request_kind"):
+            selected_kind = str(self.initial.get("request_kind")).strip()
+        elif getattr(self.instance, "request_kind", None):
+            selected_kind = str(self.instance.request_kind).strip()
         self.fields["workplace"].label = "Рабочее место"
         self.fields["workplace"].empty_label = "Выберите рабочее место"
         self.fields["cabinet"].label = "Кабинет"
         self.fields["cabinet"].empty_label = "Выберите кабинет (необязательно)"
         self.fields["request_kind"].label = "Тип заявки"
         self.fields["equipment"].label = "Оборудование"
+        equipment_qs = Equipment.objects.select_related("workplace")
+        if selected_kind == REQUEST_KIND_RESTOCK:
+            equipment_qs = equipment_qs.filter(deleted_at__isnull=True)
+        elif selected_kind == REQUEST_KIND_WRITEOFF:
+            equipment_qs = equipment_qs.filter(
+                Q(is_consumable=False, quantity_available__gt=0)
+                | Q(is_consumable=True, quantity_total__gt=0)
+            )
+        else:
+            equipment_qs = equipment_qs.filter(
+                Q(is_consumable=False, quantity_available__gt=0, status__in=("in_stock", "repair"))
+                | Q(is_consumable=True, quantity_total__gt=0, status__in=("in_stock", "repair"))
+            )
+        self.fields["equipment"].queryset = equipment_qs.order_by("name", "inventory_number")
+        self.fields["equipment"].label_from_instance = self._equipment_label
         self.fields["equipment"].empty_label = "Выберите оборудование"
         self.fields["quantity"].label = "Количество"
         self.fields["quantity"].help_text = "Укажите нужное количество для склада."
         self.fields["needed_by"].label = "Нужно до"
         self.fields["needed_by"].required = True
-        self.fields["needed_by"].help_text = "Обязательная дата, к которой желательно получить материал (по умолчанию — сегодня)."
+        self.fields["needed_by"].help_text = "Обязательная дата, к которой желательно получить материал."
+        self.fields["needed_by"].widget.format = "%Y-%m-%d"
+        self.fields["needed_by"].localize = False
         if not self.is_bound and not self.initial.get("needed_by") and not (self.instance and self.instance.pk):
-            self.initial["needed_by"] = timezone.localdate()
+            self.initial["needed_by"] = today
+        needed_by_value = self.initial.get("needed_by") or today
+        if hasattr(needed_by_value, "strftime"):
+            needed_by_value = needed_by_value.strftime("%Y-%m-%d")
+        self.fields["needed_by"].initial = needed_by_value
         self.fields["comment"].label = "Комментарий"
         self.fields["comment"].help_text = "Добавьте детали, которые помогут быстрее согласовать заявку."
+
+    @staticmethod
+    def _equipment_label(item: Equipment) -> str:
+        return f"{item.name} | доступно: {item.quantity_available} из {item.quantity_total}"
 
     def clean_quantity(self):
         quantity = self.cleaned_data.get("quantity") or 0
@@ -364,14 +436,58 @@ class EquipmentRequestForm(forms.ModelForm):
             raise ValidationError(f"Количество не должно превышать {MAX_ALLOWED_QUANTITY}.")
         return quantity
 
+    def clean_equipment(self):
+        equipment = self.cleaned_data.get("equipment")
+        request_kind = (self.cleaned_data.get("request_kind") or "").strip()
+        if equipment:
+            if request_kind == REQUEST_KIND_RESTOCK:
+                return equipment
+            if request_kind == REQUEST_KIND_WRITEOFF:
+                allowed_qty = equipment.quantity_total if equipment.is_consumable else equipment.quantity_available
+                if allowed_qty <= 0:
+                    raise ValidationError("Нельзя списать позицию с нулевым количеством.")
+                return equipment
+            if equipment.status == "retired":
+                raise ValidationError("Оборудование со статусом «Закончилось» недоступно для новых заявок.")
+            allowed_qty = equipment.quantity_total if equipment.is_consumable else equipment.quantity_available
+            if allowed_qty <= 0:
+                raise ValidationError("Эта позиция сейчас недоступна на складе. Выберите другое оборудование.")
+        return equipment
+
     def clean_comment(self):
         comment = (self.cleaned_data.get("comment") or "").strip()
         return comment
+
+    def clean_needed_by(self):
+        # Если поле оставили пустым, считаем, что выбран текущий день.
+        needed_by = self.cleaned_data.get("needed_by") or timezone.localdate()
+        if needed_by < timezone.localdate():
+            raise ValidationError("Дата «Нужно до» не может быть раньше сегодняшнего дня.")
+        return needed_by
 
     def clean(self):
         cleaned = super().clean()
         equipment = cleaned.get("equipment")
         quantity = cleaned.get("quantity") or 0
+        request_kind = (cleaned.get("request_kind") or "").strip()
+        if equipment:
+            if request_kind == REQUEST_KIND_RESTOCK:
+                if quantity <= 0:
+                    self.add_error("quantity", "Для пополнения укажите количество больше нуля.")
+                return cleaned
+            allowed_qty = equipment.quantity_total if equipment.is_consumable else equipment.quantity_available
+            if quantity > allowed_qty:
+                self.add_error("quantity", f"Доступно только {allowed_qty} шт. по выбранной позиции.")
+            if request_kind == REQUEST_KIND_WRITEOFF and allowed_qty <= 0:
+                self.add_error("equipment", "Для списания выберите позицию с доступным количеством.")
+        if request_kind != REQUEST_KIND_RESTOCK:
+            cleaned["restock_non_consumable_action"] = ""
+        if request_kind != REQUEST_KIND_WRITEOFF and equipment and not equipment.is_consumable:
+            target = (cleaned.get("non_consumable_target_status") or "").strip()
+            if target not in {NON_CONSUMABLE_TARGET_REPAIR, NON_CONSUMABLE_TARGET_RETIRED}:
+                self.add_error("non_consumable_target_status", "Выберите статус для нерасходуемого оборудования.")
+        if request_kind == REQUEST_KIND_RESTOCK:
+            cleaned["non_consumable_target_status"] = ""
         return cleaned
 
 
@@ -419,7 +535,7 @@ class InventoryAdjustmentForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields["equipment"].empty_label = "Выберите оборудование"
-        self.fields["delta"].help_text = "Используйте положительные числа для пополнения и отрицательные для списания."
+        self.fields["delta"].help_text = "Используйте положительные числа для пополнения склада и отрицательные для уменьшения остатка."
         self.fields["reason"].help_text = "Этот текст отображается в истории инвентаря и журналах аудита."
 
     def clean(self):

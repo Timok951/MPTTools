@@ -14,12 +14,15 @@ from django.urls import reverse
 from django.utils.translation import gettext_lazy as _
 
 from assets.models import Equipment
-from core.models import Cabinet, EquipmentCategory, Workplace
+from core.models import Cabinet, EmployeeSchedule, EquipmentCategory, RegistrationAllowedEmailDomain, Workplace
 from operations.models import EquipmentRequest, PeriodicMaterialUsageSchedule
 from audit.models import AdminPortalLog
 from audit.portal_log import log_portal_action
 
-from .admin_procedures import close_stale_issued_requests, reject_stale_requests, restock_low_stock_consumables
+from .admin_procedures import (
+    reject_stale_requests,
+    restock_low_stock_consumables,
+)
 from .authz import user_has_capability
 from .portal_forms import (
     PortalCabinetForm,
@@ -28,9 +31,10 @@ from .portal_forms import (
     PortalEquipmentRequestForm,
     PortalGroupForm,
     PortalPeriodicMaterialUsageScheduleForm,
+    PortalEmployeeScheduleForm,
+    PortalRegistrationAllowedEmailDomainForm,
     PortalUserForm,
     PortalWorkplaceForm,
-    CloseStaleIssuedRequestsProcedureForm,
     RejectStaleRequestsProcedureForm,
     RestockLowStockConsumablesProcedureForm,
 )
@@ -63,12 +67,30 @@ PORTAL_ENTITIES: tuple[PortalEntity, ...] = (
         PeriodicMaterialUsageSchedule,
         PortalPeriodicMaterialUsageScheduleForm,
         ("title", "equipment", "quantity", "next_run_on", "is_active", "deleted_at"),
-        "Периодические заявки",
+        "Периодический расход (расписание)",
     ),
     PortalEntity("users", User, PortalUserForm, ("username", "email", "is_active", "is_staff", "is_superuser"), "Пользователи"),
     PortalEntity("groups", Group, PortalGroupForm, ("name",), "Группы и роли"),
+    PortalEntity(
+        "registration-domains",
+        RegistrationAllowedEmailDomain,
+        PortalRegistrationAllowedEmailDomainForm,
+        ("domain", "is_active", "notes"),
+        "Домены почты для регистрации",
+    ),
+    PortalEntity(
+        "schedules",
+        EmployeeSchedule,
+        PortalEmployeeScheduleForm,
+        ("user", "schedule_type", "is_active", "updated_at"),
+        "Графики сотрудников",
+    ),
 )
 PORTAL_BY_SLUG = {e.slug: e for e in PORTAL_ENTITIES}
+
+# Разделы с отдельными страницами в основном меню — не показываем повторно на главной портала.
+_PORTAL_SLUGS_IN_MAIN_NAV = frozenset({"equipment", "requests", "workplaces", "cabinets"})
+
 
 PORTAL_ENTITY_CAPABILITIES: dict[str, tuple[str, ...]] = {
     "equipment": ("warehouse_operations", "users_and_site_admin"),
@@ -79,6 +101,8 @@ PORTAL_ENTITY_CAPABILITIES: dict[str, tuple[str, ...]] = {
     "periodic-usage": ("usage_writeoff", "users_and_site_admin", "request_creation", "request_processing"),
     "users": ("users_and_site_admin",),
     "groups": ("users_and_site_admin",),
+    "registration-domains": ("users_and_site_admin",),
+    "schedules": ("warehouse_operations", "users_and_site_admin"),
 }
 
 
@@ -89,6 +113,14 @@ def _can_access_portal_entity(user, slug: str) -> bool:
 
 def _visible_portal_entities(user):
     return tuple(entity for entity in PORTAL_ENTITIES if _can_access_portal_entity(user, entity.slug))
+
+
+def _portal_dashboard_sections(user):
+    return [
+        {"title": e.title, "url": _portal_section_list_url(e.slug)}
+        for e in _visible_portal_entities(user)
+        if e.slug not in _PORTAL_SLUGS_IN_MAIN_NAV
+    ]
 
 
 def _portal_nav_context(user, current_slug: str | None = None):
@@ -140,27 +172,28 @@ def _portal_confirm_context(user, entity_slug: str):
     }
 
 
-def _procedure_cards():
-    return [
-        {
-            "slug": "reject_stale_requests",
-            "title": _("Отклонить старые заявки"),
-            "description": _("Помечает старые необработанные заявки как отклонённые и фиксирует, кто их обработал."),
-            "form": RejectStaleRequestsProcedureForm(prefix="reject"),
-        },
-        {
-            "slug": "restock_low_stock_consumables",
-            "title": _("Пополнить расходники с низким остатком"),
-            "description": _("Создаёт корректировки остатков для расходников ниже порога; целевой остаток = порог + запас сверх порога."),
-            "form": RestockLowStockConsumablesProcedureForm(prefix="restock"),
-        },
-        {
-            "slug": "close_stale_issued_requests",
-            "title": _("Закрыть старые выданные заявки"),
-            "description": _("Переводит в «Закрыта» заявки в статусе «Выдана», у которых дата обработки (или подачи) старше указанного срока."),
-            "form": CloseStaleIssuedRequestsProcedureForm(prefix="close_issued"),
-        },
-    ]
+def _procedure_cards(user):
+    cards = []
+    if user_has_capability(user, "users_and_site_admin"):
+        cards.extend(
+            [
+                {
+                    "slug": "reject_stale_requests",
+                    "title": _("Отклонить старые заявки"),
+                    "description": _("Помечает старые необработанные заявки как отклонённые и фиксирует, кто их обработал."),
+                    "form": RejectStaleRequestsProcedureForm(prefix="reject"),
+                },
+                {
+                    "slug": "restock_low_stock_consumables",
+                    "title": _("Пополнить расходники с низким остатком"),
+                    "description": _(
+                        "Создаёт корректировки остатков для расходников ниже порога; каждая позиция увеличивается на фиксированное число единиц."
+                    ),
+                    "form": RestockLowStockConsumablesProcedureForm(prefix="restock"),
+                },
+            ]
+        )
+    return cards
 
 
 def _manager(model):
@@ -206,16 +239,14 @@ def _friendly_integrity_message(exc: Exception) -> str:
 def portal_dashboard(request):
     if resp := _portal_guard(request):
         return resp
-    portal_sections = [
-        {"title": e.title, "url": _portal_section_list_url(e.slug)} for e in _visible_portal_entities(request.user)
-    ]
+    portal_sections = _portal_dashboard_sections(request.user)
     return render(
         request,
         "inventory/portal/dashboard.html",
         {
             **_portal_nav_context(request.user, "__home"),
             "portal_sections": portal_sections,
-            "procedure_cards": _procedure_cards() if user_has_capability(request.user, "users_and_site_admin") else [],
+            "procedure_cards": _procedure_cards(request.user),
         },
     )
 
@@ -395,14 +426,14 @@ def portal_restore(request, entity: str, pk: int):
 def portal_procedure_run(request, slug: str):
     if resp := _portal_guard(request):
         return resp
-    if not user_has_capability(request.user, "users_and_site_admin"):
-        return forbidden(request, "Запуск процедур доступен только администратору.")
     if request.method != "POST":
         return redirect("portal_home")
 
     extra_meta: dict = {}
 
     if slug == "reject_stale_requests":
+        if not user_has_capability(request.user, "users_and_site_admin"):
+            return forbidden(request, "Запуск этой процедуры доступен только администратору.")
         form = RejectStaleRequestsProcedureForm(request.POST, prefix="reject")
         if not form.is_valid():
             messages.error(request, _("Укажите корректный срок давности для заявок."))
@@ -410,19 +441,14 @@ def portal_procedure_run(request, slug: str):
         extra_meta["stale_days"] = form.cleaned_data["stale_days"]
         result = reject_stale_requests(actor=request.user, stale_days=form.cleaned_data["stale_days"])
     elif slug == "restock_low_stock_consumables":
+        if not user_has_capability(request.user, "users_and_site_admin"):
+            return forbidden(request, "Запуск этой процедуры доступен только администратору.")
         form = RestockLowStockConsumablesProcedureForm(request.POST, prefix="restock")
         if not form.is_valid():
-            messages.error(request, _("Укажите неотрицательный запас сверх порога."))
+            messages.error(request, _("Укажите фиксированное число единиц для пополнения (не меньше 1)."))
             return redirect("portal_home")
-        extra_meta["target_addon"] = form.cleaned_data["target_addon"]
-        result = restock_low_stock_consumables(actor=request.user, target_addon=form.cleaned_data["target_addon"])
-    elif slug == "close_stale_issued_requests":
-        form = CloseStaleIssuedRequestsProcedureForm(request.POST, prefix="close_issued")
-        if not form.is_valid():
-            messages.error(request, _("Укажите корректный срок для выданных заявок."))
-            return redirect("portal_home")
-        extra_meta["stale_days"] = form.cleaned_data["stale_days"]
-        result = close_stale_issued_requests(actor=request.user, stale_days=form.cleaned_data["stale_days"])
+        extra_meta["fixed_increase"] = form.cleaned_data["fixed_increase"]
+        result = restock_low_stock_consumables(actor=request.user, fixed_increase=form.cleaned_data["fixed_increase"])
     else:
         messages.error(request, _("Неизвестная процедура."))
         return redirect("portal_home")

@@ -3,7 +3,7 @@ from django.contrib.auth.models import Group, User
 from django.utils import timezone
 
 from assets.models import Equipment, EquipmentCheckout, InventoryAdjustment
-from core.models import Cabinet, EquipmentCategory, Workplace
+from core.models import Cabinet, EmployeeSchedule, EquipmentCategory, RegistrationAllowedEmailDomain, Workplace
 from operations.models import REQUEST_PENDING, EquipmentRequest, PeriodicMaterialUsageSchedule
 from .authz import ROLE_ALIASES
 
@@ -20,7 +20,7 @@ class PortalEquipmentForm(forms.ModelForm):
     VISIBLE_STATUS_CHOICES = (
         ("in_stock", "На складе"),
         ("repair", "В ремонте"),
-        ("retired", "Списано"),
+        ("retired", "Закончилось"),
     )
 
     def __init__(self, *args, **kwargs):
@@ -39,7 +39,7 @@ class PortalEquipmentForm(forms.ModelForm):
 
     class Meta:
         model = Equipment
-        fields = _model_fields(Equipment, omit=("inventory_number", "quantity_available"))
+        fields = _model_fields(Equipment, omit=("inventory_number",))
         labels = {
             "name": "Название",
             "category": "Категория",
@@ -49,6 +49,7 @@ class PortalEquipmentForm(forms.ModelForm):
             "is_consumable": "Это расходник",
             "status": "Статус",
             "quantity_total": "Количество всего",
+            "quantity_available": "Количество доступно",
             "low_stock_threshold": "Порог остатка",
             "purchase_date": "Дата покупки",
             "warranty_end": "Гарантия до",
@@ -92,11 +93,37 @@ class PortalEquipmentForm(forms.ModelForm):
             raise forms.ValidationError(f"Количество не должно превышать {MAX_ALLOWED_QUANTITY}.")
         return value
 
+    def clean_quantity_available(self):
+        value = self.cleaned_data.get("quantity_available")
+        if value is not None and value > MAX_ALLOWED_QUANTITY:
+            raise forms.ValidationError(f"Количество доступно не должно превышать {MAX_ALLOWED_QUANTITY}.")
+        return value
+
     def clean_low_stock_threshold(self):
         value = self.cleaned_data.get("low_stock_threshold")
         if value is not None and value > MAX_ALLOWED_QUANTITY:
             raise forms.ValidationError(f"Порог не должен превышать {MAX_ALLOWED_QUANTITY}.")
         return value
+
+    def clean_purchase_date(self):
+        value = self.cleaned_data.get("purchase_date")
+        if value and value > timezone.localdate():
+            raise forms.ValidationError("Дата покупки не может быть в будущем.")
+        return value
+
+    def clean_warranty_end(self):
+        value = self.cleaned_data.get("warranty_end")
+        if value and value < timezone.localdate():
+            raise forms.ValidationError("Дата окончания гарантии не может быть в прошлом.")
+        return value
+
+    def clean(self):
+        cleaned = super().clean()
+        purchase_date = cleaned.get("purchase_date")
+        warranty_end = cleaned.get("warranty_end")
+        if purchase_date and warranty_end and warranty_end < purchase_date:
+            self.add_error("warranty_end", "Гарантия не может заканчиваться раньше даты покупки.")
+        return cleaned
 
     def save(self, commit=True):
         instance = super().save(commit=False)
@@ -104,6 +131,9 @@ class PortalEquipmentForm(forms.ModelForm):
         instance.serial_number = serial_number
         # Keep legacy unique field in sync while UI uses serial number only.
         instance.inventory_number = serial_number
+        # For consumables, "available" is derived from total and not edited manually.
+        if instance.is_consumable:
+            instance.quantity_available = instance.quantity_total
         if commit:
             instance.save()
             self.save_m2m()
@@ -285,6 +315,15 @@ class PortalEquipmentRequestForm(forms.ModelForm):
             self.fields["needed_by"].required = True
             if is_new:
                 self.fields["needed_by"].initial = timezone.localdate()
+        if "non_consumable_target_status" in self.fields:
+            self.fields["non_consumable_target_status"].label = "Статус для нерасходуемого"
+            self.fields["non_consumable_target_status"].help_text = (
+                "Выберите «В ремонте» или «Закончилось». "
+                "Для расходников это поле очищается автоматически."
+            )
+            choices = list(self.fields["non_consumable_target_status"].choices)
+            if choices and choices[0][0] != "":
+                self.fields["non_consumable_target_status"].choices = [("", "—")] + choices
 
     def clean_quantity(self):
         value = self.cleaned_data.get("quantity")
@@ -294,6 +333,13 @@ class PortalEquipmentRequestForm(forms.ModelForm):
 
     def clean_comment(self):
         return (self.cleaned_data.get("comment") or "").strip()
+
+    def clean(self):
+        cleaned = super().clean()
+        equipment = cleaned.get("equipment")
+        if equipment is not None and equipment.is_consumable:
+            cleaned["non_consumable_target_status"] = ""
+        return cleaned
 
     def save(self, commit=True):
         instance = super().save(commit=False)
@@ -314,6 +360,7 @@ class PortalEquipmentRequestForm(forms.ModelForm):
             "equipment": "Оборудование",
             "quantity": "Количество",
             "request_kind": "Тип заявки",
+            "non_consumable_target_status": "Статус для нерасходуемого",
             "status": "Статус",
             "requested_at": "Создана",
             "needed_by": "Нужно до",
@@ -454,21 +501,147 @@ class PortalGroupForm(forms.ModelForm):
         labels = {"name": "Название", "permissions": "Права"}
 
 
+class PortalRegistrationAllowedEmailDomainForm(forms.ModelForm):
+    """Домены почты для регистрации и восстановления пароля по коду."""
+
+    class Meta:
+        model = RegistrationAllowedEmailDomain
+        fields = ["domain", "is_active", "notes"]
+        labels = {
+            "domain": "Домен",
+            "is_active": "Разрешён",
+            "notes": "Заметка",
+        }
+        help_texts = {
+            "domain": "Без символа @, например mpt.ru или partner.company.ru.",
+            "is_active": "Если снять флажок, домен не будет приниматься при регистрации и сбросе пароля.",
+            "notes": "Необязательно: для кого домен или комментарий для коллег.",
+        }
+
+    def clean_domain(self):
+        value = self.cleaned_data.get("domain") or ""
+        d = value.strip().lower().lstrip("@")
+        if not d:
+            raise forms.ValidationError("Укажите домен.")
+        if "@" in d or "/" in d or " " in d:
+            raise forms.ValidationError("Укажите только имя домена, без @ и пути.")
+        return d
+
+    def clean_notes(self):
+        return (self.cleaned_data.get("notes") or "").strip()
+
+
+class PortalEmployeeScheduleForm(forms.ModelForm):
+    custom_weekdays = forms.MultipleChoiceField(
+        choices=EmployeeSchedule.WEEKDAY_CHOICES,
+        required=False,
+        label="Кастомные рабочие дни",
+        help_text="Используется только для режима «Кастомный».",
+        widget=forms.CheckboxSelectMultiple,
+    )
+
+    class Meta:
+        model = EmployeeSchedule
+        fields = ["user", "schedule_type", "cycle_start_date", "custom_weekdays", "is_active"]
+        labels = {
+            "user": "Сотрудник",
+            "schedule_type": "Режим графика",
+            "cycle_start_date": "Дата начала цикла 2/2",
+            "is_active": "Включить контроль по графику",
+        }
+        help_texts = {
+            "is_active": "Если снять флажок — расписание отключается, сотрудник считается всегда рабочим.",
+        }
+        widgets = {
+            "cycle_start_date": forms.DateInput(attrs={"type": "date"}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["user"].queryset = User.objects.filter(is_active=True).order_by("username")
+        self.fields["cycle_start_date"].input_formats = ["%Y-%m-%d"]
+        self.fields["cycle_start_date"].localize = False
+        if not (self.instance and self.instance.pk):
+            self.initial.setdefault("cycle_start_date", timezone.localdate().isoformat())
+        if self.instance and self.instance.pk:
+            self.initial["custom_weekdays"] = [part for part in (self.instance.custom_workdays or "").split(",") if part]
+
+    def clean(self):
+        cleaned = super().clean()
+        schedule_type = cleaned.get("schedule_type")
+        weekdays = cleaned.get("custom_weekdays") or []
+        cycle_start = cleaned.get("cycle_start_date")
+        if cycle_start and cycle_start > timezone.localdate():
+            self.add_error("cycle_start_date", "Дата начала цикла не может быть в будущем.")
+        if schedule_type != EmployeeSchedule.SCHEDULE_CUSTOM and not weekdays:
+            if self.instance and self.instance.pk and self.instance.custom_workdays:
+                weekdays = [part for part in self.instance.custom_workdays.split(",") if part]
+            else:
+                weekdays = ["0", "1", "2", "3", "4"]
+        if schedule_type == EmployeeSchedule.SCHEDULE_CUSTOM and not weekdays:
+            self.add_error("custom_weekdays", "Для кастомного графика выберите хотя бы один рабочий день.")
+        cleaned["custom_weekdays"] = weekdays
+        cleaned["custom_workdays"] = ",".join(sorted(set(weekdays)))
+        return cleaned
+
+    def save(self, commit=True):
+        instance = super().save(commit=False)
+        instance.custom_workdays = self.cleaned_data.get("custom_workdays", "")
+        if commit:
+            instance.save()
+            self.save_m2m()
+        return instance
+
+
 class RejectStaleRequestsProcedureForm(forms.Form):
     stale_days = forms.IntegerField(label="Дней без обработки", min_value=1, initial=14)
 
 
 class RestockLowStockConsumablesProcedureForm(forms.Form):
-    target_addon = forms.IntegerField(
-        label="Запас сверх порога",
-        min_value=0,
-        initial=0,
-        help_text="После пополнения доступный остаток будет доведён до «порог + это число» для каждой позиции ниже порога.",
+    fixed_increase = forms.IntegerField(
+        label="Увеличить на (шт.)",
+        min_value=1,
+        initial=5,
+        help_text="Для каждой позиции с низким остатком будет создано пополнение на фиксированное количество единиц.",
     )
 
 
-class CloseStaleIssuedRequestsProcedureForm(forms.Form):
-    stale_days = forms.IntegerField(label="Дней в статусе «Выдана»", min_value=1, initial=30)
+class SimpleRestockAndRecoverProcedureForm(forms.Form):
+    NON_CONSUMABLE_ACTION_CHOICES = (
+        ("set_in_stock", "Перевести в «На складе»"),
+        ("increase", "Пополнить количество"),
+    )
+
+    equipment = forms.ModelChoiceField(
+        queryset=Equipment.objects.none(),
+        label="Оборудование",
+    )
+    quantity = forms.IntegerField(
+        label="Количество пополнения",
+        min_value=1,
+        initial=1,
+        help_text="Для расходника всегда пополняется остаток. Для нерасходника используется режим ниже.",
+    )
+    non_consumable_action = forms.ChoiceField(
+        label="Для нерасходника",
+        choices=NON_CONSUMABLE_ACTION_CHOICES,
+        initial="set_in_stock",
+        help_text="Если выбран расходник, это поле игнорируется.",
+    )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        qs = Equipment.objects.select_related("workplace").filter(deleted_at__isnull=True).order_by("name", "inventory_number")
+        self.fields["equipment"].queryset = qs
+        self.fields["equipment"].label_from_instance = (
+            lambda item: f"{item.name} | доступно: {item.quantity_available} из {item.quantity_total}"
+        )
+
+    def clean_quantity(self):
+        value = self.cleaned_data.get("quantity") or 0
+        if value > MAX_ALLOWED_QUANTITY:
+            raise forms.ValidationError(f"Количество не должно превышать {MAX_ALLOWED_QUANTITY}.")
+        return value
 
 
 class FinishAbandonedTimersProcedureForm(forms.Form):

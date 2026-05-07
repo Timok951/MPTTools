@@ -18,6 +18,11 @@
             break-inside: avoid;
             page-break-inside: avoid;
         }
+        tr.request-row-approved td {
+            background: rgba(46, 184, 92, 0.18) !important;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+        }
     }
 </style>
 
@@ -46,7 +51,7 @@
             <tr><td>{% trans "Consumables" %}</td><td>{{ consumables_total }}</td></tr>
             <tr><td>{% trans "Low stock" %}</td><td>{{ low_stock_total }}</td></tr>
             <tr><td>{% trans "Pending requests" %}</td><td>{{ requests_pending }}</td></tr>
-            <tr><td>{% ui_text "Операции расхода (30 дн.)" "Usage records (30d)" %}</td><td>{{ usage_records_30d }}</td></tr>
+            <tr><td>{% ui_text "Учёт расхода материалов (30 дн.)" "Material usage records (30d)" %}</td><td>{{ usage_records_30d }}</td></tr>
         </tbody>
     </table>
 </div>
@@ -109,7 +114,7 @@
             <tr>
                 <th>{% ui_text "Дата" "Date" %}</th>
                 <th>{% trans "Requests" %}</th>
-                <th>{% ui_text "Расход расходников (опер.)" "Consumable usage (ops)" %}</th>
+                <th>{% ui_text "Расходники (опер.)" "Consumables (ops)" %}</th>
                 <th>{% ui_text "Нерасходуемое (опер.)" "Non-consumable (ops)" %}</th>
             </tr>
         </thead>
@@ -143,7 +148,7 @@
         </thead>
         <tbody>
             {% for item in recent_requests %}
-            <tr>
+            <tr class="{% if item.status == 'approved' %}request-row-approved{% endif %}">
                 <td>{{ item.id }}</td>
                 <td>{{ item.requester }}</td>
                 <td>{{ item.equipment|default:"—" }}</td>
@@ -161,7 +166,7 @@
 </div>
 
 <div class="card">
-    <h3>{% ui_text "Объём списаний за 30 дней" "Write-off volume (30 days)" %}</h3>
+    <h3>{% ui_text "Объём уменьшения остатка за 30 дней" "Stock decrease volume (30 days)" %}</h3>
     <table>
         <thead>
             <tr><th>{% ui_text "Тип" "Type" %}</th><th>{% ui_text "Количество" "Quantity" %}</th></tr>

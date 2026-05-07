@@ -2,7 +2,9 @@
 {% load i18n %}
 
 {% block content %}
+{% if cfg.slug != "registration-domains" %}
 {% include "inventory/portal/_portal_bar.html" %}
+{% endif %}
 <div class="card">
     <h2>Удаление: {{ cfg.title }}</h2>
     <p>Подтвердите удаление: <strong>{{ object }}</strong>.</p>

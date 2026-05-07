@@ -5,7 +5,7 @@ from django.dispatch import receiver
 
 from operations.models import REQUEST_CLOSED, REQUEST_ISSUED, EquipmentRequest
 
-from .models import EquipmentCheckout, InventoryAdjustment
+from .models import EquipmentCheckout, InventoryAdjustment, STATUS_IN_STOCK, STATUS_RETIRED
 
 
 @receiver(post_save, sender=InventoryAdjustment)
@@ -16,6 +16,11 @@ def apply_inventory_adjustment(sender, instance, created, **kwargs):
         quantity_total=F("quantity_total") + instance.delta,
         quantity_available=F("quantity_available") + instance.delta,
     )
+    # If we restock an item that was marked as exhausted, return it to in-stock status.
+    if instance.delta > 0:
+        instance.equipment.__class__.objects.filter(pk=instance.equipment_id, status=STATUS_RETIRED).update(
+            status=STATUS_IN_STOCK
+        )
 
 
 @receiver(pre_save, sender=EquipmentCheckout)

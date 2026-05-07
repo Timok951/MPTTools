@@ -2,7 +2,9 @@
 {% load i18n %}
 
 {% block content %}
+{% if cfg.slug != "registration-domains" %}
 {% include "inventory/portal/_portal_bar.html" %}
+{% endif %}
 <div class="card">
     <h2>
         {% if is_edit %}
@@ -13,29 +15,43 @@
     </h2>
     <form method="post" class="form-shell" enctype="multipart/form-data">
         {% csrf_token %}
+        {% if cfg.slug == "schedules" %}
         <div class="form-grid">
-            {% for field in form %}
-                <div class="form-field {% if field.errors %}has-error{% endif %}">
-                    {% if field.field.widget.input_type == "checkbox" %}
-                    <label for="{{ field.id_for_label }}" class="checkbox-control">
-                        {{ field }}
-                        <span>{{ field.label }}</span>
-                    </label>
-                    {% else %}
-                    <label for="{{ field.id_for_label }}">{{ field.label }}</label>
-                    <div class="inline-field-with-action">
-                        {{ field }}
-                    </div>
-                    {% endif %}
-                    {% if field.help_text %}
-                        <div class="field-help">{{ field.help_text }}</div>
-                    {% endif %}
-                    {% for error in field.errors %}
-                        <div class="field-error">{{ error }}</div>
-                    {% endfor %}
-                </div>
-            {% endfor %}
+            {% include "inventory/_form_field.html" with field=form.user %}
+            {% include "inventory/_form_field.html" with field=form.schedule_type %}
+            {% include "inventory/_form_field.html" with field=form.cycle_start_date %}
         </div>
+        <div id="schedule-custom-weekdays-wrap" class="aside-panel" style="margin-top:8px;">
+            {% include "inventory/_form_field.html" with field=form.custom_weekdays %}
+        </div>
+        <div class="form-grid single" style="margin-top:8px;">
+            {% include "inventory/_form_field.html" with field=form.is_active %}
+        </div>
+        {% else %}
+            <div class="form-grid">
+                {% for field in form %}
+                    <div class="form-field {% if field.errors %}has-error{% endif %}">
+                        {% if field.field.widget.input_type == "checkbox" %}
+                        <label for="{{ field.id_for_label }}" class="checkbox-control">
+                            {{ field }}
+                            <span>{{ field.label }}</span>
+                        </label>
+                        {% else %}
+                        <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                        <div class="inline-field-with-action">
+                            {{ field }}
+                        </div>
+                        {% endif %}
+                        {% if field.help_text %}
+                            <div class="field-help">{{ field.help_text }}</div>
+                        {% endif %}
+                        {% for error in field.errors %}
+                            <div class="field-error">{{ error }}</div>
+                        {% endfor %}
+                    </div>
+                {% endfor %}
+            </div>
+        {% endif %}
         {% if cfg.slug == "workplaces" %}
         <div class="aside-panel">
             <h3>Локация на карте</h3>
@@ -156,6 +172,44 @@
 if (window.ymaps && window.__initWorkplaceMap) {
     window.ymaps.ready(window.__initWorkplaceMap);
 }
+</script>
+{% endif %}
+{% if cfg.slug == "schedules" %}
+<script>
+(() => {
+    const typeSelect = document.getElementById("id_schedule_type");
+    const customWrap = document.getElementById("schedule-custom-weekdays-wrap");
+    if (!typeSelect || !customWrap) return;
+    const sync = () => {
+        const isCustom = typeSelect.value === "custom";
+        customWrap.style.display = isCustom ? "" : "none";
+        customWrap.style.opacity = isCustom ? "1" : "0.75";
+    };
+    typeSelect.addEventListener("change", sync);
+    sync();
+})();
+</script>
+{% endif %}
+{% if cfg.slug == "equipment" %}
+<script>
+(() => {
+    const consumable = document.getElementById("id_is_consumable");
+    const qtyAvailable = document.getElementById("id_quantity_available");
+    const qtyTotal = document.getElementById("id_quantity_total");
+    const wrap = qtyAvailable?.closest(".form-field");
+    if (!consumable || !qtyAvailable || !qtyTotal || !wrap) return;
+    const sync = () => {
+        const isConsumable = !!consumable.checked;
+        wrap.style.display = isConsumable ? "none" : "";
+        qtyAvailable.disabled = isConsumable;
+        if (isConsumable) qtyAvailable.value = qtyTotal.value || qtyAvailable.value;
+    };
+    consumable.addEventListener("change", sync);
+    qtyTotal.addEventListener("input", () => {
+        if (consumable.checked) qtyAvailable.value = qtyTotal.value || qtyAvailable.value;
+    });
+    sync();
+})();
 </script>
 {% endif %}
 {% endblock %}

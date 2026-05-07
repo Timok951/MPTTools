@@ -822,6 +822,15 @@
             background: rgba(112, 122, 146, 0.18);
             color: #526079;
         }
+        tr.request-row-approved td {
+            background: rgba(46, 184, 92, 0.14);
+        }
+        body.theme-dark tr.request-row-approved td {
+            background: rgba(58, 201, 120, 0.12);
+        }
+        body.theme-contrast tr.request-row-approved td {
+            background: rgba(46, 184, 92, 0.12);
+        }
         body.theme-dark .badge,
         body.theme-dark .kicker,
         body.theme-dark .pagination-links span.current {
@@ -853,14 +862,28 @@
             gap: 6px;
         }
         .request-status-select {
-            min-width: 150px;
+            min-width: 110px;
         }
         .request-quick-action {
             display: inline-flex;
+            gap: 6px;
+            align-items: center;
+            flex-wrap: wrap;
         }
         .request-quick-btn {
-            padding: 5px 9px;
+            padding: 4px 8px;
             font-size: 12px;
+        }
+        .request-history-table {
+            min-width: 0;
+            width: 100%;
+            table-layout: fixed;
+            font-size: 13px;
+        }
+        .request-history-table th,
+        .request-history-table td {
+            padding: 7px 6px;
+            word-break: break-word;
         }
         .quick-role-grid {
             display: flex;
@@ -1028,6 +1051,71 @@
             width: auto;
             max-width: min(100%, 360px);
             vertical-align: middle;
+        }
+        .message-attached-photo-strip img {
+            max-height: 180px;
+            max-width: min(100%, 280px);
+        }
+        .request-orphan-photos-block {
+            padding: 14px 16px;
+            margin-bottom: 18px;
+            border-radius: 12px;
+            border: 1px solid var(--border);
+            background: var(--surface);
+        }
+        .request-orphan-photos-title {
+            margin: 0 0 8px;
+            font-size: 1rem;
+            font-weight: 600;
+            color: var(--ink);
+        }
+        body.theme-dark .request-orphan-photos-block {
+            background: rgba(31, 46, 82, 0.35);
+            border-color: var(--border);
+        }
+        .request-orphan-photo-grid {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 16px;
+            margin-top: 12px;
+        }
+        .request-orphan-photo-cell {
+            max-width: 280px;
+        }
+        .request-orphan-photo-link {
+            display: block;
+            border-radius: 10px;
+            overflow: hidden;
+            border: 1px solid var(--border);
+            box-shadow: var(--shadow);
+        }
+        .request-orphan-photo-link img {
+            display: block;
+            max-height: 180px;
+            width: auto;
+            vertical-align: middle;
+        }
+        body.theme-dark .request-orphan-photo-link {
+            border-color: var(--border);
+        }
+        .request-orphan-photo-meta {
+            margin-top: 8px;
+            font-size: 0.85rem;
+            line-height: 1.35;
+        }
+        .request-photo-only-details {
+            margin: 16px 0;
+            padding: 10px 12px;
+            border-radius: 12px;
+            border: 1px dashed var(--border);
+            background: var(--surface);
+        }
+        body.theme-dark .request-photo-only-details {
+            border-color: var(--border);
+            background: rgba(20, 28, 51, 0.5);
+        }
+        .request-message-composer {
+            margin-bottom: 8px;
         }
         body.theme-dark .request-photo-strip a {
             border-color: var(--border);
@@ -1255,6 +1343,7 @@
             gap: 14px;
             margin-top: 12px;
             justify-content: flex-start;
+            align-items: stretch;
         }
         .equipment-card {
             overflow: hidden;
@@ -1263,6 +1352,7 @@
             display: flex;
             flex-direction: column;
             min-height: 0;
+            height: 100%;
         }
         .equipment-card-media {
             position: relative;
@@ -1602,18 +1692,57 @@
             color: var(--accent-2);
             text-decoration: none;
         }
+        .domain-chip-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            margin: 8px 0 0;
+        }
+        .domain-chip {
+            display: inline-flex;
+            align-items: center;
+            padding: 4px 8px;
+            border-radius: 999px;
+            border: 1px solid var(--border);
+            background: var(--panel-soft);
+            color: var(--ink);
+            font-size: 12px;
+            line-height: 1.2;
+            max-width: 100%;
+            word-break: break-all;
+        }
         footer {
             padding: 18px 24px 32px;
             color: var(--muted);
             font-size: 12px;
             text-align: center;
         }
+        @media (min-width: 1400px) {
+            .shell-header-inner,
+            main {
+                max-width: 1360px;
+            }
+        }
+        @media (max-width: 1280px) {
+            .shell-header-inner {
+                padding: 8px 10px 9px;
+            }
+            .header-nav-row {
+                padding-top: 6px;
+                gap: 8px;
+            }
+        }
         @media (max-width: 1080px) {
             .shell-header-inner {
-                padding: 12px 14px 12px;
+                padding: 10px 12px;
             }
             main {
                 padding: 18px;
+            }
+            .nav-mega > summary,
+            a.nav-mega-direct {
+                padding: 4px 10px;
+                font-size: 11px;
             }
             .header-brand-row,
             .user-strip {
@@ -1632,24 +1761,49 @@
                 position: static;
             }
         }
-        @media (max-width: 720px) {
+        @media (max-width: 820px) {
             .shell-header-inner {
-                padding: 12px;
+                padding: 8px 10px;
+            }
+            .brand span,
+            .nav-mega-tag {
+                display: none;
+            }
+            .brand h1 {
+                font-size: 15px;
+            }
+            .header-nav-row {
+                padding-top: 6px;
+            }
+            .user-chip {
+                font-size: 11px;
+                padding: 2px 7px;
+            }
+            .switch-btn {
+                padding: 4px 8px;
             }
             .primary-nav {
-                flex-direction: column;
-                align-items: stretch;
+                flex-wrap: nowrap;
+                overflow-x: auto;
+                align-items: center;
+                gap: 5px;
+                padding-bottom: 2px;
+                scrollbar-width: thin;
             }
             .nav-mega {
-                width: 100%;
+                width: auto;
+                flex: 0 0 auto;
             }
             .nav-mega > summary {
-                width: 100%;
-                justify-content: space-between;
+                width: auto;
+                justify-content: center;
+                padding: 4px 9px;
             }
             a.nav-mega-direct {
-                width: 100%;
+                width: auto;
                 justify-content: center;
+                flex: 0 0 auto;
+                padding: 4px 9px;
             }
             .nav-panel {
                 position: static;
@@ -1657,13 +1811,10 @@
                 margin-top: 4px;
                 box-shadow: none;
             }
-            .header-nav-row {
-                flex-direction: column;
-                align-items: stretch;
-            }
             .user-strip {
                 width: 100%;
                 justify-content: flex-start;
+                gap: 6px;
             }
             .switch-btn {
                 width: 100%;
@@ -1683,6 +1834,22 @@
                 white-space: nowrap;
             }
             .timeline-item { grid-template-columns: 1fr; }
+        }
+        @media (max-width: 640px) {
+            .header-brand-row {
+                gap: 6px;
+            }
+            .brand h1 {
+                font-size: 14px;
+            }
+            .nav-mega > summary,
+            a.nav-mega-direct {
+                font-size: 10.5px;
+                border-radius: 8px;
+            }
+            .user-strip .user-chip {
+                max-width: 100%;
+            }
         }
         @media (max-width: 520px) {
             main {
@@ -1773,12 +1940,10 @@
                                     <a href="{% url 'workplaces' %}">{% ui_text "Рабочие места" "Workplaces" %}</a>
                                     <a href="{% url 'cabinets' %}">{% ui_text "Кабинеты" "Cabinets" %}</a>
                                 </div>
-                                {% if user|has_capability:"warehouse_operations" %}
+                                {% if user|has_capability:"warehouse_operations" or user|has_capability:"users_and_site_admin" %}
                                 <div class="nav-panel-section">
-                                    <div class="nav-panel-section-title">{% ui_text "Добавить на склад" "Add to warehouse" %}</div>
-                                    <a href="{% url 'portal_create' entity='equipment' %}">{% ui_text "Оборудование" "Equipment" %}</a>
-                                    <a href="{% url 'portal_create' entity='workplaces' %}">{% ui_text "Рабочее место" "Workplace" %}</a>
-                                    <a href="{% url 'portal_create' entity='cabinets' %}">{% ui_text "Кабинет" "Cabinet" %}</a>
+                                    <div class="nav-panel-section-title">{% ui_text "Справочники" "Reference data" %}</div>
+                                    <a href="{% url 'portal_list' entity='categories' %}">{% ui_text "Категории оборудования" "Equipment categories" %}</a>
                                 </div>
                                 {% endif %}
                             </div>
@@ -1786,10 +1951,32 @@
 
                         {% if user.is_authenticated %}
                         {% if user|has_capability:"request_creation" or user|has_capability:"request_processing" or user|has_capability:"warehouse_operations" or user|has_capability:"users_and_site_admin" %}
-                        <a class="nav-mega-direct" href="{% url 'request_history' %}">{% ui_text "Заявки" "Requests" %}</a>
+                        <details class="nav-mega">
+                            <summary title="{% ui_text 'Заявки: журнал и периодические' 'Requests: log and periodic' %}">
+                                {% ui_text "Заявки" "Requests" %}
+                                <span class="nav-mega-tag">{% ui_text "меню" "menu" %}</span>
+                                <span class="nav-mega-cue" aria-hidden="true">▾</span>
+                                <span class="visually-hidden">{% ui_text "Выпадающее меню" "Dropdown menu" %}</span>
+                            </summary>
+                            <div class="nav-panel" role="region" aria-label="{% ui_text 'Заявки' 'Requests' %}">
+                                <div class="nav-panel-section">
+                                    <div class="nav-panel-section-title">{% ui_text "Обычные заявки" "Standard requests" %}</div>
+                                    <a href="{% url 'request_history' %}">{% ui_text "Журнал заявок" "Request log" %}</a>
+                                    {% if user|has_capability:"request_creation" %}
+                                    <a href="{% url 'request_create' %}">{% ui_text "Новая заявка" "New request" %}</a>
+                                    {% endif %}
+                                </div>
+                                {% if user|has_capability:"request_creation" or user|has_capability:"request_processing" or user|has_capability:"usage_writeoff" or user|has_capability:"users_and_site_admin" %}
+                                <div class="nav-panel-section">
+                                    <div class="nav-panel-section-title">{% ui_text "Периодические" "Periodic" %}</div>
+                                    <a href="{% url 'portal_list' entity='periodic-usage' %}">{% ui_text "Периодический расход (расписание)" "Periodic usage (schedule)" %}</a>
+                                </div>
+                                {% endif %}
+                            </div>
+                        </details>
                         {% endif %}
                         <details class="nav-mega">
-                            <summary title="{% ui_text 'Сообщения и периодика' 'Messages & periodic usage' %}">
+                            <summary title="{% ui_text 'Сообщения и служебное' 'Messages & misc' %}">
                                 {% ui_text "Ещё" "More" %}
                                 <span class="nav-mega-tag">{% ui_text "меню" "menu" %}</span>
                                 <span class="nav-mega-cue" aria-hidden="true">▾</span>
@@ -1802,15 +1989,6 @@
                                     <a href="{% url 'direct_messages' %}?moderation=1">{% ui_text "Все сообщения (админ)" "All messages (admin)" %}</a>
                                     {% endif %}
                                 </div>
-                                {% if user|has_capability:"request_creation" or user|has_capability:"request_processing" or user|has_capability:"usage_writeoff" or user|has_capability:"users_and_site_admin" %}
-                                <div class="nav-panel-section">
-                                    <div class="nav-panel-section-title">{% ui_text "Периодический расход" "Periodic usage" %}</div>
-                                    <a href="{% url 'portal_list' entity='periodic-usage' %}">{% ui_text "Список" "List" %}</a>
-                                    {% if user|has_capability:"request_creation" or user|has_capability:"usage_writeoff" or user|has_capability:"users_and_site_admin" %}
-                                    <a href="{% url 'portal_create' entity='periodic-usage' %}">{% ui_text "Новая запись" "New entry" %}</a>
-                                    {% endif %}
-                                </div>
-                                {% endif %}
                             </div>
                         </details>
                         {% endif %}
@@ -1824,7 +2002,7 @@
                             </summary>
                             <div class="nav-panel" role="region" aria-label="{% ui_text 'Сводки и отчёты' 'Insights & reports' %}">
                                 <a href="{% url 'about_site' %}">{% ui_text "О сайте" "About" %}</a>
-                                {% if user|has_group:"Sysadmin" %}
+                                {% if user|has_capability:"report_access" or user|has_capability:"warehouse_operations" or user|has_capability:"request_processing" or user|has_capability:"users_and_site_admin" %}
                                 <a href="{% url 'analytics' %}">{% ui_text "Аналитика" "Analytics" %}</a>
                                 {% endif %}
                                 {% if user|has_capability:"report_access" %}
@@ -1853,11 +2031,12 @@
                                 <div class="nav-panel-section">
                                     <div class="nav-panel-section-title">{% ui_text "Пользователи" "Users" %}</div>
                                     <a href="{% url 'portal_list' entity='users' %}">{% ui_text "Учётные записи" "Accounts" %}</a>
+                                    <a href="{% url 'portal_list' entity='schedules' %}">{% ui_text "Графики сотрудников" "Staff schedules" %}</a>
+                                    <a href="{% url 'portal_list' entity='registration-domains' %}">{% ui_text "Домены почты для регистрации" "Registration email domains" %}</a>
                                 </div>
                                 <div class="nav-panel-section">
                                     <div class="nav-panel-section-title">{% ui_text "Роли и интеграции" "Roles & integrations" %}</div>
                                     <a href="{% url 'portal_list' entity='groups' %}">{% ui_text "Группы (роли)" "Groups (roles)" %}</a>
-                                    <a href="{% url 'portal_create' entity='groups' %}">{% ui_text "Создать группу" "Create group" %}</a>
                                     <a href="{% url 'role_assignment' %}">{% ui_text "Кто в какой роли" "Role assignment" %}</a>
                                     <a href="{% url 'api_token' %}">{% ui_text "Токен API" "API token" %}</a>
                                 </div>
@@ -1920,16 +2099,21 @@
                     {% endfor %}
                 </div>
             {% endif %}
+            {% if is_off_duty_today %}
+                <div class="flash warning">
+                    {% ui_text "Сегодня у вас нерабочий день по графику. Просмотр доступен, изменения данных заблокированы." "Today is your off-duty day by schedule. Viewing is allowed, data changes are blocked." %}
+                </div>
+            {% endif %}
             {% if user.is_authenticated and show_hotkey_legend %}
                 <div class="hotkey-legend">
                     <strong>{% ui_text "Горячие клавиши" "Hotkeys" %}</strong>
                     <div class="hotkey-grid">
                         <div class="hotkey-item"><code>G</code><code>E</code> {% ui_text "Оборудование" "Equipment" %}</div>
-                        <div class="hotkey-item"><code>G</code><code>R</code> {% ui_text "Заявки" "Requests" %}</div>
+                        <div class="hotkey-item"><code>G</code><code>R</code> {% ui_text "Журнал заявок" "Request log" %}</div>
                         <div class="hotkey-item"><code>G</code><code>S</code> {% ui_text "Поиск" "Search" %}</div>
                         <div class="hotkey-item"><code>N</code><code>R</code> {% ui_text "Новая заявка" "New request" %}</div>
-                        {% if user|has_capability:"request_creation" %}
-                        <div class="hotkey-item"><code>N</code><code>P</code> {% ui_text "Новая периодическая заявка" "New periodic request" %}</div>
+                        {% if user|has_capability:"request_creation" or user|has_capability:"request_processing" or user|has_capability:"usage_writeoff" or user|has_capability:"users_and_site_admin" %}
+                        <div class="hotkey-item"><code>G</code><code>P</code> {% ui_text "Периодический расход" "Periodic usage" %}</div>
                         {% endif %}
                         <div class="hotkey-item"><code>?</code> {% ui_text "Показать или скрыть подсказку" "Show or hide help" %}</div>
                     </div>
@@ -1949,8 +2133,8 @@
                 "gr": "{% url 'request_history' %}",
                 "gs": "{% url 'inventory_search' %}",
                 "nr": "{% url 'request_create' %}",
-                {% if user|has_capability:"request_creation" %}
-                "np": "{% url 'portal_create' entity='periodic-usage' %}",
+                {% if user|has_capability:"request_creation" or user|has_capability:"request_processing" or user|has_capability:"usage_writeoff" or user|has_capability:"users_and_site_admin" %}
+                "gp": "{% url 'portal_list' entity='periodic-usage' %}",
                 {% endif %}
             };
             const leaderCodes = {
@@ -1961,7 +2145,7 @@
                 KeyE: "e",
                 KeyR: "r",
                 KeyS: "s",
-                {% if user|has_capability:"request_creation" %}
+                {% if user|has_capability:"request_creation" or user|has_capability:"request_processing" or user|has_capability:"usage_writeoff" or user|has_capability:"users_and_site_admin" %}
                 KeyP: "p",
                 {% endif %}
             };

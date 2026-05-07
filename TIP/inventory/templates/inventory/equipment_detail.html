@@ -5,7 +5,7 @@
 <div class="card equipment-detail-card">
     <div class="card-header">
         <div>
-            <div class="kicker">Оборудование #{{ item.pk }}</div>
+            <div class="kicker">{% if is_public_card %}Публичная карточка{% else %}Оборудование #{{ item.pk }}{% endif %}</div>
             <h2>{{ item.name }}</h2>
             <p class="muted">
                 Инвентарный номер: {{ item.inventory_number }} |
@@ -13,7 +13,9 @@
             </p>
         </div>
         <div class="actions">
+            {% if show_qr_link|default:True %}
             <a class="secondary" href="{% url 'equipment_qr' equipment_id=item.pk %}" target="_blank" rel="noopener">QR</a>
+            {% endif %}
             {% if can_manage_equipment %}
             <a href="{% url 'portal_edit' entity='equipment' pk=item.pk %}">Редактировать</a>
             {% endif %}
@@ -49,6 +51,7 @@
                         <h3>Остатки и сроки</h3>
                         <ul>
                             <li>Всего: {{ item.quantity_total }}</li>
+                            <li>Доступно: {{ item.quantity_available }}</li>
                             <li>Порог низкого остатка: {{ item.low_stock_threshold }}</li>
                             <li>Дата покупки: {% if item.purchase_date %}{{ item.purchase_date|date:preferred_date_format }}{% else %}—{% endif %}</li>
                             <li>Гарантия до: {% if item.warranty_end %}{{ item.warranty_end|date:preferred_date_format }}{% else %}—{% endif %}</li>
@@ -65,6 +68,29 @@
         </div>
     </div>
 </div>
+
+{% if split_repair_max_qty %}
+<div class="card">
+    <h3>{% ui_text "Часть позиции в ремонт" "Split quantity into repair" %}</h3>
+    <p class="muted" style="margin-top:0;">
+        {% ui_text "Если на одной складской позиции несколько одинаковых единиц, а в ремонт нужно отправить только часть: укажите количество и уникальный номер выделяемой единицы (как в учёте). Остаток останется на этой карточке." "If one stock row holds multiple identical units but only some go to repair: enter quantity and a unique ID for the split-off unit. The rest stays on this card." %}
+    </p>
+    <form method="post" action="{% url 'equipment_split_repair' equipment_id=item.pk %}" class="form-shell filters" style="align-items:flex-end;">
+        {% csrf_token %}
+        <div>
+            <label for="id_split_qty">{% ui_text "Штук в ремонт" "Units to repair" %}</label>
+            <input id="id_split_qty" type="number" name="qty" value="1" min="1" max="{{ split_repair_max_qty }}" />
+        </div>
+        <div style="flex:1; min-width:220px;">
+            <label for="id_unit_serial">{% ui_text "Номер единицы (уникальный)" "Unique unit ID" %}</label>
+            <input id="id_unit_serial" type="text" name="unit_serial" required maxlength="100" placeholder="{% ui_text 'Например серийник этой дрели' 'e.g. serial of this drill' %}" autocomplete="off" />
+        </div>
+        <div>
+            <button class="btn secondary" type="submit">{% ui_text "Выделить в ремонт" "Send to repair" %}</button>
+        </div>
+    </form>
+</div>
+{% endif %}
 
 {% if item.photo %}
 <dialog id="equipment-photo-zoom" class="equipment-photo-dialog" aria-label="{% ui_text 'Фото оборудования' 'Equipment photo' %}">

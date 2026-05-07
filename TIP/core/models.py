@@ -1,4 +1,5 @@
 from django.conf import settings
+from django.core.exceptions import ValidationError
 from django.db import models
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
@@ -174,6 +175,59 @@ class UserPreference(models.Model):
         }.get(self.date_display_format, "d.m.Y")
 
 
+class EmployeeSchedule(models.Model):
+    SCHEDULE_5_2 = "5_2"
+    SCHEDULE_2_2 = "2_2"
+    SCHEDULE_CUSTOM = "custom"
+    SCHEDULE_CHOICES = [
+        (SCHEDULE_5_2, "5/2"),
+        (SCHEDULE_2_2, "2/2"),
+        (SCHEDULE_CUSTOM, "Кастомный"),
+    ]
+    WEEKDAY_CHOICES = [
+        ("0", "Пн"),
+        ("1", "Вт"),
+        ("2", "Ср"),
+        ("3", "Чт"),
+        ("4", "Пт"),
+        ("5", "Сб"),
+        ("6", "Вс"),
+    ]
+
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="schedule",
+        verbose_name="Сотрудник",
+    )
+    schedule_type = models.CharField(
+        max_length=16,
+        choices=SCHEDULE_CHOICES,
+        default=SCHEDULE_5_2,
+        verbose_name="Режим графика",
+    )
+    cycle_start_date = models.DateField(
+        default=timezone.localdate,
+        help_text="Точка отсчёта для графика 2/2.",
+        verbose_name="Дата начала цикла 2/2",
+    )
+    custom_workdays = models.CharField(
+        max_length=32,
+        blank=True,
+        default="0,1,2,3,4",
+        help_text="Для кастомного графика: номера дней недели через запятую (0=Пн ... 6=Вс).",
+    )
+    is_active = models.BooleanField(default=True, verbose_name="Активен")
+    updated_at = models.DateTimeField(auto_now=True, verbose_name="Обновлён")
+
+    class Meta:
+        ordering = ["user__username"]
+        verbose_name = "График сотрудника"
+        verbose_name_plural = "Графики сотрудников"
+
+    def __str__(self) -> str:
+        return f"{self.user} ({self.get_schedule_type_display()})"
+
 class DirectMessage(models.Model):
     sender = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -223,3 +277,36 @@ class PasswordResetCode(models.Model):
 
     def __str__(self) -> str:
         return f"Password reset code for {self.user} ({self.email})"
+
+
+class RegistrationAllowedEmailDomain(models.Model):
+    """Домены почты, с которых разрешена регистрация и сценарий восстановления пароля по коду."""
+
+    domain = models.CharField(
+        max_length=253,
+        unique=True,
+        verbose_name="Домен",
+        help_text="Без символа @, например mpt.ru или subs.example.org",
+    )
+    is_active = models.BooleanField(default=True, verbose_name="Разрешён")
+    notes = models.CharField(max_length=200, blank=True, verbose_name="Заметка")
+
+    class Meta:
+        ordering = ["domain"]
+        verbose_name = "Разрешённый домен почты для регистрации"
+        verbose_name_plural = "Разрешённые домены почты для регистрации"
+
+    def __str__(self) -> str:
+        return f"@{self.domain}" if self.domain else "(empty)"
+
+    def clean(self) -> None:
+        super().clean()
+        d = (self.domain or "").strip().lower().lstrip("@")
+        if not d:
+            raise ValidationError({"domain": "Укажите домен."})
+        if "@" in d or "/" in d or " " in d:
+            raise ValidationError({"domain": "Укажите только имя домена, без @ и пути."})
+
+    def save(self, *args, **kwargs) -> None:
+        self.domain = (self.domain or "").strip().lower().lstrip("@")
+        super().save(*args, **kwargs)

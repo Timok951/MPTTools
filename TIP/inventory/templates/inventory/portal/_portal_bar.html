@@ -1,14 +1,10 @@
 {% load i18n inventory_extras %}
+{% if portal_back_url %}
 <nav class="portal-toolbar card" aria-label="{% trans 'Portal navigation' %}" style="padding:10px 14px; margin-bottom:12px;">
     <div class="toolbar-spread" style="align-items:center; flex-wrap:wrap; gap:10px;">
         <div class="actions" style="flex-wrap:wrap; gap:8px;">
-            {% if portal_back_url %}
             <a href="{{ portal_back_url }}">{{ portal_back_label }}</a>
-            {% endif %}
-            <a class="secondary" href="{% url 'portal_home' %}">{% trans "Портал" %}</a>
-            {% if user|has_capability:"users_and_site_admin" %}
-            <a class="secondary" href="{% url 'portal_logs' %}">{% trans "Журнал действий" %}</a>
-            {% endif %}
         </div>
     </div>
 </nav>
+{% endif %}

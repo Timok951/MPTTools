@@ -164,6 +164,35 @@ class RequestStatusUxTests(TestCase):
         self.assertIn("Готово к выдаче.", status_message.body)
         self.assertEqual(len(mail.outbox), 1)
         self.assertEqual(mail.outbox[0].to, ["requester@mpt.ru"])
+        self.assertIn("одобрена", mail.outbox[0].subject.lower())
+
+    def test_processor_can_delete_request_message(self):
+        msg = EquipmentRequestMessage.objects.create(
+            request=self.request_item,
+            author=self.requester,
+            body="Удаляемое сообщение",
+        )
+        self.client.force_login(self.support)
+        response = self.client.post(
+            reverse("request_detail", args=[self.request_item.pk]),
+            {"action": "delete_message", "message_id": str(msg.pk)},
+        )
+        self.assertEqual(response.status_code, 302)
+        self.assertFalse(EquipmentRequestMessage.objects.filter(pk=msg.pk).exists())
+
+    def test_requester_cannot_delete_request_message(self):
+        msg = EquipmentRequestMessage.objects.create(
+            request=self.request_item,
+            author=self.support,
+            body="Сообщение от поддержки",
+        )
+        self.client.force_login(self.requester)
+        response = self.client.post(
+            reverse("request_detail", args=[self.request_item.pk]),
+            {"action": "delete_message", "message_id": str(msg.pk)},
+        )
+        self.assertEqual(response.status_code, 403)
+        self.assertTrue(EquipmentRequestMessage.objects.filter(pk=msg.pk).exists())
 
     def test_request_detail_shows_contextual_quick_actions(self):
         self.request_item.status = REQUEST_APPROVED

@@ -13,16 +13,15 @@ from django.utils import timezone
 from rest_framework.authtoken.models import Token
 from rest_framework.test import APIClient
 
-from assets.models import Equipment, EquipmentCheckout, InventoryAdjustment, STATUS_IN_STOCK, STATUS_RETIRED
+from assets.models import Equipment, EquipmentCheckout, InventoryAdjustment, STATUS_IN_STOCK, STATUS_REPAIR, STATUS_RETIRED
 from audit.models import AuditLog
 from audit.models import AdminPortalLog
 from core.models import DirectMessage, EquipmentCategory, PasswordResetCode, UserPreference, Workplace
 from inventory.backup_utils import PostgreSQLBackupConfig, create_postgresql_backup, get_postgresql_backup_config
+from inventory.authz import GROUP_FIRST_LINE_SUPPORT
 from inventory.portal_forms import PortalUserForm
 from operations.models import (
     REQUEST_APPROVED,
-    REQUEST_CLOSED,
-    REQUEST_ISSUED,
     REQUEST_KIND_BUILDER,
     REQUEST_PENDING,
     EquipmentRequest,
@@ -199,6 +198,12 @@ class EquipmentQRCodeTests(TestCase):
         response = self.client.get(reverse("equipment_qr", args=[999999]))
 
         self.assertEqual(response.status_code, 404)
+
+    def test_public_equipment_card_is_accessible_without_auth(self):
+        response = self.client.get(reverse("equipment_public_card", args=[self.equipment.pk]))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Публичная карточка")
+        self.assertContains(response, self.equipment.name)
 
     def test_equipment_list_contains_qr_link(self):
         self.client.force_login(self.user)
@@ -389,6 +394,7 @@ class PasswordResetFlowTests(TestCase):
     def test_password_reset_request_rejects_non_corporate_email(self):
         response = self.client.post(reverse("password_reset_request"), {"email": "outsider@gmail.com"})
         self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "доменах")
         self.assertContains(response, "mpt.ru")
         self.assertEqual(PasswordResetCode.objects.count(), 0)
 
@@ -422,8 +428,46 @@ class RegistrationEmailDomainTests(TestCase):
             },
         )
         self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "доменах")
         self.assertContains(response, "mpt.ru")
         self.assertFalse(User.objects.filter(username="bad_reg_user").exists())
+
+    def test_register_accepts_configured_extra_domain(self):
+        from core.models import RegistrationAllowedEmailDomain
+
+        RegistrationAllowedEmailDomain.objects.create(domain="partner.example", is_active=True)
+        pwd = "Reg-Test-9z!"
+        response = self.client.post(
+            reverse("register"),
+            {
+                "username": "partner_reg_user",
+                "email": "person@partner.example",
+                "password1": pwd,
+                "password2": pwd,
+            },
+        )
+        self.assertEqual(response.status_code, 302)
+        user = User.objects.get(username="partner_reg_user")
+        self.assertEqual(user.email.lower(), "person@partner.example")
+
+    def test_register_rejects_domain_when_marked_inactive(self):
+        from core.models import RegistrationAllowedEmailDomain
+
+        RegistrationAllowedEmailDomain.objects.create(domain="other.org", is_active=True)
+        RegistrationAllowedEmailDomain.objects.filter(domain="mpt.ru").update(is_active=False)
+        pwd = "Reg-Test-9w!"
+        response = self.client.post(
+            reverse("register"),
+            {
+                "username": "inactive_dom_user",
+                "email": "x@mpt.ru",
+                "password1": pwd,
+                "password2": pwd,
+            },
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "доменах")
+        self.assertFalse(User.objects.filter(username="inactive_dom_user").exists())
 
 
 class LightweightPerformanceTests(TestCase):
@@ -453,6 +497,12 @@ class AdminProcedureTests(TestCase):
         self.builder = User.objects.create_user(username="portal_builder", password=self.password)
         builder_group, _ = Group.objects.get_or_create(name="Builder")
         self.builder.groups.add(builder_group)
+        self.warehouse = User.objects.create_user(username="portal_warehouse", password=self.password)
+        warehouse_group, _ = Group.objects.get_or_create(name="Warehouse")
+        self.warehouse.groups.add(warehouse_group)
+        self.sysadmin = User.objects.create_user(username="portal_sysadmin", password=self.password)
+        sysadmin_group, _ = Group.objects.get_or_create(name="Sysadmin")
+        self.sysadmin.groups.add(sysadmin_group)
 
         self.workplace = Workplace.objects.create(name="Procedure workshop")
         self.category = EquipmentCategory.objects.create(name="Consumables")
@@ -465,6 +515,16 @@ class AdminProcedureTests(TestCase):
             quantity_total=10,
             quantity_available=2,
             low_stock_threshold=5,
+        )
+        self.non_consumable = Equipment.objects.create(
+            name="Drill old",
+            inventory_number="NC-001",
+            category=self.category,
+            workplace=self.workplace,
+            is_consumable=False,
+            status=STATUS_RETIRED,
+            quantity_total=1,
+            quantity_available=0,
         )
         self.old_request = EquipmentRequest.objects.create(
             requester=self.builder,
@@ -483,6 +543,12 @@ class AdminProcedureTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Бизнес-процедуры")
         self.assertContains(response, "Запустить процедуру")
+
+    def test_registration_domains_portal_list_loads_for_admin(self):
+        self.client.force_login(self.admin)
+        response = self.client.get(reverse("portal_list", kwargs={"entity": "registration-domains"}))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Домены почты для регистрации")
 
     def test_non_admin_cannot_run_procedure(self):
         self.client.force_login(self.builder)
@@ -523,67 +589,101 @@ class AdminProcedureTests(TestCase):
 
         response = self.client.post(
             reverse("portal_procedure_run", kwargs={"slug": "restock_low_stock_consumables"}),
-            {"restock-target_addon": 0},
+            {"restock-fixed_increase": 4},
             follow=True,
         )
 
         self.assertEqual(response.status_code, 200)
         self.equipment.refresh_from_db()
-        self.assertEqual(self.equipment.quantity_available, 5)
+        self.assertEqual(self.equipment.quantity_available, 6)
         self.assertTrue(
             InventoryAdjustment.objects.filter(
                 equipment=self.equipment,
-                reason="Automatic restock to low-stock threshold by admin procedure.",
+                reason="Автопополнение по процедуре: +4 шт.",
             ).exists()
         )
 
-    def test_restock_low_stock_consumables_respects_target_addon(self):
+    def test_restock_low_stock_consumables_respects_fixed_increase(self):
         self.client.force_login(self.admin)
 
         response = self.client.post(
             reverse("portal_procedure_run", kwargs={"slug": "restock_low_stock_consumables"}),
-            {"restock-target_addon": 3},
+            {"restock-fixed_increase": 3},
             follow=True,
         )
 
         self.assertEqual(response.status_code, 200)
         self.equipment.refresh_from_db()
-        # threshold 5 + addon 3 → available 8 (was 2, delta 6; total 10+6=16)
-        self.assertEqual(self.equipment.quantity_available, 8)
+        # fixed increase +3 -> available 5 (was 2, delta 3; total 10+3=13)
+        self.assertEqual(self.equipment.quantity_available, 5)
         self.assertTrue(
             InventoryAdjustment.objects.filter(
                 equipment=self.equipment,
-                reason="Automatic restock to low-stock threshold plus 3 by admin procedure.",
+                reason="Автопополнение по процедуре: +3 шт.",
             ).exists()
         )
 
-    def test_close_stale_issued_requests_procedure(self):
+    def test_simple_restock_and_recover_equipment(self):
         self.client.force_login(self.admin)
-        issued = EquipmentRequest.objects.create(
-            requester=self.builder,
-            workplace=self.workplace,
-            equipment=self.equipment,
-            quantity=1,
-            request_kind=REQUEST_KIND_BUILDER,
-            status=REQUEST_ISSUED,
-            processed_by=self.admin,
-            processed_at=timezone.now() - timedelta(days=60),
-            requested_at=timezone.now() - timedelta(days=65),
-        )
-
         response = self.client.post(
-            reverse("portal_procedure_run", kwargs={"slug": "close_stale_issued_requests"}),
-            {"close_issued-stale_days": 30},
+            reverse("warehouse_restock"),
+            {
+                "simple_restock-equipment": self.non_consumable.pk,
+                "simple_restock-quantity": 3,
+                "simple_restock-non_consumable_action": "increase",
+            },
             follow=True,
         )
-
         self.assertEqual(response.status_code, 200)
-        issued.refresh_from_db()
-        self.assertEqual(issued.status, REQUEST_CLOSED)
-        self.assertIn("Closed automatically", issued.comment)
-        self.assertTrue(
-            AdminPortalLog.objects.filter(action="procedure", entity_slug="close_stale_issued_requests").exists()
+        self.equipment.refresh_from_db()
+        self.non_consumable.refresh_from_db()
+        self.assertEqual(self.equipment.quantity_available, 2)
+        self.assertEqual(self.non_consumable.status, STATUS_RETIRED)
+        self.assertEqual(self.non_consumable.quantity_total, 4)
+        self.assertEqual(self.non_consumable.quantity_available, 3)
+
+    def test_warehouse_can_run_simple_restock_procedure(self):
+        self.client.force_login(self.warehouse)
+        response = self.client.post(
+            reverse("warehouse_restock"),
+            {
+                "simple_restock-equipment": self.equipment.pk,
+                "simple_restock-quantity": 1,
+                "simple_restock-non_consumable_action": "set_in_stock",
+            },
+            follow=True,
         )
+        self.assertEqual(response.status_code, 200)
+        self.equipment.refresh_from_db()
+        self.assertEqual(self.equipment.quantity_available, 3)
+
+    def test_sysadmin_can_run_simple_restock_procedure(self):
+        self.client.force_login(self.sysadmin)
+        response = self.client.post(
+            reverse("warehouse_restock"),
+            {
+                "simple_restock-equipment": self.equipment.pk,
+                "simple_restock-quantity": 1,
+                "simple_restock-non_consumable_action": "set_in_stock",
+            },
+            follow=True,
+        )
+        self.assertEqual(response.status_code, 200)
+        self.equipment.refresh_from_db()
+        self.assertEqual(self.equipment.quantity_available, 3)
+
+    def test_builder_cannot_access_warehouse_restock(self):
+        self.client.force_login(self.builder)
+        response = self.client.get(reverse("warehouse_restock"))
+        self.assertEqual(response.status_code, 403)
+
+    def test_warehouse_cannot_run_admin_only_procedure(self):
+        self.client.force_login(self.warehouse)
+        response = self.client.post(
+            reverse("portal_procedure_run", kwargs={"slug": "reject_stale_requests"}),
+            {"reject-stale_days": 14},
+        )
+        self.assertEqual(response.status_code, 403)
 
 
 class RoleEnforcementWebTests(TestCase):
@@ -677,6 +777,37 @@ class RoleEnforcementWebTests(TestCase):
         self.assertEqual(sysadmin_export.status_code, 200)
         self.assertEqual(sysadmin_export["Content-Type"], "text/csv; charset=utf-8")
         self.assertIn('materials-report.csv', sysadmin_export["Content-Disposition"])
+
+    def test_analytics_dashboard_for_warehouse_first_line_and_denied_for_builder(self):
+        self.client.force_login(self.warehouse)
+        self.assertEqual(self.client.get(reverse("analytics")).status_code, 200)
+
+        first_line = User.objects.create_user(username="site_first_line_analytics", password=self.password)
+        fl_group, _ = Group.objects.get_or_create(name=GROUP_FIRST_LINE_SUPPORT)
+        first_line.groups.add(fl_group)
+        self.client.force_login(first_line)
+        self.assertEqual(self.client.get(reverse("analytics")).status_code, 200)
+
+        self.client.force_login(self.builder)
+        self.assertEqual(self.client.get(reverse("analytics")).status_code, 403)
+
+    def test_login_redirects_builder_to_requests_instead_of_forbidden_page(self):
+        response = self.client.post(
+            reverse("login"),
+            {"username": self.builder.username, "password": self.password},
+            follow=False,
+        )
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.url, reverse("request_history"))
+
+    def test_login_redirects_warehouse_to_equipment_list(self):
+        response = self.client.post(
+            reverse("login"),
+            {"username": self.warehouse.username, "password": self.password},
+            follow=False,
+        )
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.url, reverse("equipment_list"))
 
     def test_sysadmin_can_access_backup_tools_but_not_import_backup(self):
         self.client.force_login(self.sysadmin)
@@ -1273,3 +1404,115 @@ class InventoryApiTests(TestCase):
         self.assertIsNotNone(checkout.returned_at)
         self.equipment.refresh_from_db()
         self.assertEqual(self.equipment.quantity_available, 8)
+
+
+class EquipmentSplitRepairWebTests(TestCase):
+    def setUp(self):
+        self.password = "secret123"
+        self.warehouse_user = User.objects.create_user(username="split_wh", password=self.password)
+        warehouse_group, _ = Group.objects.get_or_create(name="Warehouse")
+        self.warehouse_user.groups.add(warehouse_group)
+        self.builder = User.objects.create_user(username="split_builder", password=self.password)
+        builder_group, _ = Group.objects.get_or_create(name="Builder")
+        self.builder.groups.add(builder_group)
+        self.cat = EquipmentCategory.objects.create(name="Power tools")
+        self.wp = Workplace.objects.create(name="Shop")
+        self.drills = Equipment.objects.create(
+            name="Дрели сетевые",
+            inventory_number="DRILL-BULK-001",
+            serial_number="DRILL-BULK-001",
+            category=self.cat,
+            workplace=self.wp,
+            is_consumable=False,
+            status=STATUS_IN_STOCK,
+            quantity_total=4,
+            quantity_available=4,
+        )
+
+    def test_split_repair_creates_row_and_reduces_original(self):
+        self.client.force_login(self.warehouse_user)
+        url = reverse("equipment_split_repair", kwargs={"equipment_id": self.drills.pk})
+        response = self.client.post(url, {"qty": "1", "unit_serial": "DRILL-SN-7788"})
+        self.assertEqual(response.status_code, 302)
+        self.drills.refresh_from_db()
+        self.assertEqual(self.drills.quantity_total, 3)
+        self.assertEqual(self.drills.quantity_available, 3)
+        repair = Equipment.objects.get(inventory_number="DRILL-SN-7788")
+        self.assertEqual(repair.quantity_total, 1)
+        self.assertEqual(repair.status, STATUS_REPAIR)
+
+    def test_builder_cannot_split_repair(self):
+        self.client.force_login(self.builder)
+        url = reverse("equipment_split_repair", kwargs={"equipment_id": self.drills.pk})
+        response = self.client.post(url, {"qty": "1", "unit_serial": "X-1"})
+        self.assertEqual(response.status_code, 403)
+
+
+class RequestEquipmentConditionSplitTests(TestCase):
+    def setUp(self):
+        self.password = "secret123"
+        self.processor = User.objects.create_user(username="req_proc", password=self.password)
+        support_group, _ = Group.objects.get_or_create(name=GROUP_FIRST_LINE_SUPPORT)
+        self.processor.groups.add(support_group)
+        self.requester = User.objects.create_user(username="req_owner", password=self.password)
+        builder_group, _ = Group.objects.get_or_create(name="Builder")
+        self.requester.groups.add(builder_group)
+        self.cat = EquipmentCategory.objects.create(name="Networking")
+        self.wp = Workplace.objects.create(name="Office")
+        self.router = Equipment.objects.create(
+            name="Роутер",
+            inventory_number="RTR-BULK-01",
+            serial_number="RTR-BULK-01",
+            category=self.cat,
+            workplace=self.wp,
+            is_consumable=False,
+            status=STATUS_IN_STOCK,
+            quantity_total=5,
+            quantity_available=5,
+        )
+        self.req = EquipmentRequest.objects.create(
+            requester=self.requester,
+            workplace=self.wp,
+            equipment=self.router,
+            quantity=2,
+            request_kind=REQUEST_KIND_BUILDER,
+            status=REQUEST_PENDING,
+        )
+
+    def test_request_partial_repair_creates_new_row(self):
+        self.client.force_login(self.processor)
+        response = self.client.post(
+            reverse("request_update_equipment_condition", kwargs={"request_id": self.req.pk}),
+            {
+                "equipment_condition": "repair",
+                "equipment_condition_qty": "2",
+                "equipment_condition_unit_serial": "RTR-REP-02",
+            },
+        )
+        self.assertEqual(response.status_code, 302)
+        self.router.refresh_from_db()
+        self.assertEqual(self.router.quantity_total, 3)
+        self.assertEqual(self.router.quantity_available, 3)
+        split_row = Equipment.objects.get(inventory_number="RTR-REP-02")
+        self.assertEqual(split_row.status, STATUS_REPAIR)
+        self.assertEqual(split_row.quantity_total, 2)
+        self.assertEqual(split_row.quantity_available, 2)
+
+    def test_request_partial_retired_creates_new_row_unavailable(self):
+        self.client.force_login(self.processor)
+        response = self.client.post(
+            reverse("request_update_equipment_condition", kwargs={"request_id": self.req.pk}),
+            {
+                "equipment_condition": "retired",
+                "equipment_condition_qty": "1",
+                "equipment_condition_unit_serial": "RTR-RET-01",
+            },
+        )
+        self.assertEqual(response.status_code, 302)
+        self.router.refresh_from_db()
+        self.assertEqual(self.router.quantity_total, 4)
+        self.assertEqual(self.router.quantity_available, 4)
+        retired_row = Equipment.objects.get(inventory_number="RTR-RET-01")
+        self.assertEqual(retired_row.status, STATUS_RETIRED)
+        self.assertEqual(retired_row.quantity_total, 1)
+        self.assertEqual(retired_row.quantity_available, 0)

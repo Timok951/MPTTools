@@ -1,0 +1,57 @@
+{% extends "inventory/base.html" %}
+{% load i18n inventory_extras %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header">
+        <div>
+            <div class="kicker">{% ui_text "Склад" "Warehouse" %}</div>
+            <h2>{% ui_text "Пополнение склада" "Warehouse restock" %}</h2>
+            <p class="muted">
+                {% ui_text "Выберите оборудование, укажите количество и режим для нерасходника." "Choose equipment, quantity, and non-consumable mode." %}
+            </p>
+        </div>
+    </div>
+    <form method="post" class="form-shell">
+        {% csrf_token %}
+        {% for field in form %}
+            {% include "inventory/_form_field.html" with field=field %}
+        {% endfor %}
+        <div class="field-help" style="margin-top:-8px;">
+            <img id="simple-restock-photo-preview" src="" alt="preview" style="display:none; max-width:220px; border-radius:10px; border:1px solid var(--border);" />
+        </div>
+        <div class="actions">
+            <button class="btn" type="submit">{% ui_text "Применить" "Apply" %}</button>
+            <a class="secondary" href="{% url 'equipment_list' %}">{% ui_text "К складу" "Back to warehouse" %}</a>
+        </div>
+    </form>
+</div>
+{% endblock %}
+
+{% block scripts %}
+{{ equipment_meta_map|json_script:"equipment-meta-map" }}
+<script>
+(() => {
+    const select = document.getElementById("id_simple_restock-equipment");
+    const actionWrap = document.getElementById("id_simple_restock-non_consumable_action")?.closest(".form-field");
+    const img = document.getElementById("simple-restock-photo-preview");
+    const dataEl = document.getElementById("equipment-meta-map");
+    if (!select || !img || !dataEl) return;
+    const meta = JSON.parse(dataEl.textContent || "{}");
+    const sync = () => {
+        const v = select.value || "";
+        const item = meta[v] || {};
+        if (item.photo) {
+            img.src = item.photo;
+            img.style.display = "block";
+        } else {
+            img.removeAttribute("src");
+            img.style.display = "none";
+        }
+        if (actionWrap) actionWrap.style.display = item.is_consumable ? "none" : "";
+    };
+    select.addEventListener("change", sync);
+    sync();
+})();
+</script>
+{% endblock %}

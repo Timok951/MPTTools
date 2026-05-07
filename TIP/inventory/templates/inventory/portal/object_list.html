@@ -2,7 +2,9 @@
 {% load i18n inventory_extras %}
 
 {% block content %}
+{% if cfg.slug != "registration-domains" %}
 {% include "inventory/portal/_portal_bar.html" %}
+{% endif %}
 <div class="card">
     <div class="toolbar-spread" style="align-items:center; margin-bottom:12px;">
         <h2 style="margin:0;">{{ cfg.title }}</h2>

@@ -2,13 +2,11 @@ from dataclasses import dataclass
 from datetime import timedelta
 
 from django.db import connection, transaction
-from django.db.models import F, Q
+from django.db.models import F
 from django.utils import timezone
 
-from assets.models import Equipment, InventoryAdjustment
+from assets.models import Equipment, InventoryAdjustment, STATUS_IN_STOCK
 from operations.models import (
-    REQUEST_CLOSED,
-    REQUEST_ISSUED,
     REQUEST_PENDING,
     REQUEST_REJECTED,
     EquipmentRequest,
@@ -44,7 +42,7 @@ def _append_reason(existing: str, addition: str) -> str:
 
 def reject_stale_requests(*, actor, stale_days: int) -> ProcedureResult:
     cutoff = timezone.now() - timedelta(days=stale_days)
-    note = f"Rejected automatically by admin procedure after {stale_days} days."
+    note = f"Отклонено автоматически админ-процедурой после {stale_days} дн."
     processed = EquipmentRequest.objects.filter(
         status=REQUEST_PENDING,
         requested_at__lt=cutoff,
@@ -57,9 +55,9 @@ def reject_stale_requests(*, actor, stale_days: int) -> ProcedureResult:
                 cursor.execute("CALL reject_stale_requests(%s, %s)", [actor.pk, stale_days])
         return ProcedureResult(
             slug="reject_stale_requests",
-            title="Reject stale requests",
+            title="Отклонение старых заявок",
             processed_count=processed,
-            detail=f"Rejected {processed} pending request(s) older than {stale_days} day(s).",
+            detail=f"Отклонено заявок в статусе «Ожидает»: {processed} (старше {stale_days} дн.).",
             execution_mode="postgresql_procedure",
         )
 
@@ -76,41 +74,21 @@ def reject_stale_requests(*, actor, stale_days: int) -> ProcedureResult:
 
     return ProcedureResult(
         slug="reject_stale_requests",
-        title="Reject stale requests",
+        title="Отклонение старых заявок",
         processed_count=processed,
-        detail=f"Rejected {processed} pending request(s) older than {stale_days} day(s).",
+        detail=f"Отклонено заявок в статусе «Ожидает»: {processed} (старше {stale_days} дн.).",
     )
 
 
-def restock_low_stock_consumables(*, actor, target_addon: int = 0) -> ProcedureResult:
-    target_addon = max(0, int(target_addon))
+def restock_low_stock_consumables(*, actor, fixed_increase: int = 1) -> ProcedureResult:
+    fixed_increase = max(1, int(fixed_increase))
     processed = Equipment.objects.filter(
         is_consumable=True,
         low_stock_threshold__gt=0,
         quantity_available__lt=F("low_stock_threshold"),
     ).count()
 
-    reason = (
-        f"Automatic restock to low-stock threshold plus {target_addon} by admin procedure."
-        if target_addon
-        else "Automatic restock to low-stock threshold by admin procedure."
-    )
-
-    if _is_postgresql():
-        with transaction.atomic():
-            _set_db_actor(actor.pk)
-            with connection.cursor() as cursor:
-                cursor.execute("CALL restock_low_stock_consumables(%s, %s)", [actor.pk, target_addon])
-        detail = f"Created {processed} restock adjustment(s) for low-stock consumables."
-        if target_addon:
-            detail += f" Целевой остаток: порог + {target_addon}."
-        return ProcedureResult(
-            slug="restock_low_stock_consumables",
-            title="Restock low-stock consumables",
-            processed_count=processed,
-            detail=detail,
-            execution_mode="postgresql_procedure",
-        )
+    reason = f"Автопополнение по процедуре: +{fixed_increase} шт."
 
     processed = 0
     with transaction.atomic():
@@ -121,10 +99,7 @@ def restock_low_stock_consumables(*, actor, target_addon: int = 0) -> ProcedureR
         )
 
         for equipment in low_stock_items:
-            target_quantity = equipment.low_stock_threshold + target_addon
-            if equipment.quantity_available >= target_quantity:
-                continue
-            delta = target_quantity - equipment.quantity_available
+            delta = fixed_increase
             adjustment = InventoryAdjustment(
                 equipment=equipment,
                 delta=delta,
@@ -133,47 +108,73 @@ def restock_low_stock_consumables(*, actor, target_addon: int = 0) -> ProcedureR
             )
             adjustment._actor = actor
             adjustment.save()
+            if equipment.status != STATUS_IN_STOCK:
+                equipment.status = STATUS_IN_STOCK
+                equipment._actor = actor
+                equipment.save(update_fields=["status"])
             processed += 1
 
-    detail = f"Created {processed} restock adjustment(s) for low-stock consumables."
-    if target_addon:
-        detail += f" Целевой остаток: порог + {target_addon}."
+    detail = f"Пополнено расходников с низким остатком: {processed} поз., по +{fixed_increase} шт."
     return ProcedureResult(
         slug="restock_low_stock_consumables",
-        title="Restock low-stock consumables",
+        title="Пополнение расходников с низким остатком",
         processed_count=processed,
         detail=detail,
     )
 
 
-def close_stale_issued_requests(*, actor, stale_days: int) -> ProcedureResult:
-    cutoff = timezone.now() - timedelta(days=stale_days)
-    note = f"Closed automatically by admin procedure after {stale_days} day(s) in issued status."
-    stale_filter = Q(status=REQUEST_ISSUED) & (
-        Q(processed_at__lt=cutoff) | Q(processed_at__isnull=True, requested_at__lt=cutoff)
-    )
+def simple_restock_and_recover_equipment(
+    *,
+    actor,
+    equipment_id: int,
+    quantity: int = 1,
+    non_consumable_action: str = "set_in_stock",
+) -> ProcedureResult:
+    quantity = max(1, int(quantity))
     processed = 0
+
     with transaction.atomic():
-        for request in EquipmentRequest.objects.select_for_update().filter(stale_filter):
-            request.status = REQUEST_CLOSED
-            if not request.processed_by_id:
-                request.processed_by = actor
-            request.processed_at = timezone.now()
-            request.comment = _append_reason(request.comment, note)
-            request._actor = actor
-            request.save(update_fields=["status", "processed_by", "processed_at", "comment"])
+        equipment = Equipment.objects.select_for_update().get(pk=equipment_id, deleted_at__isnull=True)
+        if equipment.is_consumable:
+            adjustment = InventoryAdjustment(
+                equipment=equipment,
+                delta=quantity,
+                reason=f"Ручное пополнение по процедуре: +{quantity} шт.",
+                created_by=actor,
+            )
+            adjustment._actor = actor
+            adjustment.save()
             processed += 1
+            detail = f"Расходник «{equipment.name}» пополнен на {quantity} шт."
+        else:
+            if non_consumable_action == "set_in_stock":
+                equipment.status = STATUS_IN_STOCK
+                equipment._actor = actor
+                equipment.save(update_fields=["status"])
+                processed += 1
+                detail = f"Нерасходник «{equipment.name}» переведён в статус «На складе»."
+            else:
+                adjustment = InventoryAdjustment(
+                    equipment=equipment,
+                    delta=quantity,
+                    reason=f"Ручное пополнение нерасходника по процедуре: +{quantity} шт.",
+                    created_by=actor,
+                )
+                adjustment._actor = actor
+                adjustment.save()
+                processed += 1
+                detail = f"Нерасходник «{equipment.name}» пополнен на {quantity} шт."
 
     return ProcedureResult(
-        slug="close_stale_issued_requests",
-        title="Close stale issued requests",
+        slug="simple_restock_and_recover_equipment",
+        title="Простое пополнение и возврат на склад",
         processed_count=processed,
-        detail=f"Closed {processed} issued request(s) older than {stale_days} day(s).",
+        detail=detail,
     )
 
 
 PROCEDURE_REGISTRY = {
     "reject_stale_requests": reject_stale_requests,
     "restock_low_stock_consumables": restock_low_stock_consumables,
-    "close_stale_issued_requests": close_stale_issued_requests,
+    "simple_restock_and_recover_equipment": simple_restock_and_recover_equipment,
 }

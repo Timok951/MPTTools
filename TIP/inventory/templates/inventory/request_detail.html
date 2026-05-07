@@ -11,6 +11,42 @@
             <p class="muted">Обработчик: {{ item.processed_by|default:"-" }} | Сообщений: {{ messages_list|length }} | Фото: {{ photos|length }}</p>
         </div>
     </div>
+    {% if item.equipment %}
+    <div class="aside-panel" style="margin-bottom:10px;">
+        <h3 style="margin-top:0;">Оборудование по заявке</h3>
+        <div style="display:grid; grid-template-columns:minmax(120px,180px) minmax(0,1fr); gap:12px; align-items:start;">
+            <a href="{% url 'equipment_detail' equipment_id=item.equipment.pk %}" style="display:block;">
+                {% if item.equipment.photo %}
+                <img
+                    src="{{ item.equipment.photo.url }}"
+                    alt="{{ item.equipment.name }}"
+                    style="width:100%; max-width:180px; border-radius:10px; border:1px solid var(--border); object-fit:cover;"
+                    loading="lazy"
+                />
+                {% else %}
+                <div class="equipment-card-empty" style="min-height:120px; border:1px dashed var(--border); border-radius:10px;">
+                    Нет фото
+                </div>
+                {% endif %}
+            </a>
+            <div style="display:grid; gap:6px;">
+                <strong>
+                    <a href="{% url 'equipment_detail' equipment_id=item.equipment.pk %}" style="text-decoration:none; color:var(--ink);">
+                        {{ item.equipment.name }}
+                    </a>
+                </strong>
+                <div class="muted">Модель: {{ item.equipment.model|default:"—" }}</div>
+                <div class="muted">Серийный номер: {{ item.equipment.serial_number|default:"—" }}</div>
+                <div class="muted">Статус: {{ item.equipment.get_status_display }}</div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+    {% if is_approved_locked %}
+    <div class="flash warning" style="margin-top:10px;">
+        Заявка в статусе «Одобрена» переведена в режим только чтения: изменение данных и отправка сообщений недоступны.
+    </div>
+    {% endif %}
     {% if can_quick_status %}
     <form method="post" action="{% url 'request_update_status' request_id=item.pk %}" class="filters">
         {% csrf_token %}
@@ -39,17 +75,42 @@
     </div>
     {% endif %}
     {% if can_update_equipment_condition %}
-    <div class="actions" style="margin-top:8px;">
-        <form method="post" action="{% url 'request_update_equipment_condition' request_id=item.pk %}">
+    <div class="card" style="margin-top:10px; padding:12px;">
+        <h3 style="margin:0 0 8px 0;">Перевод нерасходуемого оборудования</h3>
+        <p class="muted" style="margin-top:0;">Можно перевести всю позицию целиком или выделить только часть в отдельную карточку.</p>
+        <form method="post" action="{% url 'request_update_equipment_condition' request_id=item.pk %}" class="filters" style="align-items:flex-end;">
             {% csrf_token %}
-            <input type="hidden" name="equipment_condition" value="repair" />
-            <button class="btn secondary" type="submit">Отправить в ремонт</button>
+            <div>
+                <label for="id_condition_full">Куда перевести всю позицию</label>
+                <select id="id_condition_full" name="equipment_condition">
+                    <option value="in_stock">На склад</option>
+                    <option value="repair">В ремонт</option>
+                    <option value="retired">Списать из-за поломки</option>
+                </select>
+            </div>
+            <div><button class="btn secondary" type="submit">Применить к всей позиции</button></div>
         </form>
-        <form method="post" action="{% url 'request_update_equipment_condition' request_id=item.pk %}">
+        <form method="post" action="{% url 'request_update_equipment_condition' request_id=item.pk %}" class="filters" style="align-items:flex-end; margin-top:8px;">
             {% csrf_token %}
-            <input type="hidden" name="equipment_condition" value="retired" />
-            <button class="btn secondary" type="submit">Списать из-за поломки</button>
+            <div>
+                <label for="id_condition_partial">Куда перевести часть</label>
+                <select id="id_condition_partial" name="equipment_condition">
+                    <option value="repair">В ремонт</option>
+                    <option value="retired">Списать из-за поломки</option>
+                    <option value="in_stock">На склад (отдельной карточкой)</option>
+                </select>
+            </div>
+            <div>
+                <label for="id_condition_qty">Количество</label>
+                <input id="id_condition_qty" type="number" name="equipment_condition_qty" min="1" value="1" />
+            </div>
+            <div style="min-width:220px;">
+                <label for="id_condition_serial">Номер новой позиции (необязательно)</label>
+                <input id="id_condition_serial" type="text" name="equipment_condition_unit_serial" maxlength="100" placeholder="Можно оставить пустым — номер сгенерируется" />
+            </div>
+            <div><button class="btn secondary" type="submit">Выделить часть</button></div>
         </form>
+        <p class="muted" style="margin-top:8px;">Как использовать: выберите статус, укажите количество, при необходимости номер новой позиции и нажмите «Выделить часть».</p>
     </div>
     {% endif %}
 </div>
@@ -71,6 +132,7 @@
 <div class="grid cols-2">
     <div class="card">
         <h3>Сообщения</h3>
+        {% if can_add_request_content %}
         <form method="post" class="form-shell">
             {% csrf_token %}
             <input type="hidden" name="action" value="add_message" />
@@ -82,6 +144,9 @@
                 <button class="btn secondary" type="button" id="clear-reply-btn" style="display:none;">Сбросить ответ</button>
             </div>
         </form>
+        {% else %}
+        <p class="muted">Отправка сообщений для одобренной заявки отключена.</p>
+        {% endif %}
         <div class="timeline">
             {% for msg in messages_list %}
             <div class="timeline-item" style="margin-left: calc({{ msg.thread_depth|default:0 }} * 18px);">
@@ -93,15 +158,25 @@
                     {% endif %}
                     <div>{{ msg.body }}</div>
                     <div class="actions" style="margin-top:6px;">
-                        <button
-                            type="button"
-                            class="btn secondary reply-btn"
-                            data-message-id="{{ msg.pk }}"
-                            data-author="{{ msg.author }}"
-                            style="padding:4px 8px;"
-                        >
-                            Ответить
-                        </button>
+                        {% if can_add_request_content %}
+                            <button
+                                type="button"
+                                class="btn secondary reply-btn"
+                                data-message-id="{{ msg.pk }}"
+                                data-author="{{ msg.author }}"
+                                style="padding:4px 8px;"
+                            >
+                                Ответить
+                            </button>
+                        {% endif %}
+                        {% if can_delete_messages %}
+                        <form method="post" style="display:inline;" onsubmit="return confirm('Удалить это сообщение? Ответы к нему тоже будут удалены.');">
+                            {% csrf_token %}
+                            <input type="hidden" name="action" value="delete_message" />
+                            <input type="hidden" name="message_id" value="{{ msg.pk }}" />
+                            <button class="btn secondary" type="submit" style="padding:4px 8px;" title="Удалить сообщение">Удалить</button>
+                        </form>
+                        {% endif %}
                     </div>
                 </div>
             </div>
@@ -113,6 +188,7 @@
 
     <div class="card">
         <h3>Фотографии</h3>
+        {% if can_add_request_content %}
         <form method="post" enctype="multipart/form-data" class="form-shell">
             {% csrf_token %}
             <input type="hidden" name="action" value="add_photo" />
@@ -122,6 +198,9 @@
             </div>
             <div class="actions"><button class="btn" type="submit">Добавить фото</button></div>
         </form>
+        {% else %}
+        <p class="muted">Добавление фото для одобренной заявки отключено.</p>
+        {% endif %}
         <div class="equipment-card-grid">
             {% for photo in photos %}
             <article class="card equipment-card">

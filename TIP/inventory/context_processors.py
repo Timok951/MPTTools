@@ -3,6 +3,7 @@ from urllib.parse import urljoin
 from django.conf import settings
 from django.db.utils import OperationalError, ProgrammingError
 
+from core.schedule_utils import is_working_day_for_user
 from core.models import UserPreference
 
 
@@ -34,4 +35,7 @@ def user_preferences(request):
         "show_hotkey_legend": preference.show_hotkey_legend if preference else True,
         "grafana_public_url": getattr(settings, "GRAFANA_PUBLIC_URL", "") or "",
         "grafana_menu_url": _grafana_menu_url(),
+        "is_off_duty_today": (
+            request.user.is_authenticated and not is_working_day_for_user(request.user)
+        ),
     }

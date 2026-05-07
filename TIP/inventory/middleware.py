@@ -1,3 +1,39 @@
+from django.contrib import messages
+from django.shortcuts import redirect
+from django.urls import reverse
+
+from core.schedule_utils import is_working_day_for_user
+
+
+class WorkScheduleGuardMiddleware:
+    """
+    Allows sign-in on off days, but blocks write operations.
+    """
+
+    SAFE_METHODS = {"GET", "HEAD", "OPTIONS"}
+
+    def __init__(self, get_response):
+        self.get_response = get_response
+        self.exempt_prefixes = (
+            reverse("login"),
+            reverse("logout"),
+            reverse("password_reset_request"),
+            reverse("password_reset_confirm"),
+        )
+
+    def __call__(self, request):
+        if (
+            request.user.is_authenticated
+            and request.method not in self.SAFE_METHODS
+            and not request.path.startswith(self.exempt_prefixes)
+            and not is_working_day_for_user(request.user)
+        ):
+            messages.warning(
+                request,
+                "Сегодня по вашему графику нерабочий день. Изменения данных временно недоступны.",
+            )
+            return redirect(request.META.get("HTTP_REFERER") or reverse("about_site"))
+        return self.get_response(request)
 from django.db.utils import OperationalError, ProgrammingError
 from django.utils import translation
 

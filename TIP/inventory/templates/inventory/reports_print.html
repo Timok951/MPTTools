@@ -34,7 +34,7 @@
         {% if filters.from or filters.to %}
             {% ui_text "Период:" "Period:" %} {{ filters.from|default:"—" }} — {{ filters.to|default:"—" }}
         {% else %}
-            {% ui_text "Период: все даты (списание расходников без ограничения по датам)." "Period: all dates (consumable usage not limited by date)." %}
+            {% ui_text "Период: все даты (расход расходников по данным без ограничения по датам)." "Period: all dates (consumable usage in data not limited by date)." %}
         {% endif %}
     </p>
 </div>

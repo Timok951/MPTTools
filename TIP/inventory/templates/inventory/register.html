@@ -1,10 +1,33 @@
 {% extends "inventory/base.html" %}
-{% load inventory_extras %}
+{% load i18n inventory_extras %}
 
 {% block content %}
 <div class="card auth-card">
     <h2>{% ui_text "Регистрация" "Registration" %}</h2>
-    <p class="muted">{% ui_text "После регистрации администратор назначит роль. Нужен корпоративный email на домене @mpt.ru — он же используется для смены пароля по коду." "An administrator will assign a role after registration. A corporate @mpt.ru email is required; the same address is used for password reset codes." %}</p>
+    {% get_current_language as LANG %}
+    <p class="muted">
+        {% if LANG == 'en' %}
+        New users receive the default Worker role. Allowed corporate email domains:
+        {% else %}
+        Новые пользователи получают роль «Работник». Разрешённые корпоративные домены почты:
+        {% endif %}
+    </p>
+    {% if registration_domains %}
+    <div class="domain-chip-list">
+        {% for d in registration_domains %}
+        <span class="domain-chip">@{{ d }}</span>
+        {% endfor %}
+    </div>
+    {% else %}
+    <p class="muted">—</p>
+    {% endif %}
+    <p class="muted" style="margin-top:8px;">
+        {% if LANG == 'en' %}
+        The same address is used for password recovery codes.
+        {% else %}
+        Тот же адрес используется для смены пароля по коду.
+        {% endif %}
+    </p>
     <form method="post" class="grid">
         {% csrf_token %}
         {{ form.as_p }}

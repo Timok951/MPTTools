@@ -4,8 +4,9 @@
 {% block content %}
 {% include "inventory/portal/_portal_bar.html" %}
 <div class="card">
-    <h2>Портал администратора</h2>
-    <p class="muted">Разделы данных: откройте список и используйте кнопку «Добавить» для создания записей.</p>
+    <h2>{% ui_text "Портал администратора" "Administrator portal" %}</h2>
+    <p class="muted">{% ui_text "Разделы без отдельного пункта в верхнем меню: откройте список и при необходимости нажмите «Добавить»." "Sections not duplicated in the top menu: open the list and use «Add» when needed." %}</p>
+    {% if portal_sections %}
     <div class="portal-section-grid" style="display:grid; grid-template-columns:repeat(auto-fill,minmax(200px,1fr)); gap:10px; margin-top:14px;">
         {% for s in portal_sections %}
         <a class="card" href="{{ s.url }}" style="padding:14px 16px; text-decoration:none; color:var(--ink); border:1px solid var(--border); box-shadow:none;">
@@ -13,8 +14,12 @@
         </a>
         {% endfor %}
     </div>
+    {% else %}
+    <p class="muted" style="margin-top:12px;">{% ui_text "Все ваши разделы доступны из основного меню (Склад, Заявки и т.д.)." "Your sections are available from the main menu (Warehouse, Requests, etc.)." %}</p>
+    {% endif %}
 </div>
 
+{% if procedure_cards %}
 <div class="card">
     <div class="card-header">
         <div>
@@ -25,7 +30,7 @@
     </div>
     <div class="grid cols-3">
         {% for procedure in procedure_cards %}
-            <div class="aside-panel">
+            <div class="aside-panel" id="procedure-{{ procedure.slug }}">
                 <h3>{{ procedure.title }}</h3>
                 <p class="muted">{{ procedure.description }}</p>
                 <form method="post" action="{% url 'portal_procedure_run' slug=procedure.slug %}" class="form-shell">
@@ -43,4 +48,5 @@
         {% endfor %}
     </div>
 </div>
+{% endif %}
 {% endblock %}

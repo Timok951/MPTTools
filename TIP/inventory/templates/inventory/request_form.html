@@ -11,7 +11,7 @@
         </div>
     </div>
     <div class="split-layout">
-        <form method="post" class="form-shell">
+        <form method="post" enctype="multipart/form-data" class="form-shell">
             {% csrf_token %}
             {% if form.non_field_errors %}
                 <div class="form-errors">
@@ -25,24 +25,81 @@
                 {% include "inventory/_form_field.html" with field=form.cabinet %}
                 {% include "inventory/_form_field.html" with field=form.request_kind %}
                 {% include "inventory/_form_field.html" with field=form.equipment %}
+                <div id="non-consumable-status-wrap" style="display:none;">
+                    {% include "inventory/_form_field.html" with field=form.non_consumable_target_status %}
+                </div>
+                <div id="restock-non-consumable-action-wrap" style="display:none;">
+                    {% include "inventory/_form_field.html" with field=form.restock_non_consumable_action %}
+                </div>
                 {% include "inventory/_form_field.html" with field=form.quantity %}
                 {% include "inventory/_form_field.html" with field=form.needed_by %}
                 {% include "inventory/_form_field.html" with field=form.comment full_width=True %}
+                {% include "inventory/_form_field.html" with field=form.initial_photo %}
             </div>
             <div class="actions">
                 <button class="btn" type="submit">Создать заявку</button>
             </div>
         </form>
         <div class="field-list">
+            <div class="aside-panel" id="request-equipment-preview-wrap" style="display:none;">
+                <h3 style="margin-top:0;">Выбранное оборудование</h3>
+                <div style="display:flex; align-items:center; gap:10px;">
+                    <img id="request-equipment-preview-img" src="" alt="equipment-preview" style="width:64px; height:64px; border-radius:10px; object-fit:cover; border:1px solid var(--border);" />
+                    <span class="muted" id="request-equipment-preview-note">Фото выбранной позиции</span>
+                </div>
+            </div>
             <div class="aside-panel">
                 <h3>Подсказки для согласования</h3>
                 <ul>
                     <li>По возможности выбирайте конкретную позицию оборудования.</li>
                     <li>Для плановых работ указывайте срок, чтобы не оставлять заявку неопределённой.</li>
-                    <li>В комментарии укажите срочность, задачу и контекст выдачи.</li>
+                    <li>При необходимости прикрепите фото к заявке — оно появится во вложениях и не потеряется в переписке.</li>
                 </ul>
             </div>
         </div>
     </div>
 </div>
+{% endblock %}
+
+{% block scripts %}
+{{ equipment_photo_map|json_script:"equipment-photo-map" }}
+{{ equipment_consumable_map|json_script:"equipment-consumable-map" }}
+<script>
+(() => {
+    const select = document.getElementById("id_equipment");
+    const kindSelect = document.getElementById("id_request_kind");
+    const wrap = document.getElementById("request-equipment-preview-wrap");
+    const img = document.getElementById("request-equipment-preview-img");
+    const payload = document.getElementById("equipment-photo-map");
+    const targetStatusWrap = document.getElementById("non-consumable-status-wrap");
+    const restockNonConsumableWrap = document.getElementById("restock-non-consumable-action-wrap");
+    if (!select || !wrap || !img || !payload || !kindSelect) return;
+    const photoMap = JSON.parse(payload.textContent || "{}");
+    const consumableMap = JSON.parse((document.getElementById("equipment-consumable-map") || {}).textContent || "{}");
+    const sync = () => {
+        const val = select.value || "";
+        const kind = kindSelect.value || "";
+        const src = photoMap[val];
+        const isConsumable = Boolean(consumableMap[val]);
+        const isRestock = kind === "restock";
+        const isWriteoff = kind === "writeoff";
+        if (!src) {
+            wrap.style.display = "none";
+            img.removeAttribute("src");
+        } else {
+            img.src = src;
+            wrap.style.display = "";
+        }
+        if (targetStatusWrap) {
+            targetStatusWrap.style.display = (!val || isConsumable || isRestock) ? "none" : "";
+        }
+        if (restockNonConsumableWrap) {
+            restockNonConsumableWrap.style.display = (isRestock && val && !isConsumable) ? "" : "none";
+        }
+    };
+    select.addEventListener("change", sync);
+    kindSelect.addEventListener("change", sync);
+    sync();
+})();
+</script>
 {% endblock %}

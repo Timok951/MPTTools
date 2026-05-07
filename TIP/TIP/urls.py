@@ -17,11 +17,17 @@ Including another URLconf
 from django.contrib import admin
 from django.conf import settings
 from django.conf.urls.static import static
+from django.views.generic import RedirectView
 from django.views.i18n import set_language
 from django.urls import include, path
 
 urlpatterns = [
     path('', include('django_prometheus.urls')),
+    path(
+        'admin/core/registrationallowedemaildomain/',
+        RedirectView.as_view(pattern_name='portal_list', permanent=False, query_string=True),
+        kwargs={'entity': 'registration-domains'},
+    ),
     path('admin/', admin.site.urls),
     path('i18n/setlang/', set_language, name='set_language'),
     path('api/v1/', include('TIP.api_urls')),

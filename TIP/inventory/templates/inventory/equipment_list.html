@@ -6,10 +6,8 @@
     <div class="toolbar-spread" style="align-items: flex-start;">
         <h2 style="margin: 0;">{% trans "Equipment" %}</h2>
         {% if can_manage_equipment %}
-        <div class="actions" style="flex-wrap: wrap; justify-content: flex-end;">
+        <div class="actions">
             <a class="btn" href="{% url 'portal_create' entity='equipment' %}">{% ui_text "Добавить оборудование" "Add equipment" %}</a>
-            <a class="secondary" href="{% url 'portal_create' entity='workplaces' %}">{% ui_text "Рабочее место" "Workplace" %}</a>
-            <a class="secondary" href="{% url 'portal_create' entity='cabinets' %}">{% ui_text "Кабинет" "Cabinet" %}</a>
         </div>
         {% endif %}
     </div>
@@ -72,6 +70,7 @@
         <div class="actions">
             <a class="secondary" href="{% url 'equipment_export_csv' %}{% if export_query %}?{{ export_query }}{% endif %}">{% ui_text "CSV" "CSV" %}</a>
             <a class="secondary" href="{% url 'equipment_print' %}{% if export_query %}?{{ export_query }}{% endif %}" target="_blank" rel="noopener noreferrer">{% ui_text "PDF (печать)" "PDF (print)" %}</a>
+            <a class="secondary" href="{% url 'equipment_print' %}?download=1{% if export_query %}&{{ export_query }}{% endif %}">{% ui_text "Скачать PDF" "Download PDF" %}</a>
         </div>
     </div>
     <div class="equipment-card-grid">
@@ -86,11 +85,6 @@
                 <div class="equipment-card-empty">{% ui_text "Нет фото — открыть карточку" "No photo — open item" %}</div>
                 {% endif %}
                 </a>
-                {% with sn=item.serial_number|default:item.inventory_number %}
-                {% if sn %}
-                <span class="equipment-card-badge" title="{{ sn }}">{{ sn }}</span>
-                {% endif %}
-                {% endwith %}
             </div>
             <div class="equipment-card-body">
                 <div class="catalog-card-head">
@@ -119,7 +113,7 @@
                     </div>
                     <div class="equipment-card-row">
                         <span>{% ui_text "Количество" "Quantity" %}</span>
-                        <strong>{{ item.quantity_total|default:1 }}</strong>
+                        <strong>{% if item.status == "retired" %}0{% else %}{{ item.quantity_total|default:1 }}{% endif %}</strong>
                     </div>
                     <div class="equipment-card-row">
                         <span>{% ui_text "Дата покупки" "Purchase date" %}</span>
@@ -142,7 +136,15 @@
                 </div>
 
                 <div class="actions">
-                    <a class="secondary qr-toggle-btn" href="{% url 'equipment_qr' equipment_id=item.pk %}" target="_blank" data-qr-id="{{ item.pk }}">QR</a>
+                    <a
+                        class="secondary qr-toggle-btn"
+                        href="{% url 'equipment_qr' equipment_id=item.pk %}"
+                        data-qr-src="{% url 'equipment_qr' equipment_id=item.pk %}"
+                        data-qr-download="{% url 'equipment_qr' equipment_id=item.pk %}"
+                        data-qr-filename="qr-{{ item.serial_number|default:item.pk }}.png"
+                    >
+                        QR
+                    </a>
                     {% if can_manage_equipment %}
                     <a href="{% url 'portal_edit' entity='equipment' pk=item.pk %}">✏️ {% ui_text "Редактировать" "Edit" %}</a>
                     <form method="post" class="request-quick-action">
@@ -170,12 +172,6 @@
                     </form>
                     {% endif %}
                 </div>
-                <div class="qr-preview" id="qr-preview-{{ item.pk }}" style="display:none; text-align:center; margin-top:8px;">
-                    <img src="{% url 'equipment_qr' equipment_id=item.pk %}" alt="QR {{ item.serial_number|default:item.name }}" style="max-width:160px;" loading="lazy" />
-                    <div style="margin-top:4px;">
-                        <a class="secondary" href="{% url 'equipment_qr' equipment_id=item.pk %}" download="qr-{{ item.serial_number|default:item.pk }}.png" style="font-size:12px;">{% ui_text "Скачать" "Download" %}</a>
-                    </div>
-                </div>
             </div>
         </article>
         {% empty %}
@@ -184,6 +180,18 @@
     </div>
     {% include "inventory/_pagination.html" %}
 </div>
+
+<dialog id="equipment-qr-dialog" class="equipment-photo-dialog" aria-label="{% ui_text 'QR оборудования' 'Equipment QR' %}">
+    <form method="dialog" class="equipment-photo-dialog-bar">
+        <button type="submit" class="btn secondary">{% ui_text "Закрыть" "Close" %}</button>
+    </form>
+    <div class="equipment-photo-dialog-body" style="text-align:center;">
+        <img id="equipment-qr-dialog-img" src="" alt="QR" style="max-width:260px;" />
+        <div style="margin-top:8px;">
+            <a id="equipment-qr-dialog-download" class="secondary" href="#" download="qr.png">{% ui_text "Скачать" "Download" %}</a>
+        </div>
+    </div>
+</dialog>
 {% endblock %}
 
 {% block scripts %}
@@ -191,11 +199,16 @@
 document.querySelectorAll('.qr-toggle-btn').forEach(btn => {
     btn.addEventListener('click', e => {
         e.preventDefault();
-        const id = btn.dataset.qrId;
-        const preview = document.getElementById('qr-preview-' + id);
-        if (preview) {
-            preview.style.display = preview.style.display === 'none' ? 'block' : 'none';
-        }
+        const dlg = document.getElementById('equipment-qr-dialog');
+        const img = document.getElementById('equipment-qr-dialog-img');
+        const download = document.getElementById('equipment-qr-dialog-download');
+        if (!dlg || !img || !download) return;
+        const src = btn.dataset.qrSrc || btn.getAttribute('href') || '';
+        const href = btn.dataset.qrDownload || src;
+        img.src = src;
+        download.href = href;
+        download.setAttribute('download', btn.dataset.qrFilename || 'qr.png');
+        dlg.showModal();
     });
 });
 </script>

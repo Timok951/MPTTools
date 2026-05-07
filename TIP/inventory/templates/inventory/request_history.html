@@ -20,15 +20,6 @@
         <a class="shortcut-chip {% if filters.view == 'mine' %}is-active{% endif %}" href="{% url 'request_history' %}?view=mine&status={{ filters.status }}&kind={{ filters.kind }}&from={{ filters.from }}&to={{ filters.to }}">Мои заявки</a>
         <a class="shortcut-chip {% if filters.view == 'processing' %}is-active{% endif %}" href="{% url 'request_history' %}?view=processing&status={{ filters.status }}&kind={{ filters.kind }}&from={{ filters.from }}&to={{ filters.to }}">Нуждаются в обработке</a>
     </div>
-    {% if can_quick_status %}
-    <div class="request-bulk-actions">
-        <div class="table-meta">Частые статусы:</div>
-        <a class="status-hero status-pending {% if filters.status == 'pending' %}is-active{% endif %}" href="{% url 'request_history' %}?view={{ filters.view }}&status=pending&kind={{ filters.kind }}&from={{ filters.from }}&to={{ filters.to }}">На рассмотрении</a>
-        <a class="status-hero status-approved {% if filters.status == 'approved' %}is-active{% endif %}" href="{% url 'request_history' %}?view={{ filters.view }}&status=approved&kind={{ filters.kind }}&from={{ filters.from }}&to={{ filters.to }}">Одобрены</a>
-        <a class="status-hero status-issued {% if filters.status == 'issued' %}is-active{% endif %}" href="{% url 'request_history' %}?view={{ filters.view }}&status=issued&kind={{ filters.kind }}&from={{ filters.from }}&to={{ filters.to }}">Выданы</a>
-        <a class="status-hero status-reset {% if not filters.status %}is-active{% endif %}" href="{% url 'request_history' %}?view={{ filters.view }}&kind={{ filters.kind }}&from={{ filters.from }}&to={{ filters.to }}">Сбросить статус</a>
-    </div>
-    {% endif %}
     <form method="get" class="filters">
         <input type="hidden" name="view" value="{{ filters.view }}" />
         <div>
@@ -69,9 +60,11 @@
         <div class="actions">
             <a class="secondary" href="{% url 'request_export_csv' %}{% if export_query %}?{{ export_query }}{% endif %}">CSV</a>
             <a class="secondary" href="{% url 'request_print' %}{% if export_query %}?{{ export_query }}{% endif %}" target="_blank" rel="noopener noreferrer">PDF (печать)</a>
+            <a class="secondary" href="{% url 'request_print' %}?download=1{% if export_query %}&{{ export_query }}{% endif %}">Скачать PDF</a>
         </div>
     </div>
-    <table>
+    <div class="table-scroll">
+    <table class="request-history-table">
         <thead>
             <tr>
                 <th>{% trans "ID" %}</th>
@@ -79,8 +72,9 @@
                 <th>{% trans "Request type" %}</th>
                 <th>{% trans "Equipment" %}</th>
                 <th>Кабинет</th>
-                <th>{% trans "Qty" %}</th>
-                <th>{% trans "Status" %}</th>
+                <th>Кол-во</th>
+                <th>Статус заявки</th>
+                <th>Статус оборудования</th>
                 <th>Обработчик</th>
                 <th>{% trans "Requested at" %}</th>
                 <th>{% trans "Needed by" %}</th>
@@ -92,23 +86,42 @@
             <tr>
                 <td>{{ item.id }}</td>
                 <td>{{ item.requester }}</td>
-                <td>{{ item.get_request_kind_display }}</td>
+                <td>
+                    {% if item.request_kind == "standard" or item.request_kind == "builder" or item.request_kind == "sysadmin" %}
+                        Списание
+                    {% else %}
+                        {{ item.get_request_kind_display }}
+                    {% endif %}
+                </td>
                 <td>{{ item.equipment }}</td>
                 <td>{{ item.cabinet|default:"—" }}</td>
                 <td>{{ item.quantity }}</td>
                 <td>
+                    <span class="{{ item.badge_class }}">{{ item.get_status_display }}</span>
                     {% if can_quick_status %}
-                    <form method="post" action="{% url 'request_update_status' request_id=item.pk %}" class="request-status-form">
+                    <form method="post" action="{% url 'request_update_status' request_id=item.pk %}" class="request-quick-action" style="margin-top:6px;">
                         {% csrf_token %}
                         <select name="status" class="request-status-select" aria-label="{% trans 'Status' %}">
                             {% for value, label in status_choices %}
                             <option value="{{ value }}" {% if item.status == value %}selected{% endif %}>{{ label }}</option>
                             {% endfor %}
                         </select>
-                        <button class="btn secondary" type="submit">Сохранить</button>
+                        <button class="btn secondary request-quick-btn" type="submit">Сохранить</button>
+                        {% if item.status != "approved" %}
+                        <button class="btn request-quick-btn" type="submit" name="quick_status" value="approved">Одобрить</button>
+                        {% endif %}
                     </form>
+                    {% endif %}
+                </td>
+                <td>
+                    {% if item.non_consumable_target_status %}
+                        {% for value, label in non_consumable_target_status_choices %}
+                            {% if value == item.non_consumable_target_status %}{{ label }}{% endif %}
+                        {% endfor %}
+                    {% elif item.equipment and item.equipment.is_consumable %}
+                        Вычет
                     {% else %}
-                    <span class="{{ item.badge_class }}">{{ item.get_status_display }}</span>
+                        —
                     {% endif %}
                 </td>
                 <td>{{ item.processed_by|default:"-" }}</td>
@@ -116,15 +129,6 @@
                 <td>{% if item.needed_by %}{{ item.needed_by|date:preferred_date_format }}{% else %}-{% endif %}</td>
                 <td class="actions">
                     <a class="secondary" href="{% url 'request_detail' request_id=item.pk %}">Открыть</a>
-                    {% if can_quick_status %}
-                    {% for action in item.quick_actions %}
-                    <form method="post" action="{% url 'request_update_status' request_id=item.pk %}" class="request-quick-action">
-                        {% csrf_token %}
-                        <input type="hidden" name="status" value="{{ action.value }}" />
-                        <button class="btn secondary request-quick-btn" type="submit">{{ action.label }}</button>
-                    </form>
-                    {% endfor %}
-                    {% endif %}
                     {% if can_manage_requests %}
                     <a href="{% url 'portal_edit' entity='requests' pk=item.pk %}">✏️</a>
                     {% if user|has_capability:"users_and_site_admin" %}
@@ -134,10 +138,11 @@
                 </td>
             </tr>
             {% empty %}
-            <tr><td colspan="10" class="muted">Заявок пока нет.</td></tr>
+            <tr><td colspan="12" class="muted">Заявок пока нет.</td></tr>
             {% endfor %}
         </tbody>
     </table>
+    </div>
     {% include "inventory/_pagination.html" %}
 </div>
 {% endblock %}

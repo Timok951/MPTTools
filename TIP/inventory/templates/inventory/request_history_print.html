@@ -54,6 +54,7 @@
                 <th>{% ui_text "Кабинет" "Cabinet" %}</th>
                 <th>{% trans "Qty" %}</th>
                 <th>{% trans "Status" %}</th>
+                <th>{% ui_text "Статус нерасходника" "Non-consumable status" %}</th>
                 <th>{% ui_text "Обработчик" "Processor" %}</th>
                 <th>{% trans "Requested at" %}</th>
                 <th>{% trans "Needed by" %}</th>
@@ -70,13 +71,20 @@
                 <td>{{ item.cabinet|default:"—" }}</td>
                 <td>{{ item.quantity }}</td>
                 <td>{{ item.get_status_display }}</td>
+                <td>
+                    {% if item.non_consumable_target_status %}
+                        {% for value, label in non_consumable_target_status_choices %}
+                            {% if value == item.non_consumable_target_status %}{{ label }}{% endif %}
+                        {% endfor %}
+                    {% else %}—{% endif %}
+                </td>
                 <td>{{ item.processed_by|default:"—" }}</td>
                 <td>{{ item.requested_at|date:"SHORT_DATETIME_FORMAT" }}</td>
                 <td>{% if item.needed_by %}{{ item.needed_by|date:preferred_date_format }}{% else %}—{% endif %}</td>
                 <td>{{ item.comment|default:""|truncatechars:120 }}</td>
             </tr>
             {% empty %}
-            <tr><td colspan="11" class="muted">—</td></tr>
+            <tr><td colspan="12" class="muted">—</td></tr>
             {% endfor %}
         </tbody>
     </table>

@@ -16,7 +16,7 @@ EQUIPMENT_STATUS_CHOICES = [
     (STATUS_ASSIGNED, "Закреплено"),
     (STATUS_CHECKED_OUT, "Выдано"),
     (STATUS_REPAIR, "В ремонте"),
-    (STATUS_RETIRED, "Списано"),
+    (STATUS_RETIRED, "Закончилось"),
 ]
 
 
@@ -51,7 +51,7 @@ class Equipment(SoftDeleteModel):
 
     def clean(self) -> None:
         if self.quantity_available > self.quantity_total:
-            raise ValidationError("Available quantity cannot exceed total quantity.")
+            raise ValidationError("Доступное количество не может превышать общее количество.")
 
 
 class InventoryAdjustment(SoftDeleteModel):
@@ -73,7 +73,7 @@ class InventoryAdjustment(SoftDeleteModel):
         new_total = self.equipment.quantity_total + self.delta
         new_available = self.equipment.quantity_available + self.delta
         if new_total < 0 or new_available < 0:
-            raise ValidationError("Adjustment would make stock negative.")
+            raise ValidationError("Корректировка приведёт к отрицательному остатку.")
 
 
 class EquipmentCheckout(SoftDeleteModel):

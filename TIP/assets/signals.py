@@ -5,7 +5,7 @@ from django.dispatch import receiver
 
 from operations.models import REQUEST_APPROVED, EquipmentRequest
 
-from .models import EquipmentCheckout, InventoryAdjustment, STATUS_IN_STOCK, STATUS_RETIRED
+from .models import Equipment, EquipmentCheckout, InventoryAdjustment, STATUS_IN_STOCK, STATUS_RETIRED
 
 
 @receiver(post_save, sender=InventoryAdjustment)
@@ -23,6 +23,13 @@ def apply_inventory_adjustment(sender, instance, created, **kwargs):
         )
 
 
+@receiver(pre_save, sender=Equipment)
+def keep_consumable_available_synced(sender, instance, **kwargs):
+    # Для расходников "доступно" всегда равно общему остатку.
+    if instance.is_consumable:
+        instance.quantity_available = instance.quantity_total
+
+
 @receiver(pre_save, sender=EquipmentCheckout)
 def stash_checkout_prev(sender, instance, **kwargs):
     if not instance.pk:
@@ -34,6 +41,12 @@ def stash_checkout_prev(sender, instance, **kwargs):
 @receiver(post_save, sender=EquipmentCheckout)
 def apply_checkout_effect(sender, instance, created, **kwargs):
     if not instance.equipment_id:
+        return
+    equipment = instance.equipment
+    if equipment and equipment.is_consumable:
+        # Для расходников не ведём отдельный "резерв/выдачу" через quantity_available.
+        if created and not instance.returned_at and instance.related_request_id:
+            EquipmentRequest.objects.filter(pk=instance.related_request_id).update(status=REQUEST_APPROVED)
         return
     if created and not instance.returned_at:
         sender_equipment = instance.equipment.__class__

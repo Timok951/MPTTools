@@ -23,7 +23,7 @@ class ActiveManager(models.Manager):
 
 
 class SoftDeleteModel(models.Model):
-    deleted_at = models.DateTimeField(null=True, blank=True)
+    deleted_at = models.DateTimeField(null=True, blank=True, verbose_name="Удалено")
 
     objects = ActiveManager()
     all_objects = models.Manager()
@@ -49,41 +49,48 @@ class SoftDeleteModel(models.Model):
 
 
 class EquipmentCategory(SoftDeleteModel):
-    name = models.CharField(max_length=200, unique=True)
-    description = models.TextField(blank=True)
+    name = models.CharField(max_length=200, unique=True, verbose_name="Название")
+    description = models.TextField(blank=True, verbose_name="Описание")
 
     class Meta:
         ordering = ["name"]
-        verbose_name_plural = "equipment categories"
+        verbose_name = "Категория оборудования"
+        verbose_name_plural = "Категории оборудования"
 
     def __str__(self) -> str:
         return self.name
 
 
 class Workplace(SoftDeleteModel):
-    name = models.CharField(max_length=200, unique=True)
-    location = models.CharField(max_length=200, blank=True)
-    map_address = models.CharField(max_length=255, blank=True)
-    latitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
-    longitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
-    description = models.TextField(blank=True)
+    name = models.CharField(max_length=200, unique=True, verbose_name="Название")
+    location = models.CharField(max_length=200, blank=True, verbose_name="Локация")
+    map_address = models.CharField(max_length=255, blank=True, verbose_name="Адрес на карте")
+    latitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True, verbose_name="Широта")
+    longitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True, verbose_name="Долгота")
+    description = models.TextField(blank=True, verbose_name="Описание")
 
     class Meta:
         ordering = ["name"]
+        verbose_name = "Рабочее место"
+        verbose_name_plural = "Рабочие места"
 
     def __str__(self) -> str:
         return self.name
 
 
 class Cabinet(SoftDeleteModel):
-    workplace = models.ForeignKey(Workplace, on_delete=models.SET_NULL, null=True, blank=True)
-    code = models.CharField(max_length=50, unique=True)
-    name = models.CharField(max_length=200)
-    floor = models.CharField(max_length=50, blank=True)
-    description = models.TextField(blank=True)
+    workplace = models.ForeignKey(
+        Workplace, on_delete=models.SET_NULL, null=True, blank=True, verbose_name="Рабочее место"
+    )
+    code = models.CharField(max_length=50, unique=True, verbose_name="Код")
+    name = models.CharField(max_length=200, verbose_name="Название")
+    floor = models.CharField(max_length=50, blank=True, verbose_name="Этаж")
+    description = models.TextField(blank=True, verbose_name="Описание")
 
     class Meta:
         ordering = ["name"]
+        verbose_name = "Кабинет"
+        verbose_name_plural = "Кабинеты"
 
     def clean(self) -> None:
         name = (self.name or "").strip()
@@ -100,15 +107,17 @@ class Cabinet(SoftDeleteModel):
 
 
 class WorkplaceMember(SoftDeleteModel):
-    workplace = models.ForeignKey(Workplace, on_delete=models.CASCADE)
-    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
-    role = models.CharField(max_length=20, choices=ROLE_CHOICES)
-    assigned_at = models.DateTimeField(default=timezone.now)
-    note = models.TextField(blank=True)
+    workplace = models.ForeignKey(Workplace, on_delete=models.CASCADE, verbose_name="Рабочее место")
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, verbose_name="Пользователь")
+    role = models.CharField(max_length=20, choices=ROLE_CHOICES, verbose_name="Роль")
+    assigned_at = models.DateTimeField(default=timezone.now, verbose_name="Назначен")
+    note = models.TextField(blank=True, verbose_name="Примечание")
 
     class Meta:
         ordering = ["workplace__name", "user__username"]
         unique_together = [("workplace", "user")]
+        verbose_name = "Участник рабочего места"
+        verbose_name_plural = "Участники рабочих мест"
 
     def __str__(self) -> str:
         return f"{self.workplace} - {self.user} ({self.role})"
@@ -147,23 +156,39 @@ class UserPreference(models.Model):
         (CHECKOUT_FILTER_RETURNED, _("Возвращённые выдачи")),
     ]
 
-    user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="preferences")
-    theme_variant = models.CharField(max_length=20, choices=THEME_CHOICES, default=THEME_DEFAULT)
-    page_size = models.PositiveSmallIntegerField(choices=PAGE_SIZE_CHOICES, default=25)
-    preferred_language = models.CharField(max_length=10, default="ru")
-    date_display_format = models.CharField(max_length=20, choices=DATE_FORMAT_CHOICES, default=DATE_FORMAT_COMPACT)
-    default_request_status = models.CharField(max_length=20, blank=True, default="pending")
-    default_request_kind = models.CharField(max_length=20, blank=True, default="")
-    default_usage_period_days = models.PositiveSmallIntegerField(default=30)
-    default_checkout_status = models.CharField(max_length=20, choices=CHECKOUT_FILTER_CHOICES, blank=True, default=CHECKOUT_FILTER_ALL)
-    hotkeys_enabled = models.BooleanField(default=True)
-    show_hotkey_legend = models.BooleanField(default=True)
-    updated_at = models.DateTimeField(auto_now=True)
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="preferences", verbose_name="Пользователь"
+    )
+    theme_variant = models.CharField(
+        max_length=20, choices=THEME_CHOICES, default=THEME_DEFAULT, verbose_name="Тема интерфейса"
+    )
+    page_size = models.PositiveSmallIntegerField(choices=PAGE_SIZE_CHOICES, default=25, verbose_name="Размер страницы")
+    preferred_language = models.CharField(max_length=10, default="ru", verbose_name="Предпочитаемый язык")
+    date_display_format = models.CharField(
+        max_length=20, choices=DATE_FORMAT_CHOICES, default=DATE_FORMAT_COMPACT, verbose_name="Формат даты"
+    )
+    default_request_status = models.CharField(
+        max_length=20, blank=True, default="pending", verbose_name="Статус заявки по умолчанию"
+    )
+    default_request_kind = models.CharField(
+        max_length=20, blank=True, default="", verbose_name="Тип заявки по умолчанию"
+    )
+    default_usage_period_days = models.PositiveSmallIntegerField(default=30, verbose_name="Период операций (дни)")
+    default_checkout_status = models.CharField(
+        max_length=20,
+        choices=CHECKOUT_FILTER_CHOICES,
+        blank=True,
+        default=CHECKOUT_FILTER_ALL,
+        verbose_name="Фильтр выдач по умолчанию",
+    )
+    hotkeys_enabled = models.BooleanField(default=True, verbose_name="Горячие клавиши включены")
+    show_hotkey_legend = models.BooleanField(default=True, verbose_name="Показывать легенду горячих клавиш")
+    updated_at = models.DateTimeField(auto_now=True, verbose_name="Обновлено")
 
     class Meta:
         ordering = ["user__username"]
-        verbose_name = "User preference"
-        verbose_name_plural = "User preferences"
+        verbose_name = "Пользовательская настройка"
+        verbose_name_plural = "Пользовательские настройки"
 
     def __str__(self) -> str:
         return f"Preferences for {self.user}"
@@ -243,18 +268,22 @@ class DirectMessage(models.Model):
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
         related_name="sent_direct_messages",
+        verbose_name="Отправитель",
     )
     recipient = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
         related_name="received_direct_messages",
+        verbose_name="Получатель",
     )
-    body = models.TextField()
-    created_at = models.DateTimeField(default=timezone.now, db_index=True)
-    read_at = models.DateTimeField(null=True, blank=True)
+    body = models.TextField(verbose_name="Сообщение")
+    created_at = models.DateTimeField(default=timezone.now, db_index=True, verbose_name="Создано")
+    read_at = models.DateTimeField(null=True, blank=True, verbose_name="Прочитано")
 
     class Meta:
         ordering = ["created_at", "id"]
+        verbose_name = "Личное сообщение"
+        verbose_name_plural = "Личные сообщения"
         constraints = [
             models.CheckConstraint(
                 condition=~models.Q(sender=models.F("recipient")),
@@ -271,15 +300,18 @@ class PasswordResetCode(models.Model):
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
         related_name="password_reset_codes",
+        verbose_name="Пользователь",
     )
-    email = models.EmailField()
-    code_hash = models.CharField(max_length=256)
-    created_at = models.DateTimeField(default=timezone.now)
-    expires_at = models.DateTimeField()
-    used_at = models.DateTimeField(null=True, blank=True)
+    email = models.EmailField(verbose_name="Email")
+    code_hash = models.CharField(max_length=256, verbose_name="Хеш кода")
+    created_at = models.DateTimeField(default=timezone.now, verbose_name="Создан")
+    expires_at = models.DateTimeField(verbose_name="Истекает")
+    used_at = models.DateTimeField(null=True, blank=True, verbose_name="Использован")
 
     class Meta:
         ordering = ["-created_at", "-id"]
+        verbose_name = "Код сброса пароля"
+        verbose_name_plural = "Коды сброса пароля"
 
     @property
     def is_active(self) -> bool:

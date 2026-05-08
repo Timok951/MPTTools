@@ -74,6 +74,7 @@ _ANYMAIL_INSTALLED = importlib.util.find_spec("anymail") is not None
 
 INSTALLED_APPS = [
     *(['anymail'] if _ANYMAIL_INSTALLED else []),
+    'django_extensions',
     'django_prometheus',
     'django.contrib.admin',
     'django.contrib.auth',

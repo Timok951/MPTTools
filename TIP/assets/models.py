@@ -28,26 +28,30 @@ MODEL_ALLOWED_RE = re.compile(r"^[0-9A-Za-zА-Яа-яЁё\-_\/\s]+$")
 
 
 class Equipment(SoftDeleteModel):
-    name = models.CharField(max_length=200)
-    inventory_number = models.CharField(max_length=100, unique=True)
-    category = models.ForeignKey(EquipmentCategory, on_delete=models.SET_NULL, null=True, blank=True)
+    name = models.CharField(max_length=200, verbose_name="Название")
+    inventory_number = models.CharField(max_length=100, unique=True, verbose_name="Инвентарный номер")
+    category = models.ForeignKey(
+        EquipmentCategory, on_delete=models.SET_NULL, null=True, blank=True, verbose_name="Категория"
+    )
     photo = models.ImageField(upload_to="equipment/", null=True, blank=True, verbose_name="Фото")
-    serial_number = models.CharField(max_length=100, blank=True)
-    model = models.CharField(max_length=200, blank=True)
-    workplace = models.ForeignKey(Workplace, on_delete=models.SET_NULL, null=True, blank=True)
-    is_consumable = models.BooleanField(default=False)
-    status = models.CharField(max_length=20, choices=EQUIPMENT_STATUS_CHOICES, default=STATUS_IN_STOCK)
-    quantity_total = models.PositiveIntegerField(default=1)
-    quantity_available = models.PositiveIntegerField(default=1)
-    low_stock_threshold = models.PositiveIntegerField(default=0)
-    purchase_date = models.DateField(null=True, blank=True)
-    warranty_end = models.DateField(null=True, blank=True)
-    notes = models.TextField(blank=True)
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
+    serial_number = models.CharField(max_length=100, blank=True, verbose_name="Серийный номер")
+    model = models.CharField(max_length=200, blank=True, verbose_name="Модель")
+    workplace = models.ForeignKey(Workplace, on_delete=models.SET_NULL, null=True, blank=True, verbose_name="Рабочее место")
+    is_consumable = models.BooleanField(default=False, verbose_name="Расходник")
+    status = models.CharField(max_length=20, choices=EQUIPMENT_STATUS_CHOICES, default=STATUS_IN_STOCK, verbose_name="Статус")
+    quantity_total = models.PositiveIntegerField(default=1, verbose_name="Количество всего")
+    quantity_available = models.PositiveIntegerField(default=1, verbose_name="Количество доступно")
+    low_stock_threshold = models.PositiveIntegerField(default=0, verbose_name="Порог низкого остатка")
+    purchase_date = models.DateField(null=True, blank=True, verbose_name="Дата покупки")
+    warranty_end = models.DateField(null=True, blank=True, verbose_name="Гарантия до")
+    notes = models.TextField(blank=True, verbose_name="Примечание")
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="Создано")
+    updated_at = models.DateTimeField(auto_now=True, verbose_name="Обновлено")
 
     class Meta:
         ordering = ["name", "inventory_number"]
+        verbose_name = "Оборудование"
+        verbose_name_plural = "Оборудование"
 
     def __str__(self) -> str:
         return f"{self.name} ({self.inventory_number})"
@@ -94,14 +98,18 @@ class Equipment(SoftDeleteModel):
 
 
 class InventoryAdjustment(SoftDeleteModel):
-    equipment = models.ForeignKey(Equipment, on_delete=models.CASCADE)
-    delta = models.IntegerField()
-    reason = models.CharField(max_length=200)
-    created_at = models.DateTimeField(default=timezone.now)
-    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True)
+    equipment = models.ForeignKey(Equipment, on_delete=models.CASCADE, verbose_name="Оборудование")
+    delta = models.IntegerField(verbose_name="Изменение количества")
+    reason = models.CharField(max_length=200, verbose_name="Причина")
+    created_at = models.DateTimeField(default=timezone.now, verbose_name="Создано")
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, verbose_name="Кем создано"
+    )
 
     class Meta:
         ordering = ["-created_at"]
+        verbose_name = "Корректировка остатка"
+        verbose_name_plural = "Корректировки остатков"
 
     def __str__(self) -> str:
         return f"Adjustment #{self.pk} ({self.delta})"
@@ -116,21 +124,25 @@ class InventoryAdjustment(SoftDeleteModel):
 
 
 class EquipmentCheckout(SoftDeleteModel):
-    equipment = models.ForeignKey(Equipment, on_delete=models.SET_NULL, null=True, blank=True)
-    taken_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True)
-    workplace = models.ForeignKey(Workplace, on_delete=models.SET_NULL, null=True, blank=True)
-    cabinet = models.ForeignKey(Cabinet, on_delete=models.SET_NULL, null=True, blank=True)
-    related_request = models.ForeignKey(
-        "operations.EquipmentRequest", on_delete=models.SET_NULL, null=True, blank=True
+    equipment = models.ForeignKey(Equipment, on_delete=models.SET_NULL, null=True, blank=True, verbose_name="Оборудование")
+    taken_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, verbose_name="Получатель"
     )
-    quantity = models.PositiveIntegerField(default=1)
-    taken_at = models.DateTimeField(default=timezone.now)
-    due_at = models.DateTimeField(null=True, blank=True)
-    returned_at = models.DateTimeField(null=True, blank=True)
-    note = models.TextField(blank=True)
+    workplace = models.ForeignKey(Workplace, on_delete=models.SET_NULL, null=True, blank=True, verbose_name="Рабочее место")
+    cabinet = models.ForeignKey(Cabinet, on_delete=models.SET_NULL, null=True, blank=True, verbose_name="Кабинет")
+    related_request = models.ForeignKey(
+        "operations.EquipmentRequest", on_delete=models.SET_NULL, null=True, blank=True, verbose_name="Связанная заявка"
+    )
+    quantity = models.PositiveIntegerField(default=1, verbose_name="Количество")
+    taken_at = models.DateTimeField(default=timezone.now, verbose_name="Выдано")
+    due_at = models.DateTimeField(null=True, blank=True, verbose_name="Срок возврата")
+    returned_at = models.DateTimeField(null=True, blank=True, verbose_name="Возвращено")
+    note = models.TextField(blank=True, verbose_name="Примечание")
 
     class Meta:
         ordering = ["-taken_at"]
+        verbose_name = "Выдача оборудования"
+        verbose_name_plural = "Выдачи оборудования"
 
     def __str__(self) -> str:
         return f"Checkout #{self.pk}"

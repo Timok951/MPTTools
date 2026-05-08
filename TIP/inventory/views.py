@@ -33,6 +33,34 @@ from django.conf import settings
 from django.utils.html import escape
 
 from core.mail_out import send_multipart_email
+
+_REPORTLAB_UNICODE_FONT: str | None = None
+
+
+def _reportlab_unicode_font_name() -> str:
+    """Helvetica не поддерживает кириллицу; подключаем системный TTF при наличии."""
+    global _REPORTLAB_UNICODE_FONT
+    if _REPORTLAB_UNICODE_FONT is not None:
+        return _REPORTLAB_UNICODE_FONT
+    candidates = [
+        Path("C:/Windows/Fonts/arial.ttf"),
+        Path("C:/Windows/Fonts/calibri.ttf"),
+        Path("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"),
+        Path("/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf"),
+        Path("/usr/share/fonts/truetype/noto/NotoSans-Regular.ttf"),
+        getattr(settings, "BASE_DIR", None) and (settings.BASE_DIR / "fonts" / "DejaVuSans.ttf"),
+    ]
+    for p in candidates:
+        if not p or not isinstance(p, Path) or not p.exists():
+            continue
+        try:
+            pdfmetrics.registerFont(TTFont("MPTUnicode", str(p)))
+            _REPORTLAB_UNICODE_FONT = "MPTUnicode"
+            return _REPORTLAB_UNICODE_FONT
+        except Exception:
+            continue
+    _REPORTLAB_UNICODE_FONT = "Helvetica"
+    return _REPORTLAB_UNICODE_FONT
 from core.registration_domains import get_registration_email_domains
 from django.views.decorators.http import require_POST
 from django.utils import translation
@@ -658,14 +686,7 @@ def _pdf_table_response(*, title: str, headers: list[str], rows: list[list], fil
         topMargin=20,
         bottomMargin=20,
     )
-    font_name = "Helvetica"
-    try:
-        windows_font = Path("C:/Windows/Fonts/arial.ttf")
-        if windows_font.exists():
-            pdfmetrics.registerFont(TTFont("ArialUnicode", str(windows_font)))
-            font_name = "ArialUnicode"
-    except Exception:
-        font_name = "Helvetica"
+    font_name = _reportlab_unicode_font_name()
 
     styles = getSampleStyleSheet()
     title_style = styles["Heading3"].clone("pdf_title")
@@ -747,14 +768,7 @@ def _analytics_pdf_with_charts(ctx: dict) -> HttpResponse:
         topMargin=20,
         bottomMargin=20,
     )
-    font_name = "Helvetica"
-    try:
-        windows_font = Path("C:/Windows/Fonts/arial.ttf")
-        if windows_font.exists():
-            pdfmetrics.registerFont(TTFont("ArialUnicode", str(windows_font)))
-            font_name = "ArialUnicode"
-    except Exception:
-        font_name = "Helvetica"
+    font_name = _reportlab_unicode_font_name()
 
     styles = getSampleStyleSheet()
     title_style = styles["Heading3"].clone("analytics_pdf_title")

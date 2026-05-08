@@ -60,40 +60,47 @@ RESTOCK_NON_CONSUMABLE_ACTION_CHOICES = [
 
 class EquipmentRequest(SoftDeleteModel):
     requester = models.ForeignKey(
-        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="equipment_requests"
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="equipment_requests", verbose_name="Инициатор"
     )
-    workplace = models.ForeignKey(Workplace, on_delete=models.SET_NULL, null=True, blank=True)
-    cabinet = models.ForeignKey(Cabinet, on_delete=models.SET_NULL, null=True, blank=True, related_name="equipment_requests")
-    equipment = models.ForeignKey(Equipment, on_delete=models.SET_NULL, null=True, blank=True)
-    quantity = models.PositiveIntegerField(default=1)
-    request_kind = models.CharField(max_length=20, choices=REQUEST_KIND_CHOICES)
+    workplace = models.ForeignKey(Workplace, on_delete=models.SET_NULL, null=True, blank=True, verbose_name="Рабочее место")
+    cabinet = models.ForeignKey(
+        Cabinet, on_delete=models.SET_NULL, null=True, blank=True, related_name="equipment_requests", verbose_name="Кабинет"
+    )
+    equipment = models.ForeignKey(Equipment, on_delete=models.SET_NULL, null=True, blank=True, verbose_name="Оборудование")
+    quantity = models.PositiveIntegerField(default=1, verbose_name="Количество")
+    request_kind = models.CharField(max_length=20, choices=REQUEST_KIND_CHOICES, verbose_name="Тип заявки")
     non_consumable_target_status = models.CharField(
         max_length=20,
         choices=NON_CONSUMABLE_TARGET_STATUS_CHOICES,
         blank=True,
         default="",
+        verbose_name="Целевой статус нерасходника",
     )
     restock_non_consumable_action = models.CharField(
         max_length=20,
         choices=RESTOCK_NON_CONSUMABLE_ACTION_CHOICES,
         blank=True,
         default="",
+        verbose_name="Действие пополнения нерасходника",
     )
-    status = models.CharField(max_length=20, choices=REQUEST_STATUS_CHOICES, default=REQUEST_PENDING)
-    requested_at = models.DateTimeField(default=timezone.now)
-    needed_by = models.DateField(default=default_needed_by_date)
-    comment = models.TextField(blank=True)
+    status = models.CharField(max_length=20, choices=REQUEST_STATUS_CHOICES, default=REQUEST_PENDING, verbose_name="Статус")
+    requested_at = models.DateTimeField(default=timezone.now, verbose_name="Создана")
+    needed_by = models.DateField(default=default_needed_by_date, verbose_name="Нужно до")
+    comment = models.TextField(blank=True, verbose_name="Комментарий")
     processed_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
         related_name="processed_requests",
+        verbose_name="Обработал",
     )
-    processed_at = models.DateTimeField(null=True, blank=True)
+    processed_at = models.DateTimeField(null=True, blank=True, verbose_name="Обработано")
 
     class Meta:
         ordering = ["-requested_at"]
+        verbose_name = "Заявка на оборудование"
+        verbose_name_plural = "Заявки на оборудование"
         indexes = [
             models.Index(fields=["status", "-requested_at"], name="ops_req_status_reqat_idx"),
             models.Index(fields=["request_kind", "-requested_at"], name="ops_req_kind_reqat_idx"),
@@ -143,20 +150,27 @@ class EquipmentRequest(SoftDeleteModel):
 
 
 class EquipmentRequestMessage(models.Model):
-    request = models.ForeignKey(EquipmentRequest, on_delete=models.CASCADE, related_name="messages")
-    author = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="request_messages")
+    request = models.ForeignKey(
+        EquipmentRequest, on_delete=models.CASCADE, related_name="messages", verbose_name="Заявка"
+    )
+    author = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="request_messages", verbose_name="Автор"
+    )
     parent = models.ForeignKey(
         "self",
         on_delete=models.CASCADE,
         null=True,
         blank=True,
         related_name="replies",
+        verbose_name="Родительское сообщение",
     )
-    body = models.TextField(blank=True)
-    created_at = models.DateTimeField(default=timezone.now, db_index=True)
+    body = models.TextField(blank=True, verbose_name="Сообщение")
+    created_at = models.DateTimeField(default=timezone.now, db_index=True, verbose_name="Создано")
 
     class Meta:
         ordering = ["created_at", "id"]
+        verbose_name = "Сообщение в заявке"
+        verbose_name_plural = "Сообщения в заявках"
 
     def __str__(self) -> str:
         return f"Request message #{self.pk} for request #{self.request_id}"
@@ -169,15 +183,19 @@ class EquipmentRequestThreadRead(models.Model):
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
         related_name="equipment_request_thread_reads",
+        verbose_name="Пользователь",
     )
     equipment_request = models.ForeignKey(
         EquipmentRequest,
         on_delete=models.CASCADE,
         related_name="thread_reads",
+        verbose_name="Заявка",
     )
-    last_read_at = models.DateTimeField(default=timezone.now)
+    last_read_at = models.DateTimeField(default=timezone.now, verbose_name="Прочитано")
 
     class Meta:
+        verbose_name = "Отметка прочтения треда заявки"
+        verbose_name_plural = "Отметки прочтения тредов заявок"
         constraints = [
             models.UniqueConstraint(
                 fields=["user", "equipment_request"],
@@ -190,43 +208,55 @@ class EquipmentRequestThreadRead(models.Model):
 
 
 class EquipmentRequestPhoto(models.Model):
-    request = models.ForeignKey(EquipmentRequest, on_delete=models.CASCADE, related_name="photos")
+    request = models.ForeignKey(
+        EquipmentRequest, on_delete=models.CASCADE, related_name="photos", verbose_name="Заявка"
+    )
     message = models.ForeignKey(
         EquipmentRequestMessage,
         on_delete=models.CASCADE,
         null=True,
         blank=True,
         related_name="attached_photos",
+        verbose_name="Сообщение",
     )
-    image = models.ImageField(upload_to="requests/")
-    caption = models.CharField(max_length=200, blank=True)
+    image = models.ImageField(upload_to="requests/", verbose_name="Изображение")
+    caption = models.CharField(max_length=200, blank=True, verbose_name="Подпись")
     uploaded_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
         related_name="uploaded_request_photos",
+        verbose_name="Кем загружено",
     )
-    uploaded_at = models.DateTimeField(default=timezone.now, db_index=True)
+    uploaded_at = models.DateTimeField(default=timezone.now, db_index=True, verbose_name="Загружено")
 
     class Meta:
         ordering = ["-uploaded_at", "-id"]
+        verbose_name = "Фото заявки"
+        verbose_name_plural = "Фото заявок"
 
     def __str__(self) -> str:
         return f"Request photo #{self.pk} for request #{self.request_id}"
 
 
 class MaterialUsage(SoftDeleteModel):
-    equipment = models.ForeignKey(Equipment, on_delete=models.SET_NULL, null=True, blank=True)
-    workplace = models.ForeignKey(Workplace, on_delete=models.SET_NULL, null=True, blank=True)
-    quantity = models.PositiveIntegerField(default=1)
-    used_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True)
-    used_at = models.DateTimeField(default=timezone.now)
-    related_request = models.ForeignKey(EquipmentRequest, on_delete=models.SET_NULL, null=True, blank=True)
-    note = models.TextField(blank=True)
+    equipment = models.ForeignKey(Equipment, on_delete=models.SET_NULL, null=True, blank=True, verbose_name="Оборудование")
+    workplace = models.ForeignKey(Workplace, on_delete=models.SET_NULL, null=True, blank=True, verbose_name="Рабочее место")
+    quantity = models.PositiveIntegerField(default=1, verbose_name="Количество")
+    used_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, verbose_name="Кем списано"
+    )
+    used_at = models.DateTimeField(default=timezone.now, verbose_name="Списано")
+    related_request = models.ForeignKey(
+        EquipmentRequest, on_delete=models.SET_NULL, null=True, blank=True, verbose_name="Связанная заявка"
+    )
+    note = models.TextField(blank=True, verbose_name="Примечание")
 
     class Meta:
         ordering = ["-used_at"]
+        verbose_name = "Списание материала"
+        verbose_name_plural = "Списания материалов"
 
     def __str__(self) -> str:
         return f"Usage #{self.pk}"
@@ -288,7 +318,7 @@ class PeriodicMaterialUsageSchedule(SoftDeleteModel):
         verbose_name="Кем создано",
     )
     last_run_at = models.DateTimeField(null=True, blank=True, verbose_name="Последний запуск")
-    created_at = models.DateTimeField(auto_now_add=True)
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="Создано")
 
     class Meta:
         ordering = ["next_run_on", "pk"]

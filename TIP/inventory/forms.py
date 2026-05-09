@@ -311,7 +311,7 @@ class UserPreferenceForm(forms.ModelForm):
         self.fields["hotkeys_enabled"].label = t("Включить горячие клавиши", "Enable hotkeys")
         self.fields["show_hotkey_legend"].label = t("Показывать подсказку по горячим клавишам", "Show hotkey legend")
         self.fields["default_request_status"] = forms.ChoiceField(
-            label=t("Статус заявок по умолчанию", "Default request status"),
+            label=t("Статус фильтра заявок по умолчанию", "Default request filter status"),
             required=False,
             choices=[
                 ("", t("Все заявки", "All requests")),
@@ -321,11 +321,19 @@ class UserPreferenceForm(forms.ModelForm):
             ],
             initial=self.instance.default_request_status if self.instance and self.instance.pk else "pending",
         )
+        self.fields["default_request_status"].help_text = t(
+            "Применяется только к фильтру в списке заявок и не влияет на статус новой заявки.",
+            "Used only as the list filter default and does not affect new request status.",
+        )
         self.fields["default_request_kind"] = forms.ChoiceField(
-            label=t("Тип заявок по умолчанию", "Default request type"),
+            label=t("Тип фильтра заявок по умолчанию", "Default request filter type"),
             required=False,
             choices=[("", t("Все типы заявок", "All request types")), ("sysadmin", t("Сисадмин", "Sysadmin")), ("builder", t("Стройка", "Builder"))],
             initial=self.instance.default_request_kind if self.instance and self.instance.pk else "",
+        )
+        self.fields["default_request_kind"].help_text = t(
+            "Применяется только к фильтру в списке заявок.",
+            "Used only as the list filter default.",
         )
         self.fields["default_usage_period_days"].label = t(
             "Период истории расхода материалов по умолчанию",
@@ -349,6 +357,7 @@ class UserPreferenceForm(forms.ModelForm):
         if not raw:
             return ""
         email = raw.lower()
+        _validate_corporate_email(email)
         user = getattr(self.instance, "user", None)
         if user and User.objects.filter(email__iexact=email).exclude(pk=user.pk).exists():
             raise ValidationError("Этот адрес уже привязан к другому пользователю.")

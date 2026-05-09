@@ -45,7 +45,7 @@ class TimerAndPreferenceViewTests(TestCase):
         response = self.client.post(
             reverse("user_preferences"),
             {
-                "email": "builder_prefs@example.com",
+                "email": "builder_prefs@mpt.ru",
                 "theme_variant": "contrast",
                 "preferred_language": "ru",
                 "page_size": 50,
@@ -61,7 +61,7 @@ class TimerAndPreferenceViewTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.user.refresh_from_db()
-        self.assertEqual(self.user.email, "builder_prefs@example.com")
+        self.assertEqual(self.user.email, "builder_prefs@mpt.ru")
         pref = UserPreference.objects.get(user=self.user)
         self.assertEqual(pref.theme_variant, "contrast")
         self.assertEqual(pref.preferred_language, "ru")
@@ -74,12 +74,12 @@ class TimerAndPreferenceViewTests(TestCase):
         self.assertTrue(pref.show_hotkey_legend)
 
     def test_preferences_rejects_duplicate_email(self):
-        User.objects.create_user(username="other_builder", email="taken@example.com", password="secret123")
+        User.objects.create_user(username="other_builder", email="taken@mpt.ru", password="secret123")
         self.client.force_login(self.user)
         response = self.client.post(
             reverse("user_preferences"),
             {
-                "email": "taken@example.com",
+                "email": "taken@mpt.ru",
                 "theme_variant": "default",
                 "preferred_language": "ru",
                 "page_size": 25,
@@ -91,6 +91,26 @@ class TimerAndPreferenceViewTests(TestCase):
         )
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "уже привязан")
+        self.user.refresh_from_db()
+        self.assertEqual((self.user.email or "").strip(), "")
+
+    def test_preferences_rejects_email_with_unallowed_domain(self):
+        self.client.force_login(self.user)
+        response = self.client.post(
+            reverse("user_preferences"),
+            {
+                "email": "builder@gmail.com",
+                "theme_variant": "default",
+                "preferred_language": "ru",
+                "page_size": 25,
+                "date_display_format": "compact",
+                "default_request_status": "",
+                "default_request_kind": "",
+                "default_usage_period_days": 30,
+            },
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Разрешены адреса только на доменах")
         self.user.refresh_from_db()
         self.assertEqual((self.user.email or "").strip(), "")
 

@@ -112,6 +112,8 @@ class EquipmentRequest(SoftDeleteModel):
         return f"Request #{self.pk} by {self.requester}"
 
     def clean(self) -> None:
+        if not self.equipment_id:
+            raise ValidationError({"equipment": "Выберите оборудование."})
         if self.quantity < 0:
             raise ValidationError("Количество не может быть отрицательным.")
         if self.quantity == 0:

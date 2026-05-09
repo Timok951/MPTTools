@@ -443,6 +443,7 @@ class EquipmentRequestForm(forms.ModelForm):
         self.fields["equipment"].queryset = equipment_qs.order_by("name", "inventory_number")
         self.fields["equipment"].label_from_instance = self._equipment_label
         self.fields["equipment"].empty_label = "Выберите оборудование"
+        self.fields["equipment"].required = False
         self.fields["quantity"].label = "Количество"
         self.fields["quantity"].help_text = "Укажите нужное количество для склада."
         self.fields["needed_by"].label = "Нужно до"
@@ -510,6 +511,8 @@ class EquipmentRequestForm(forms.ModelForm):
         equipment = cleaned.get("equipment")
         quantity = cleaned.get("quantity") or 0
         request_kind = (cleaned.get("request_kind") or "").strip()
+        if not equipment:
+            return cleaned
         if equipment:
             if request_kind == REQUEST_KIND_RESTOCK:
                 action = (cleaned.get("restock_non_consumable_action") or "").strip()

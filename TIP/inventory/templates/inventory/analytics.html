@@ -6,7 +6,7 @@
     <div class="actions" style="margin-bottom:10px;">
         <a class="secondary" href="{% url 'analytics_export_csv_zip' %}">{% ui_text "Таблицы CSV (ZIP)" "Tables CSV (ZIP)" %}</a>
         <a class="secondary" href="{% url 'analytics_print' %}" target="_blank" rel="noopener noreferrer">{% ui_text "Таблицы PDF (печать)" "Tables PDF (print)" %}</a>
-        <button type="button" class="secondary" id="downloadAnalyticsPdfBtn">{% ui_text "Скачать PDF (сводка и графики)" "Download PDF (summary and charts)" %}</button>
+        <button type="button" class="btn secondary" id="downloadAnalyticsPdfBtn">{% ui_text "Скачать PDF (сводка и графики)" "Download PDF (summary and charts)" %}</button>
     </div>
     <div id="analyticsExportKpi" class="analytics-pdf-capture">
     <h2>{% trans "Analytics" %}</h2>

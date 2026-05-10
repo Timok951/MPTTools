@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from typing import Any
+from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
@@ -11,6 +12,7 @@ from django.db import IntegrityError
 from django.db.models import ProtectedError
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
+from django.utils.http import url_has_allowed_host_and_scheme
 from django.utils.translation import gettext_lazy as _
 
 from assets.models import Equipment
@@ -162,6 +164,22 @@ def _redirect_to_portal_section_list(entity_slug: str):
     if target:
         return redirect(target[0], **target[1])
     return redirect("portal_list", entity=entity_slug)
+
+
+def _resolve_safe_return_url(request, default_url: str) -> str:
+    """
+    Resolve optional `next` URL for quick-add flow.
+    Adds a refresh marker so browser requests fresh page state.
+    """
+    next_url = (request.POST.get("next") or request.GET.get("next") or "").strip()
+    if not next_url:
+        return default_url
+    if not url_has_allowed_host_and_scheme(next_url, allowed_hosts={request.get_host()}, require_https=request.is_secure()):
+        return default_url
+    parsed = urlparse(next_url)
+    query_items = dict(parse_qsl(parsed.query, keep_blank_values=True))
+    query_items["_refresh"] = "1"
+    return urlunparse(parsed._replace(query=urlencode(query_items)))
 
 
 def _portal_common_context(user, current_slug: str | None = None):
@@ -338,7 +356,8 @@ def portal_create(request, entity: str):
                     form.save_m2m()
                 log_portal_action(request, "create", cfg.slug, obj=obj, meta={"pk": obj.pk})
                 messages.success(request, f"Запись добавлена: {cfg.title}.")
-                return _redirect_to_portal_section_list(cfg.slug)
+                default_redirect = _portal_section_list_url(cfg.slug)
+                return redirect(_resolve_safe_return_url(request, default_redirect))
             except ValidationError as exc:
                 form.add_error(None, "; ".join(exc.messages))
             except IntegrityError as exc:

@@ -593,10 +593,7 @@ class PortalUserForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
         for role_name in ROLE_ALIASES:
             Group.objects.get_or_create(name=role_name)
-        role_names = set(ROLE_ALIASES.keys())
-        for aliases in ROLE_ALIASES.values():
-            role_names.update(aliases)
-        self.fields["groups"].queryset = Group.objects.filter(name__in=sorted(role_names)).order_by("name")
+        self.fields["groups"].queryset = Group.objects.all().order_by("name")
 
     def clean(self):
         cleaned = super().clean()

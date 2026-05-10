@@ -2592,7 +2592,16 @@ def role_assignment(request):
     if not user_has_capability(request.user, "users_and_site_admin"):
         return forbidden(request, "Выдача ролей доступна только администратору.")
 
-    groups = {name: Group.objects.get_or_create(name=name)[0] for name in ROLE_DESCRIPTIONS}
+    # Keep built-in roles first, then expose any additional custom groups created in admin/portal.
+    for role_name in ROLE_DESCRIPTIONS:
+        Group.objects.get_or_create(name=role_name)
+    all_groups = list(Group.objects.all().order_by("name"))
+    groups = {group.name: group for group in all_groups}
+
+    roles_for_ui = dict(ROLE_DESCRIPTIONS)
+    for group in all_groups:
+        if group.name not in roles_for_ui:
+            roles_for_ui[group.name] = "Пользовательская роль (создана администратором)."
 
     if request.method == "POST":
         user_id = request.POST.get("user_id")
@@ -2633,6 +2642,9 @@ def role_assignment(request):
             if current_names & all_names:
                 resolved = canonical_name
                 break
+        if not resolved and current_names:
+            # For custom roles/groups show the first assigned group in UI.
+            resolved = sorted(current_names)[0]
         user_role_map[item.pk] = resolved
     if query:
         query_lower = query.lower()
@@ -2646,11 +2658,13 @@ def role_assignment(request):
         users = [item for item in users if not user_role_map.get(item.pk)]
     elif selected_role:
         users = [item for item in users if user_role_map.get(item.pk) == selected_role]
-    role_counts = {role_name: 0 for role_name in ROLE_DESCRIPTIONS}
+    role_counts = {role_name: 0 for role_name in roles_for_ui}
     role_capability_map = {
         role_name: [ROLE_CAPABILITY_LABELS[item] for item in spec.capabilities]
         for role_name, spec in ROLE_SPECS.items()
     }
+    for role_name in roles_for_ui:
+        role_capability_map.setdefault(role_name, [])
     without_role_count = 0
     for user_obj in User.objects.prefetch_related("groups").all():
         role_name = user_role_map.get(user_obj.pk, "")
@@ -2663,7 +2677,7 @@ def role_assignment(request):
         "inventory/role_assignment.html",
         {
             "users": users,
-            "roles": ROLE_DESCRIPTIONS,
+            "roles": roles_for_ui,
             "user_role_map": user_role_map,
             "filters": {"q": query, "role": selected_role},
             "role_counts": role_counts,

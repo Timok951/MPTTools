@@ -9,7 +9,14 @@
         {% if add_url and show_add_button %}
         <div class="inline-field-with-action">
             {{ field }}
-            <a class="quick-add-btn" href="{{ add_url }}" title="{{ add_title|default:'Добавить' }}" aria-label="{{ add_title|default:'Добавить' }}">+</a>
+            <a
+                class="quick-add-btn"
+                href="{{ add_url }}"
+                data-add-url="{{ add_url }}"
+                title="{{ add_title|default:'Добавить' }}"
+                aria-label="{{ add_title|default:'Добавить' }}"
+                onclick="(function(el){const u=new URL(el.dataset.addUrl, window.location.origin);u.searchParams.set('next', window.location.pathname + window.location.search);window.location.href=u.pathname + u.search + u.hash;return false;})(this);"
+            >+</a>
         </div>
         {% else %}
         {{ field }}

@@ -1,0 +1,260 @@
+@startuml use_case_mpt_tools
+' Многостраничная версия для diagrams.net: python docs/generate_use_case_drawio.py → docs/diagram_use_case_mpt_tools.drawio
+title Диаграмма прецедентов\nИС учёта оборудования MPT Tools (TIP)
+
+skinparam monochrome true
+skinparam shadowing false
+skinparam dpi 120
+skinparam packageStyle rectangle
+skinparam usecase {
+  FontSize 11
+}
+skinparam actor {
+  FontSize 11
+}
+
+left to right direction
+
+
+' ---------- Актёры и обобщение ролей ----------
+actor "Гость" as Guest
+
+actor "Пользователь\n(аутентифицированный)" as User
+actor "Техник" as Tech
+actor "Поддержка\nпервой линии" as L1
+actor "Старший техник" as Senior
+actor "Администратор" as Admin
+actor "Системный\nадминистратор" as SysAdmin
+actor "Внешняя система\n(REST-клиент)" as ExtAPI
+
+Guest <|-- User
+User <|-- Tech
+User <|-- L1
+User <|-- Admin
+Tech <|-- Senior
+Admin <|-- SysAdmin
+Senior <|-- SysAdmin
+
+rectangle "Система MPT Tools (TIP)" {
+
+  package "Вход и учётная запись" {
+      usecase "Зарегистрироваться" as UC_REG
+      usecase "Авторизоваться" as UC_LOGIN
+      usecase "Выйти из системы" as UC_LOGOUT
+      usecase "Запросить восстановление пароля" as UC_PW_REQ
+      usecase "Подтвердить сброс пароля по коду" as UC_PW_OK
+    }
+
+  package "Профиль и интерфейс" {
+      usecase "Изменить персональные настройки" as UC_PREF
+      usecase "Сменить язык интерфейса (i18n)" as UC_LANG
+      usecase "Просмотреть центр уведомлений" as UC_NOTIF
+      usecase "Обмен личными сообщениями" as UC_DM
+      usecase "Модерировать переписку (удаление сообщений)" as UC_DM_MOD
+      usecase "Просмотреть раздел «О проекте»" as UC_ABOUT
+      usecase "Просмотреть описание REST API" as UC_API_DOC
+    }
+
+  package "Оборудование и справочники" {
+    usecase "Просмотреть публичную карточку оборудования" as UC_EQ_PUB
+    usecase "Просмотреть каталог оборудования" as UC_EQ_LIST
+    usecase "Применить фильтры и сортировку каталога" as UC_EQ_FILT
+    usecase "Открыть карточку оборудования" as UC_EQ_CARD
+    usecase "Экспортировать каталог в CSV" as UC_EQ_CSV
+    usecase "Распечатать каталог / получить PDF списка" as UC_EQ_PRINT
+    usecase "Сформировать QR-код единицы оборудования" as UC_EQ_QR
+    usecase "Выделить количество в отдельную карточку «В ремонте»" as UC_EQ_SPLIT
+    usecase "Изменить статусы позиций на складе" as UC_EQ_STATUS
+    usecase "Просмотреть реестр рабочих мест" as UC_WP
+    usecase "Просмотреть реестр кабинетов" as UC_CAB
+    usecase "Выполнить глобальный поиск" as UC_SEARCH
+    usecase "Переключить отображение удалённых записей" as UC_DEL_TGL
+    usecase "Перейти к оформлению пополнения (заявка)" as UC_RESTOCK_HINT
+  }
+
+  package "Заявки" {
+    usecase "Создать заявку" as UC_RQ_NEW
+    usecase "Просмотреть журнал заявок" as UC_RQ_LIST
+    usecase "Открыть карточку заявки и переписку" as UC_RQ_VIEW
+    usecase "Изменить статус заявки" as UC_RQ_ST
+    usecase "Зафиксировать состояние оборудования по заявке" as UC_RQ_COND
+    usecase "Экспортировать заявки в CSV" as UC_RQ_CSV
+    usecase "Распечатать журнал заявок" as UC_RQ_PRINT
+  }
+
+  package "Выдачи и расходные материалы" {
+    usecase "Просмотреть журнал выдач" as UC_CH_LIST
+    usecase "Оформить выдачу оборудования" as UC_CH_OUT
+    usecase "Оформить возврат выдачи" as UC_CH_IN
+    usecase "Зарегистрировать расход материала" as UC_USE_NEW
+    usecase "Просмотреть журнал расхода" as UC_USE_LIST
+    usecase "Экспортировать журнал расхода в CSV" as UC_USE_CSV
+    usecase "Распечатать журнал расхода" as UC_USE_PRINT
+    usecase "Оформить корректировку остатков" as UC_ADJ
+  }
+
+  package "Аналитика и отчёты" {
+    usecase "Просмотреть дашборд аналитики" as UC_AN
+    usecase "Экспортировать аналитику (ZIP CSV)" as UC_AN_ZIP
+    usecase "Экспортировать графики аналитики (PDF)" as UC_AN_PDF
+    usecase "Распечатать страницу аналитики" as UC_AN_PRINT
+    usecase "Сформировать отчёты по номенклатуре" as UC_REP
+    usecase "Экспортировать отчёт по типу" as UC_REP_EX
+    usecase "Распечатать отчёты" as UC_REP_PR
+    usecase "Просмотреть хронологию изменений (аудит)" as UC_AUDIT
+  }
+
+  package "Администрирование и данные" {
+    usecase "Работать с порталом сущностей (списки)" as UC_PORT_LIST
+    usecase "Создать, изменить, удалить, восстановить сущность (портал)" as UC_PORT_CRUD
+    usecase "Просмотреть журнал действий портала" as UC_PORT_LOG
+    usecase "Запустить процедуру портала" as UC_PORT_RUN
+    usecase "Назначить пользователю группы и роли" as UC_ROLES
+    usecase "Просмотреть и пересчитать отчёт качества данных" as UC_QUALITY
+    usecase "Открыть инструменты данных (сведения о БД)" as UC_DATA_HUB
+    usecase "Выгрузить резервную копию JSON" as UC_BAK_JSON
+    usecase "Импортировать данные из JSON-резервной копии" as UC_IMP_JSON
+    usecase "Выгрузить дамп PostgreSQL" as UC_BAK_PG
+    usecase "Восстановить БД из дампа PostgreSQL" as UC_IMP_PG
+    usecase "Выгрузить файл SQLite (при SQLite)" as UC_BAK_SQLITE
+    usecase "Экспортировать журнал портала в CSV" as UC_LOG_CSV
+  }
+
+  package "API и интеграции" {
+    usecase "Управлять персональным API-токеном" as UC_TOKEN
+    usecase "Обмениваться данными через REST API" as UC_REST
+    usecase "Получить OpenAPI-схему" as UC_SCHEMA
+    usecase "Получить метрики Prometheus" as UC_PROM
+    usecase "Использовать панель администратора Django" as UC_DJANGO
+  }
+}
+
+' ---------- Гость ----------
+Guest --> UC_REG
+Guest --> UC_LOGIN
+Guest --> UC_PW_REQ
+Guest --> UC_EQ_PUB
+
+' ---------- Пользователь (базовые сценарии после входа) ----------
+User --> UC_LOGOUT
+User --> UC_PREF
+User --> UC_LANG
+User --> UC_NOTIF
+User --> UC_DM
+User --> UC_ABOUT
+User --> UC_API_DOC
+User --> UC_PW_OK
+
+' ---------- Техник ----------
+Tech --> UC_EQ_LIST
+Tech --> UC_EQ_FILT
+Tech --> UC_EQ_CARD
+Tech --> UC_EQ_CSV
+Tech --> UC_EQ_PRINT
+Tech --> UC_EQ_QR
+Tech --> UC_WP
+Tech --> UC_CAB
+Tech --> UC_SEARCH
+Tech --> UC_DEL_TGL
+Tech --> UC_RESTOCK_HINT
+Tech --> UC_RQ_NEW
+Tech --> UC_RQ_LIST
+Tech --> UC_RQ_VIEW
+Tech --> UC_RQ_CSV
+Tech --> UC_RQ_PRINT
+
+' ---------- Поддержка первой линии ----------
+L1 --> UC_RQ_ST
+L1 --> UC_RQ_COND
+L1 --> UC_AN
+L1 --> UC_AN_ZIP
+L1 --> UC_AN_PDF
+L1 --> UC_AN_PRINT
+
+' ---------- Старший техник ----------
+Senior --> UC_EQ_SPLIT
+Senior --> UC_EQ_STATUS
+Senior --> UC_CH_LIST
+Senior --> UC_CH_OUT
+Senior --> UC_CH_IN
+Senior --> UC_USE_NEW
+Senior --> UC_USE_LIST
+Senior --> UC_USE_CSV
+Senior --> UC_USE_PRINT
+Senior --> UC_ADJ
+Senior --> UC_REP
+Senior --> UC_REP_EX
+Senior --> UC_REP_PR
+
+' ---------- Администратор ----------
+Admin --> UC_DM_MOD
+Admin --> UC_PORT_LIST
+Admin --> UC_PORT_CRUD
+Admin --> UC_PORT_LOG
+Admin --> UC_PORT_RUN
+Admin --> UC_ROLES
+Admin --> UC_QUALITY
+Admin --> UC_DATA_HUB
+Admin --> UC_BAK_JSON
+Admin --> UC_IMP_JSON
+Admin --> UC_BAK_PG
+Admin --> UC_IMP_PG
+Admin --> UC_BAK_SQLITE
+Admin --> UC_LOG_CSV
+Admin --> UC_AUDIT
+Admin --> UC_AN
+Admin --> UC_AN_ZIP
+Admin --> UC_AN_PDF
+Admin --> UC_AN_PRINT
+Admin --> UC_RQ_LIST
+Admin --> UC_TOKEN
+
+' ---------- Системный администратор ----------
+SysAdmin --> UC_REST
+SysAdmin --> UC_SCHEMA
+SysAdmin --> UC_PROM
+SysAdmin --> UC_DJANGO
+SysAdmin --> UC_TOKEN
+
+' ---------- Внешний клиент ----------
+ExtAPI --> UC_REST
+ExtAPI --> UC_SCHEMA
+ExtAPI ..> UC_PROM : <<optional>>
+
+' ---------- Отношения include / extend ----------
+UC_PW_OK .> UC_PW_REQ : <<extend>>
+UC_EQ_FILT .> UC_EQ_LIST : <<extend>>
+UC_LANG .> UC_PREF : <<extend>>
+UC_AN_ZIP .> UC_AN : <<extend>>
+UC_AN_PDF .> UC_AN : <<extend>>
+UC_AN_PRINT .> UC_AN : <<extend>>
+UC_PORT_CRUD .> UC_PORT_LIST : <<extend>>
+UC_DM_MOD .> UC_DM : <<extend>>
+
+note right of User
+  Детальные ограничения по ролям см. в TIP/inventory/authz.py
+  (группы Django и capabilities).
+  Наследники «Пользователя» участвуют во всех
+  его прецедентах; для компактности часть общих
+  связей показана только у выбранных актёров.
+end note
+
+note bottom of L1
+  «Поддержка» дополнительно участвует во всех
+  прецедентах «Техника», связанных с каталогом,
+  справочниками и заявками (просмотр и оформление).
+end note
+
+note bottom of Senior
+  «Старший техник» дополнительно участвует
+  во всех прецедентах «Поддержки» и «Техника»
+  в части заявок и аналитики.
+end note
+
+note bottom of SysAdmin
+  Обобщает полномочия «Администратора»
+  и «Старшего техника»; отдельные линии
+  к их прецедентам не дублируются.
+end note
+
+@enduml

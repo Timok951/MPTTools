@@ -492,7 +492,7 @@ def _request_history_filtered_queryset(request):
     requests_manager = EquipmentRequest.all_objects if show_deleted else EquipmentRequest.objects
     requests_qs = requests_manager.select_related(
         "requester", "equipment", "workplace", "cabinet", "processed_by"
-    ).order_by("-requested_at")
+    ).order_by("-requested_at", "-id")
     view_mode = request.GET.get("view", "").strip()
     # Обработчики по умолчанию видят очередь (как бывшая отдельная «Обработка заявок»);
     # полный список — чип «Все заявки» с view=all.
@@ -712,6 +712,59 @@ def _pdf_table_response(*, title: str, headers: list[str], rows: list[list], fil
     )
 
     doc.build([Paragraph(title, title_style), Spacer(1, 8), table, Spacer(1, 8), Paragraph("Сформировано системой MPT Tools.", body_style)])
+    pdf_bytes = buffer.getvalue()
+    response = HttpResponse(pdf_bytes, content_type="application/pdf")
+    response["Content-Disposition"] = f'attachment; filename="{filename}"'
+    return response
+
+
+def _pdf_multi_tables_response(*, title: str, sections: list[tuple[str, list[str], list[list]]], filename: str) -> HttpResponse:
+    """Build one PDF with multiple titled tables."""
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=landscape(A4),
+        leftMargin=20,
+        rightMargin=20,
+        topMargin=20,
+        bottomMargin=20,
+    )
+    font_name = _reportlab_unicode_font_name()
+    styles = getSampleStyleSheet()
+    title_style = styles["Heading3"].clone("pdf_multi_title")
+    title_style.fontName = font_name
+    subtitle_style = styles["Heading4"].clone("pdf_multi_subtitle")
+    subtitle_style.fontName = font_name
+    body_style = styles["BodyText"].clone("pdf_multi_body")
+    body_style.fontName = font_name
+
+    elements: list = [Paragraph(title, title_style), Spacer(1, 8)]
+    for idx, (section_title, headers, rows) in enumerate(sections):
+        safe_rows = [[str(cell) if cell is not None else "" for cell in row] for row in rows]
+        table_data = [headers, *safe_rows]
+        table = Table(table_data, repeatRows=1)
+        table.setStyle(
+            TableStyle(
+                [
+                    ("FONTNAME", (0, 0), (-1, -1), font_name),
+                    ("FONTSIZE", (0, 0), (-1, -1), 9),
+                    ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#eef2ff")),
+                    ("TEXTCOLOR", (0, 0), (-1, 0), colors.HexColor("#1f2a44")),
+                    ("GRID", (0, 0), (-1, -1), 0.4, colors.HexColor("#cbd5e1")),
+                    ("ALIGN", (0, 0), (-1, 0), "CENTER"),
+                    ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                ]
+            )
+        )
+        elements.append(Paragraph(section_title, subtitle_style))
+        elements.append(Spacer(1, 4))
+        elements.append(table)
+        if idx != len(sections) - 1:
+            elements.append(Spacer(1, 10))
+
+    elements.append(Spacer(1, 8))
+    elements.append(Paragraph("Сформировано системой MPT Tools.", body_style))
+    doc.build(elements)
     pdf_bytes = buffer.getvalue()
     response = HttpResponse(pdf_bytes, content_type="application/pdf")
     response["Content-Disposition"] = f'attachment; filename="{filename}"'
@@ -1699,14 +1752,36 @@ def reports_print(request):
         return forbidden(request, "Отчёты доступны только администратору и складу.")
     ctx = _reports_page_context(request)
     if request.GET.get("download") == "1":
-        rows = [
+        workplace_rows = [
+            [
+                row["workplace__name"] or "-",
+                row["items"] or 0,
+                row["total"] or 0,
+                row["available"] or 0,
+            ]
+            for row in ctx["workplace_equipment_report"]
+        ]
+        materials_rows = [
             [row["name"], row["inventory_number"], row["total"], row["available"], row["used"]]
             for row in ctx["materials_report"]
         ]
-        return _pdf_table_response(
-            title="Отчёт по материалам",
-            headers=["Материал", "Серийный номер", "Всего", "Доступно", "Использовано"],
-            rows=rows,
+        period_from = (ctx.get("filters", {}).get("from") or "").strip()
+        period_to = (ctx.get("filters", {}).get("to") or "").strip()
+        period_label = f"Период: {period_from or '—'} — {period_to or '—'}" if (period_from or period_to) else "Период: все даты"
+        return _pdf_multi_tables_response(
+            title=f"Сводка отчётов ({period_label})",
+            sections=[
+                (
+                    "Оборудование по рабочим местам",
+                    ["Рабочее место", "Позиции", "Всего", "Доступно"],
+                    workplace_rows,
+                ),
+                (
+                    "Расходуемые материалы",
+                    ["Материал", "Серийный номер", "Всего", "Доступно", "Использовано"],
+                    materials_rows,
+                ),
+            ],
             filename="materials-report.pdf",
         )
     return render(request, "inventory/reports_print.html", ctx)
